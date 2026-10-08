@@ -1,0 +1,1113 @@
+{
+  "name": "citibike smart dock assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "test details:\n\nchat: i am at 135w 15th street nyc. where can i park my citibike\n\nsiri webhook: POST /webhook/citibike-siri\narrival webhook: POST /webhook/citibike-arrival",
+        "height": 240,
+        "width": 416
+      },
+      "id": "905cda26-9b48-4dbf-ab61-8bee7b4045ee",
+      "name": "start here",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "id": "1deee07e-5dc7-40ff-919a-c75baed4f94b",
+      "name": "chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -528,
+        320
+      ],
+      "webhookId": "43605c53-41cd-43fc-a68d-aa5f7205d1f1"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $json;\nreturn [{\n  json: {\n    userInput: String(input.chatInput ?? '').trim(),\n    sessionId: String(input.sessionId ?? 'chat-session'),\n    outputMode: 'chat',\n    chatId: ''\n  }\n}];\n"
+      },
+      "id": "efc81243-383b-494d-bf5b-d2a6bcfd195c",
+      "name": "normalize chat input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nif (!$json.userInput) {\n  return [{\n    json: {\n      ...$json,\n      userInput: 'help me use the citibike assistant'\n    }\n  }];\n}\nreturn [{json:$json}];\n"
+      },
+      "id": "ec61be89-f745-4c68-ab6e-f06c67256c3f",
+      "name": "input envelope",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('input envelope').first().json.userInput }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "you are only the request-understanding layer for a citibike assistant.\n\nread the newest user request together with conversation memory and turn it into the structured fields requested by the output parser.\n\nintents:\nstation = user wants live information about one specific citibike station\nplace = user wants good return stations near an address, landmark, intersection, school, office, or neighborhood\ngps = user gave current latitude/longitude and a destination, or shared gps after already stating a destination\nnetwork = user asks a broad question about the citibike system overall\nremember = user tells you that a named place/alias like school, home, work, gym, etc maps to a specific usual citibike station\nhelp = you genuinely need clarification or theyre asking what the assistant can do\n\nrules:\n- use conversation memory to resolve things like \"my school dock\" after the user previously told you what school means.\n- if the user says \"my usual school dock is e 17 st & broadway\", intent is remember, alias is school, rememberedStation is e 17 st & broadway.\n- if the user later says \"check my school dock\", intent is station and stationQuery should be the actual remembered station name, not the words \"my school dock\".\n- if the user asks \"find somewhere to dock near stern\", intent is place and placeQuery should be a clear nyc geocoding query. for obvious shorthand you can expand it, for example stern -> nyu stern school of business, 44 west 4th street, new york.\n- if the user gives coordinates plus a destination, intent is gps. put the coordinates in currentLat/currentLon and destination in placeQuery.\n- if a gps location message says to use the previous destination, use memory to fill placeQuery. if no destination exists in memory, use help and put a short question in clarification.\n- if they ask whether a named station is full, intent is station.\n- if they ask about total bikes, full stations, or the network overall, intent is network.\n- usualStation is only for a destination/place/gps request when a known usual station is relevant. otherwise use an empty string.\n- use empty strings for unused text fields and 0 for unused coordinates.\n- do not answer the user here. only classify and extract.\n- messages from siri may end with \"(my current gps coordinates are LAT, LON)\". that is the riders live location, not a request by itself. whenever it is present, copy it into currentLat/currentLon, whatever the intent.\n- if they want a dock near me / near here / nearby / around here and coordinates are present, intent is gps and placeQuery is an empty string.\n- if they name a destination and coordinates are present, intent is gps and placeQuery is that destination.\n- placeQuery is sent to an address geocoder (openstreetmap) that only matches street addresses and official place names, never descriptions. ALWAYS rewrite placeQuery as a plain street address with the borough when you know it, otherwise the official name. examples: \"jp morgan headquarters\" -> \"270 park avenue, manhattan\". \"the empire state building\" -> \"350 5th avenue, manhattan\". \"my gym on 14th and 8th\" -> \"west 14th street and 8th avenue, manhattan\". \"barclays center\" -> \"620 atlantic avenue, brooklyn\". never include words like headquarters, office, building, near, or the."
+        }
+      },
+      "id": "e4862232-4fe4-42d0-9c68-aae4414af2c0",
+      "name": "understand request",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        896,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('input envelope').first().json.sessionId }}",
+        "contextWindowLength": 20
+      },
+      "id": "49bd783d-e128-49d2-95c5-9d29b893bc01",
+      "name": "conversation memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"intent\": {\"type\": \"string\", \"enum\": [\"station\", \"place\", \"gps\", \"network\", \"remember\", \"help\"]}, \"stationQuery\": {\"type\": \"string\"}, \"placeQuery\": {\"type\": \"string\"}, \"currentLat\": {\"type\": \"number\"}, \"currentLon\": {\"type\": \"number\"}, \"usualStation\": {\"type\": \"string\"}, \"alias\": {\"type\": \"string\"}, \"rememberedStation\": {\"type\": \"string\"}, \"clarification\": {\"type\": \"string\"}}, \"required\": [\"intent\", \"stationQuery\", \"placeQuery\", \"currentLat\", \"currentLon\", \"usualStation\", \"alias\", \"rememberedStation\", \"clarification\"], \"additionalProperties\": false}"
+      },
+      "id": "f2e05fc5-135c-41c7-bdd8-77871ea9a5d4",
+      "name": "request schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst env = $('input envelope').first().json;\nconst parsed = $json.output ?? {};\nreturn [{\n  json: {\n    ...env,\n    intent: String(parsed.intent ?? 'help'),\n    stationQuery: String(parsed.stationQuery ?? ''),\n    placeQuery: String(parsed.placeQuery ?? ''),\n    currentLat: Number(parsed.currentLat ?? 0),\n    currentLon: Number(parsed.currentLon ?? 0),\n    usualStation: String(parsed.usualStation ?? ''),\n    alias: String(parsed.alias ?? ''),\n    rememberedStation: String(parsed.rememberedStation ?? ''),\n    clarification: String(parsed.clarification ?? '')\n  }\n}];\n"
+      },
+      "id": "51f0fea5-c27b-4323-be78-5f4d2ee8b8d3",
+      "name": "request fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ace4184f-16be-4281-b8ff-10d763356535",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "station",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "station"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "88be373c-7b7b-4e47-b7d6-77163cd7e6ab",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "place",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "place"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f56e62bd-4861-4792-828f-6abaea7aefe9",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "gps",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "gps"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "50936133-6521-4555-a4ce-eaa9b155d50f",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "network",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "network"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8df4dea1-6dce-4733-a0e9-c2a39c3ea586",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "remember",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "remember"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b0e1eef5-e98e-4f95-8541-978c80b85436",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "help"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5ff8a8f2-6dc0-4c3e-92c0-d5dd0f5cce33",
+      "name": "what does the user want",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1440,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
+        "options": {}
+      },
+      "id": "a6f93975-9128-49df-8ab5-e2283be8e9b7",
+      "name": "station information",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1696,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+        "options": {}
+      },
+      "id": "efd6d38f-842b-420b-a938-1f7e254a157a",
+      "name": "station live status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1936,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst req = $('request fields').first().json;\nconst info = $('station information').first().json;\nconst status = $('station live status').first().json;\nconst query = String(req.stationQuery ?? '').trim();\n\nfunction norm(s) {\n  return String(s ?? '').toLowerCase()\n    .replace(/&/g,' and ')\n    .replace(/\\bstreet\\b/g,' st ')\n    .replace(/\\bavenue\\b/g,' ave ')\n    .replace(/\\broad\\b/g,' rd ')\n    .replace(/\\bboulevard\\b/g,' blvd ')\n    .replace(/[^a-z0-9]+/g,' ')\n    .replace(/\\s+/g,' ').trim();\n}\nfunction score(name, q, id) {\n  if (String(q) === String(id)) return 100000;\n  const a = norm(name), b = norm(q);\n  if (!a || !b) return -999;\n  if (a === b) return 10000;\n  let s = 0;\n  if (a.includes(b) || b.includes(a)) s += 2000;\n  const A = new Set(a.split(' ')), B = new Set(b.split(' '));\n  let overlap = 0;\n  for (const t of B) if (A.has(t)) overlap++;\n  s += (overlap / Math.max(B.size,1)) * 1200;\n  s -= Math.abs(a.length-b.length);\n  return s;\n}\nfunction meters(lat1,lon1,lat2,lon2) {\n  const R=6371000, r=x=>x*Math.PI/180;\n  const dLat=r(lat2-lat1), dLon=r(lon2-lon1);\n  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;\n  return 2*R*Math.asin(Math.sqrt(a));\n}\n\nconst infos = info?.data?.stations ?? [];\nconst statuses = status?.data?.stations ?? [];\nconst byId = new Map(statuses.map(s=>[String(s.station_id),s]));\n\nconst ranked = infos.map(s=>({s,score:score(s.name,query,s.station_id)})).sort((a,b)=>b.score-a.score);\n\nif (!ranked.length || ranked[0].score < 250) {\n  const matches = ranked.slice(0,5).map(x=>x.s.name);\n  const text = `i couldnt confidently match \"${query}\" to a citibike station. closest matches: ${matches.join(', ')}.`;\n  return [{json:{text,spokenText:`couldnt find a station called ${query}.`}}];\n}\n\nconst i = ranked[0].s;\nconst live = byId.get(String(i.station_id)) ?? {};\nconst target = {\n  stationId:String(i.station_id),\n  name:String(i.name),\n  lat:Number(i.lat),\n  lon:Number(i.lon),\n  openDocks:Number(live.num_docks_available ?? 0),\n  bikesAvailable:Number(live.num_vehicles_available ?? live.num_bikes_available ?? 0),\n  isReturning:live.is_returning === undefined ? true : Boolean(live.is_returning),\n  isInstalled:live.is_installed === undefined ? true : Boolean(live.is_installed)\n};\nconst canReturn = s => s && s.isInstalled && s.isReturning && s.openDocks >= 2;\n\nconst alternatives = infos.map(s=>{\n  const l=byId.get(String(s.station_id)) ?? {};\n  return {\n    stationId:String(s.station_id),\n    name:String(s.name),\n    lat:Number(s.lat),\n    lon:Number(s.lon),\n    openDocks:Number(l.num_docks_available ?? 0),\n    bikesAvailable:Number(l.num_vehicles_available ?? l.num_bikes_available ?? 0),\n    isReturning:l.is_returning === undefined ? true : Boolean(l.is_returning),\n    isInstalled:l.is_installed === undefined ? true : Boolean(l.is_installed),\n    distanceMeters:Math.round(meters(target.lat,target.lon,Number(s.lat),Number(s.lon)))\n  };\n}).filter(s=>s.stationId!==target.stationId && s.distanceMeters<=1200 && canReturn(s))\n  .sort((a,b)=>a.distanceMeters-b.distanceMeters || b.openDocks-a.openDocks);\n\nlet selected = target;\nlet text, spokenText;\nconst away = m => m < 75 ? 'right there' : `${Math.round(m/50)*50} meters away`;\nconst problem = s => !s.isInstalled || !s.isReturning ? 'is closed' : s.openDocks === 0 ? 'is full' : s.openDocks === 1 ? 'is almost full' : 'is too far';\n\nif (canReturn(target)) {\n  text = `${target.name} has ${target.openDocks} open docks right now, so youre good to return there. it also has ${target.bikesAvailable} bikes available.`;\n  spokenText = `${target.name} has ${target.openDocks} docks open.`;\n} else if (alternatives.length) {\n  selected = alternatives[0];\n  const url = `https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}&travelmode=bicycling`;\n  text = `${target.name} only has ${target.openDocks} open docks right now or isnt accepting returns. head to ${selected.name} instead \u2014 it has ${selected.openDocks} open docks and is about ${selected.distanceMeters} meters away.\\n\\ndirections: ${url}`;\n  spokenText = `${target.name} ${problem(target)}. go to ${selected.name}, ${selected.openDocks} docks, ${away(selected.distanceMeters)}.`;\n} else {\n  text = `${target.name} only has ${target.openDocks} open docks right now or isnt accepting returns, and i couldnt find another station within about 1.2 kilometers with at least 2 open docks.`;\n  spokenText = `${target.name} ${problem(target)}, and nothing nearby has space.`;\n}\n\nreturn [{json:{\n  text,\n  spokenText,\n  selectedStation:selected,\n  alternatives:alternatives.slice(0,4),\n  lastUpdated:status?.last_updated ?? null\n}}];\n"
+      },
+      "id": "abba4817-d28e-4497-89e8-9bc966620a2f",
+      "name": "check the station",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ ($('request fields').first().json.placeQuery || 'Manhattan') + ', New York, NY' }}"
+            },
+            {
+              "name": "format",
+              "value": "jsonv2"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "us"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "citibike-course-agent/1.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6b629f3c-ed39-43c4-ba24-600e783f715b",
+      "name": "geocode destination",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1696,
+        480
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
+        "options": {}
+      },
+      "id": "9e6f9701-9347-4ec8-9809-90e4d3ac9743",
+      "name": "nearby station information",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1936,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+        "options": {}
+      },
+      "id": "9ae9c9be-65da-4a9a-89b3-40368ba75dc5",
+      "name": "nearby station status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2176,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst req = $('request fields').first().json;\nconst geoRaw = $('geocode destination').first().json;\nconst info = $('nearby station information').first().json;\nconst status = $('nearby station status').first().json;\n\nlet geo = geoRaw;\nif (Array.isArray(geoRaw)) geo = geoRaw[0];\n\n// \"find me a dock near me\" from siri: no destination, so search around the riders gps instead\nconst hasGps = req.currentLat !== 0 && req.currentLon !== 0;\nconst nearMe = !String(req.placeQuery ?? '').trim() && hasGps;\nconst destLat = nearMe ? req.currentLat : Number(geo?.lat);\nconst destLon = nearMe ? req.currentLon : Number(geo?.lon);\nconst placeLabel = nearMe ? 'you' : req.placeQuery;\n\nif (!Number.isFinite(destLat) || !Number.isFinite(destLon)) {\n  const text = `i couldnt confidently find \"${req.placeQuery}\" on the map. try giving me a street address, intersection, or a more specific landmark.`;\n  return [{json:{text,spokenText:`couldnt find ${req.placeQuery} on the map.`}}];\n}\n\nfunction meters(lat1,lon1,lat2,lon2) {\n  const R=6371000, r=x=>x*Math.PI/180;\n  const dLat=r(lat2-lat1), dLon=r(lon2-lon1);\n  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;\n  return 2*R*Math.asin(Math.sqrt(a));\n}\nfunction norm(s) {\n  return String(s ?? '').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\\s+/g,' ').trim();\n}\nfunction matchScore(name,q) {\n  const a=norm(name), b=norm(q);\n  if(!a||!b) return -999;\n  if(a===b) return 10000;\n  let s=0;\n  if(a.includes(b)||b.includes(a)) s+=1800;\n  const A=new Set(a.split(' ')), B=new Set(b.split(' '));\n  let overlap=0;\n  for(const t of B) if(A.has(t)) overlap++;\n  s+=(overlap/Math.max(B.size,1))*1000;\n  return s-Math.abs(a.length-b.length);\n}\n\nconst statuses = status?.data?.stations ?? [];\nconst byId = new Map(statuses.map(s=>[String(s.station_id),s]));\n\nconst stations = (info?.data?.stations ?? []).map(s=>{\n  const l=byId.get(String(s.station_id)) ?? {};\n  const lat=Number(s.lat), lon=Number(s.lon);\n  return {\n    stationId:String(s.station_id),\n    name:String(s.name),\n    lat,lon,\n    openDocks:Number(l.num_docks_available ?? 0),\n    bikesAvailable:Number(l.num_vehicles_available ?? l.num_bikes_available ?? 0),\n    isReturning:l.is_returning === undefined ? true : Boolean(l.is_returning),\n    isInstalled:l.is_installed === undefined ? true : Boolean(l.is_installed),\n    distanceFromDestinationMeters:Math.round(meters(destLat,destLon,lat,lon))\n  };\n}).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon));\n\nconst canReturn=s=>s&&s.isInstalled&&s.isReturning&&s.openDocks>=2;\nconst problem = s => !s.isInstalled || !s.isReturning ? 'is closed' : s.openDocks === 0 ? 'is full' : s.openDocks === 1 ? 'is almost full' : 'is too far';\nconst nearby=stations.filter(s=>s.distanceFromDestinationMeters<=1200)\n  .sort((a,b)=>a.distanceFromDestinationMeters-b.distanceFromDestinationMeters || b.openDocks-a.openDocks);\nconst good=nearby.filter(canReturn);\n\nlet usual=null;\nif(req.usualStation){\n  const ranked=stations.map(s=>({s,score:matchScore(s.name,req.usualStation)})).sort((a,b)=>b.score-a.score);\n  if(ranked.length&&ranked[0].score>=250) usual=ranked[0].s;\n}\n\nlet selected=null;\nlet reason='nearest good dock';\nif(usual && usual.distanceFromDestinationMeters<=1200 && canReturn(usual)){\n  selected=usual;\n  reason='usual dock is good';\n}else if(good.length){\n  selected=good[0];\n  reason=usual ? 'usual dock needs a reroute' : 'best nearby dock';\n}\n\nlet prefix='';\nif(req.intent==='gps' && hasGps && !nearMe){\n  const distance=Math.round(meters(req.currentLat,req.currentLon,destLat,destLon));\n  prefix=`youre about ${distance} meters from ${req.placeQuery}. `;\n}\n\nif(!selected){\n  const text=`${prefix}i couldnt find a station within about 1.2 kilometers of ${placeLabel} that currently has at least 2 open docks.`;\n  return [{json:{text,spokenText:`no docks with space near ${placeLabel}.`,matchedPlace:nearMe ? 'current location' : (geo?.display_name ?? req.placeQuery)}}];\n}\n\nconst url=`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}&travelmode=bicycling`;\nconst fromWhere = nearMe ? 'you' : 'the destination';\n\nlet text, spokenText;\nconst d = selected.distanceFromDestinationMeters;\nconst where = nearMe ? (d < 75 ? 'right there' : `${Math.round(d/50)*50} meters away`)\n  : (d < 75 ? `right at ${req.placeQuery}` : `${Math.round(d/50)*50} meters from ${req.placeQuery}`);\nif(reason==='usual dock is good'){\n  text=`${prefix}your usual dock at ${selected.name} has ${selected.openDocks} open docks right now, so id keep using it.\\n\\ndirections: ${url}`;\n  spokenText=`your usual dock has ${selected.openDocks} docks open.`;\n}else if(reason==='usual dock needs a reroute'){\n  text=`${prefix}your usual dock isnt the best return option right now. head to ${selected.name} instead \u2014 it has ${selected.openDocks} open docks and is about ${selected.distanceFromDestinationMeters} meters from ${placeLabel}.\\n\\ndirections: ${url}`;\n  spokenText=`your usual dock ${problem(usual)}. go to ${selected.name}, ${selected.openDocks} docks, ${where}.`;\n}else{\n  text=`${prefix}${selected.name} looks like the best return option near ${placeLabel}. it has ${selected.openDocks} open docks and is about ${selected.distanceFromDestinationMeters} meters from ${fromWhere}.\\n\\ndirections: ${url}`;\n  spokenText=`${selected.name} has ${selected.openDocks} docks open, ${where}.`;\n}\n\nreturn [{json:{\n  text,\n  spokenText,\n  matchedPlace:nearMe ? 'current location' : (geo?.display_name ?? req.placeQuery),\n  selectedStation:selected,\n  alternatives:good.filter(s=>s.stationId!==selected.stationId).slice(0,4),\n  lastUpdated:status?.last_updated ?? null\n}}];\n"
+      },
+      "id": "d29b7b26-eb88-4b34-839f-d48c92b248ba",
+      "name": "pick a dock near the destination",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2416,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+        "options": {}
+      },
+      "id": "d2ac25a0-9f28-4de3-86c0-a24c20e686d0",
+      "name": "network live status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1696,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data=$json;\nconst stations=data?.data?.stations ?? [];\nlet bikes=0,docks=0,full=0,oneDock=0,accepting=0,active=0;\n\nfor(const s of stations){\n  const b=Number(s.num_vehicles_available ?? s.num_bikes_available ?? 0);\n  const d=Number(s.num_docks_available ?? 0);\n  const installed=s.is_installed===undefined ? true : Boolean(s.is_installed);\n  const returning=s.is_returning===undefined ? true : Boolean(s.is_returning);\n  bikes+=Number.isFinite(b)?b:0;\n  docks+=Number.isFinite(d)?d:0;\n  if(installed) active++;\n  if(installed&&returning) accepting++;\n  if(installed&&returning&&d===0) full++;\n  if(installed&&returning&&d===1) oneDock++;\n}\nconst text=`right now the live feed shows ${bikes.toLocaleString()} bikes available and ${docks.toLocaleString()} open docks across ${active.toLocaleString()} active stations. ${full.toLocaleString()} stations are full and ${oneDock.toLocaleString()} more only have 1 open dock.`;\nconst spokenText=`${bikes.toLocaleString()} bikes and ${docks.toLocaleString()} open docks citywide. ${full.toLocaleString()} stations are full.`;\nreturn [{json:{text,spokenText,lastUpdated:data?.last_updated ?? null}}];\n"
+      },
+      "id": "7310822f-a7c0-4dc5-b475-8affd5d79bd0",
+      "name": "summarize the network",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst req=$json;\nlet text;\nif(req.alias && req.rememberedStation){\n  text=`got it \u2014 ill treat ${req.rememberedStation} as your ${req.alias} dock in this conversation.`;\n}else if(req.rememberedStation){\n  text=`got it \u2014 ill remember ${req.rememberedStation} as one of your usual docks in this conversation.`;\n}else{\n  text=`got it. if you tell me the exact citibike station name and what you call it, like \"my school dock is e 17 st & broadway\", ill remember it for this chat.`;\n}\nconst spokenText = req.rememberedStation\n  ? (req.alias ? `got it, ${req.rememberedStation} is your ${req.alias} dock.` : `got it, ill remember ${req.rememberedStation}.`)\n  : text;\nreturn [{json:{text,spokenText}}];\n"
+      },
+      "id": "1de21aa4-486c-4705-9361-49ff737bcff6",
+      "name": "remember response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst req=$json;\nconst text=req.clarification\n  ? req.clarification\n  : `you can ask me to check a specific citibike station, find a good return station near a place, remember what you call a usual dock, or use gps coordinates. for example: \"find me a dock near nyu stern\" or \"gps 40.7295, -73.9965 going to union square\".`;\nconst spokenText=req.clarification\n  ? req.clarification\n  : `you can ask if a station has room, or for a dock near a place or near you. for example, find me a dock near union square.`;\nreturn [{json:{text,spokenText}}];\n"
+      },
+      "id": "54762f1f-3f6d-4d5f-a378-463d87a372d5",
+      "name": "help response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        1136
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst env=$('input envelope').first().json;\nconst text=String($json.text ?? 'i couldnt build a response for that.');\nconst spokenText=String($json.spokenText ?? text);\nreturn [{\n  json:{\n    ...$json,\n    text,\n    spokenText,\n    outputMode:env.outputMode,\n    chatId:env.chatId,\n    sessionId:env.sessionId\n  }\n}];\n"
+      },
+      "id": "f2f557af-92ff-4c84-bcbc-54ebd6157082",
+      "name": "final response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "03d4c0ac-63f2-4b7f-bd50-8278eacdf9ab",
+                    "leftValue": "={{ $json.outputMode }}",
+                    "rightValue": "chat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "chat"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "dc511afb-48ce-4b2b-86bf-fdb8fa2759a2",
+                    "leftValue": "={{ $json.outputMode }}",
+                    "rightValue": "siri",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "siri"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c4905115-ba17-4976-84dc-d0886102a1f5",
+      "name": "where should the answer go",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2944,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nreturn [{json:{output:String($json.text ?? '')}}];\n"
+      },
+      "id": "475ca549-8b3a-4500-99e1-16862f45fabd",
+      "name": "return chat answer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "content": "general idea: \n\nThe idea for our project came from a pretty simple problem our group kept running into. The two Evans would ride Citi Bikes around campus pretty often, and when we got to where we were going, a lot of the nearby docks would already be full. That made us think about building something that could check live Citi Bike availability, remember the docks we normally use, and quickly redirect us to another nearby station if needed.\nSo far, we have built an n8n-based chat workflow that can understand normal user prompts, check the live status of a specific Citi Bike station, find nearby stations around a destination such as NYU Stern or Washington Square, compare open dock availability, and recommend an alternative if the usual station is full or not accepting returns. The workflow can also remember things said earlier in the conversation, such as \u201cmy school dock is E 17 St & Broadway,\u201d and then use that information later when the user asks something like \u201ccheck my school dock.\u201d We also added support for GPS coordinates, so if the user provides their current latitude and longitude along with a destination, the workflow can estimate how far away they are and recommend the best station near where they are going. We are currently working on setting up Telegram and voice functionality so the system can accept spoken input and return both text and audio directions. The final step is to connect it to live GPS automatically, so while someone is riding, the system can recognize when they are getting close to their destination, check dock availability ahead of time, and tell them through their headphones whether to continue to their normal station or reroute somewhere else.",
+        "height": 400,
+        "width": 736
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "88c9b44a-ad86-4010-9d8a-3ea9ea28fe8a",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "ios arrival mode (commuters)\n\nan iphone shortcuts \"arrive\" automation POSTs here when you get near school/work/home.\nbody: {\"place\":\"school\",\"destLat\":40.73,\"destLon\":-73.99,\"usualDock\":\"E 17 St & Broadway\"}\nusualDock is optional. if destLat/destLon are missing it uses lat/lon (current location).\nreturns ONE plain-text sentence; the shortcut speaks it with Speak Text over your headphones.\nno ai step here: fixed inputs, so its fast and free.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "692aea57-8ac2-4ffa-ad3f-648b7604225b",
+      "name": "ios arrival mode",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "citibike-arrival",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "04565d57-b6c8-4cbf-b21f-22b76a7e5990",
+      "name": "arrival webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        1520
+      ],
+      "webhookId": "ec843739-9cb3-4e22-bfae-016984a38e55"
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json",
+        "options": {}
+      },
+      "id": "4b64ac95-a7ac-4535-b275-b71383d41e1a",
+      "name": "arrival station information",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -288,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_status.json",
+        "options": {}
+      },
+      "id": "8c16a5ef-aa91-4639-89c2-3c571cd8a5df",
+      "name": "arrival station status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -48,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// called by the ios shortcut arrival automation. returns one short sentence for speak text.\nconst body = $('arrival webhook').first().json.body ?? {};\nconst info = $('arrival station information').first().json;\nconst status = $('arrival station status').first().json;\n\nconst num = v => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null; };\nconst place = String(body.place ?? '').trim() || 'your destination';\nconst usualDock = String(body.usualDock ?? '').trim();\nconst destLat = num(body.destLat), destLon = num(body.destLon);\nconst curLat = num(body.lat), curLon = num(body.lon);\nconst useDest = destLat !== null && destLon !== null;\nconst centerLat = useDest ? destLat : curLat;\nconst centerLon = useDest ? destLon : curLon;\nconst fromWhere = useDest ? place : 'you';\n\nif (centerLat === null || centerLon === null) {\n  const text = 'no location from your phone.';\n  return [{json:{text,spokenText:text}}];\n}\n\nfunction meters(lat1,lon1,lat2,lon2) {\n  const R=6371000, r=x=>x*Math.PI/180;\n  const dLat=r(lat2-lat1), dLon=r(lon2-lon1);\n  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;\n  return 2*R*Math.asin(Math.sqrt(a));\n}\nfunction norm(s) {\n  return String(s ?? '').toLowerCase()\n    .replace(/&/g,' and ')\n    .replace(/\\bstreet\\b/g,' st ')\n    .replace(/\\bavenue\\b/g,' ave ')\n    .replace(/[^a-z0-9]+/g,' ')\n    .replace(/\\s+/g,' ').trim();\n}\nfunction matchScore(name,q) {\n  const a=norm(name), b=norm(q);\n  if(!a||!b) return -999;\n  if(a===b) return 10000;\n  let s=0;\n  if(a.includes(b)||b.includes(a)) s+=1800;\n  const A=new Set(a.split(' ')), B=new Set(b.split(' '));\n  let overlap=0;\n  for(const t of B) if(A.has(t)) overlap++;\n  s+=(overlap/Math.max(B.size,1))*1000;\n  return s-Math.abs(a.length-b.length);\n}\nfunction howFar(m) {\n  if (m < 75) return useDest ? `right at ${place}` : 'right there';\n  return useDest ? `${Math.round(m/50)*50} meters from ${place}` : `${Math.round(m/50)*50} meters away`;\n}\nconst docks = n => `${n} ${n===1?'dock':'docks'} open`;\n\nconst statuses = status?.data?.stations ?? [];\nconst byId = new Map(statuses.map(s=>[String(s.station_id),s]));\nconst stations = (info?.data?.stations ?? []).map(s=>{\n  const l=byId.get(String(s.station_id)) ?? {};\n  const lat=Number(s.lat), lon=Number(s.lon);\n  return {\n    stationId:String(s.station_id),\n    name:String(s.name),\n    lat,lon,\n    openDocks:Number(l.num_docks_available ?? 0),\n    isReturning:l.is_returning === undefined ? true : Boolean(l.is_returning),\n    isInstalled:l.is_installed === undefined ? true : Boolean(l.is_installed),\n    distanceMeters:Math.round(meters(centerLat,centerLon,lat,lon))\n  };\n}).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon));\n\nconst canReturn = s => s && s.isInstalled && s.isReturning && s.openDocks >= 2;\nconst good = stations.filter(s=>s.distanceMeters<=1200 && canReturn(s))\n  .sort((a,b)=>a.distanceMeters-b.distanceMeters || b.openDocks-a.openDocks);\n\nlet usual = null;\nif (usualDock) {\n  const ranked = stations.map(s=>({s,score:matchScore(s.name,usualDock)})).sort((a,b)=>b.score-a.score);\n  if (ranked.length && ranked[0].score >= 250) usual = ranked[0].s;\n}\n\nlet text, selected = null;\nif (usual && canReturn(usual)) {\n  selected = usual;\n  text = `your usual dock has ${docks(usual.openDocks)}.`;\n} else {\n  let lead = '';\n  if (usual) {\n    const problem = !usual.isInstalled || !usual.isReturning ? 'is closed'\n      : usual.openDocks === 0 ? 'is full' : 'is almost full';\n    lead = `your usual dock ${problem}. `;\n  }\n  selected = good.find(s=>!usual || s.stationId!==usual.stationId) ?? null;\n  text = selected\n    ? (lead ? `${lead}go to ${selected.name}, ${selected.openDocks} docks, ${howFar(selected.distanceMeters)}.`\n            : `${selected.name} has ${docks(selected.openDocks)}, ${howFar(selected.distanceMeters)}.`)\n    : `${lead}no docks with space near ${fromWhere}.`;\n}\n\nreturn [{json:{\n  text,\n  spokenText:text,\n  selectedStation:selected,\n  usualMatched:usual ? usual.name : null,\n  centeredOn:useDest ? 'destination' : 'current location',\n  lastUpdated:status?.last_updated ?? null\n}}];\n"
+      },
+      "id": "13ffb2d6-eb62-4d98-bbde-9a5a4467782d",
+      "name": "pick arrival dock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.spokenText }}",
+        "options": {}
+      },
+      "id": "0c78f08a-b76c-4496-b769-297e4fd3166e",
+      "name": "speak this",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3424,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "content": "siri mode (\"hey siri, dock check\")\n\nthe iphone shortcut asks what you need, then POSTs here:\n{\"text\":\"find me a dock near stern\",\"lat\":40.73,\"lon\":-73.99,\"sessionId\":\"evans iphone\"}\n\nit runs through the same ai request-understanding as chat, and the answer comes back as one plain sentence that the shortcut speaks over your headphones.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "af49c60e-6b38-4718-9dce-040861a07781",
+      "name": "siri mode",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "citibike-siri",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5161f8f1-9a92-41c9-be1f-674af255dfbf",
+      "name": "siri webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        1040
+      ],
+      "webhookId": "97436e94-8db9-48f1-9909-48c41a5138df"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// called by the \"dock check\" siri shortcut: {text, lat, lon, sessionId}\nconst body = $json.body ?? {};\nconst lat = Number(body.lat), lon = Number(body.lon);\nconst hasGps = Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && lon !== 0;\nconst said = String(body.text ?? '').trim();\nreturn [{\n  json: {\n    userInput: hasGps ? `${said} (my current gps coordinates are ${lat}, ${lon})` : said,\n    sessionId: `siri-${String(body.sessionId ?? 'default').trim() || 'default'}`,\n    outputMode: 'siri',\n    chatId: ''\n  }\n}];\n"
+      },
+      "id": "64b7fadc-3788-4d2b-9f16-d8b973e1c562",
+      "name": "normalize siri input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// siri reads \"St\" as \"saint\", \"id\" as \"I.D.\" and spells out links, so tidy the sentence before it gets spoken.\n// station names get shortened the way new yorkers say them: \"W 15 St & 6 Ave\" -> \"West 15th and 6th\"\nfunction ordinal(n) {\n  const v=n%100;\n  return n + (v>=11&&v<=13 ? 'th' : ({1:'st',2:'nd',3:'rd'}[n%10] || 'th'));\n}\nconst contractions = {\n  i:'I', id:\"I'd\", ill:\"I'll\", im:\"I'm\", ive:\"I've\",\n  youre:\"you're\", isnt:\"isn't\", couldnt:\"couldn't\", didnt:\"didn't\", cant:\"can't\", dont:\"don't\"\n};\nfunction forSpeech(s) {\n  return String(s ?? '')\n    .replace(/https?:\\/\\/\\S+/g,'')\n    .replace(/directions:\\s*/gi,'')\n    .replace(/&/g,' and ')\n    .replace(/\\bE\\b(?=\\s+\\d)/g,'East')\n    .replace(/\\bW\\b(?=\\s+\\d)/g,'West')\n    .replace(/\\b(\\d+)\\s+(St|Ave)\\b/g,(m,n)=>ordinal(Number(n)))\n    .replace(/\\s+(St|Ave|Pl|Blvd|Rd|Dr)\\b(?!\\s+[A-Z0-9])/g,'')\n    .replace(/\\bAve\\b/g,'Avenue')\n    .replace(/\\bPl\\b/g,'Place')\n    .replace(/\\bBlvd\\b/g,'Boulevard')\n    .replace(/\\b(i|id|ill|im|ive|youre|isnt|couldnt|didnt|cant|dont)\\b/g,w=>contractions[w])\n    .replace(/\\s+/g,' ').trim();\n}\nreturn [{json:{spokenText:forSpeech($json.spokenText ?? $json.text)}}];\n"
+      },
+      "id": "64af185a-1134-480b-9610-35cc42531cb1",
+      "name": "make it speakable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-6-luna",
+          "mode": "list",
+          "cachedResultName": "gpt-6-luna",
+          "cachedResultUrl": ""
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        736
+      ],
+      "id": "faa09f5a-7d2e-4d7a-90e1-8125bd906466",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": ""
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "chat": {
+      "main": [
+        [
+          {
+            "node": "normalize chat input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize chat input": {
+      "main": [
+        [
+          {
+            "node": "input envelope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "input envelope": {
+      "main": [
+        [
+          {
+            "node": "understand request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "conversation memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "understand request",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "request schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "understand request",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "understand request": {
+      "main": [
+        [
+          {
+            "node": "request fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "request fields": {
+      "main": [
+        [
+          {
+            "node": "what does the user want",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "what does the user want": {
+      "main": [
+        [
+          {
+            "node": "station information",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "geocode destination",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "geocode destination",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "network live status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "remember response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "help response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "station information": {
+      "main": [
+        [
+          {
+            "node": "station live status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "station live status": {
+      "main": [
+        [
+          {
+            "node": "check the station",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check the station": {
+      "main": [
+        [
+          {
+            "node": "final response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "geocode destination": {
+      "main": [
+        [
+          {
+            "node": "nearby station information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nearby station information": {
+      "main": [
+        [
+          {
+            "node": "nearby station status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "nearby station status": {
+      "main": [
+        [
+          {
+            "node": "pick a dock near the destination",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pick a dock near the destination": {
+      "main": [
+        [
+          {
+            "node": "final response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "network live status": {
+      "main": [
+        [
+          {
+            "node": "summarize the network",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "summarize the network": {
+      "main": [
+        [
+          {
+            "node": "final response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "remember response": {
+      "main": [
+        [
+          {
+            "node": "final response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "help response": {
+      "main": [
+        [
+          {
+            "node": "final response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "final response": {
+      "main": [
+        [
+          {
+            "node": "where should the answer go",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "where should the answer go": {
+      "main": [
+        [
+          {
+            "node": "return chat answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "make it speakable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arrival webhook": {
+      "main": [
+        [
+          {
+            "node": "arrival station information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arrival station information": {
+      "main": [
+        [
+          {
+            "node": "arrival station status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arrival station status": {
+      "main": [
+        [
+          {
+            "node": "pick arrival dock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pick arrival dock": {
+      "main": [
+        [
+          {
+            "node": "make it speakable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "siri webhook": {
+      "main": [
+        [
+          {
+            "node": "normalize siri input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize siri input": {
+      "main": [
+        [
+          {
+            "node": "input envelope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "make it speakable": {
+      "main": [
+        [
+          {
+            "node": "speak this",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "understand request",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
