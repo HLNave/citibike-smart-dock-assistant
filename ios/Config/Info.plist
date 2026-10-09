@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Rides: keep tracking and speak the arrival answer with the phone locked. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>When you start a ride, Dock Finder watches for you to get close to your destination so it can tell you where to dock, even with your phone locked.</string>
 	<key>DockFinderBackendHost</key>
 	<string>$(DOCKFINDER_BACKEND_HOST)</string>
 	<!-- "Dock" and "doc" sound the same, so Siri often transcribes the app's

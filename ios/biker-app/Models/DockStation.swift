@@ -26,7 +26,7 @@ nonisolated struct DockStation: Sendable, Equatable, Identifiable {
 }
 
 /// A place to find docks near: a saved place or a map search result.
-nonisolated struct Destination: Sendable, Equatable, Hashable {
+nonisolated struct Destination: Codable, Sendable, Equatable, Hashable {
     let name: String
     let latitude: Double
     let longitude: Double
@@ -84,18 +84,23 @@ nonisolated struct DestinationDockResult: Sendable, Equatable {
     let usualDockProblem: StationProblem?
     /// Where to go. Distance is measured from the destination.
     let selected: DockStation?
+    /// True when `selected` is the rider's backup dock for this place.
+    var selectedIsBackup = false
 
     var usesUsualDock: Bool { usualDock != nil && usualDockProblem == nil }
 
     var summary: String {
+        let lead = usualDockProblem.map { "Your usual dock \($0.phrase). " } ?? ""
         guard let selected else {
-            let lead = usualDockProblem.map { "Your usual dock \($0.phrase). " } ?? ""
             return lead + "No docks with space near \(destination.name)."
         }
         if usesUsualDock {
             return "Your usual dock has \(Speech.docksOpen(selected.availableDocks))."
         }
         let distance = Speech.distance(selected.straightLineDistance, from: destination.name)
+        if selectedIsBackup {
+            return lead + "Your backup, \(selected.spokenName), has \(Speech.docksOpen(selected.availableDocks)), \(distance)."
+        }
         if let usualDockProblem {
             return "Your usual dock \(usualDockProblem.phrase). Go to \(selected.spokenName), \(selected.availableDocks) docks, \(distance)."
         }

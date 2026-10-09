@@ -15,6 +15,12 @@ import MapKit
 nonisolated protocol PlaceSearching: Sendable {
     /// Best matches first. Throws `DockFinderError.placeNotFound` when nothing matches.
     func search(_ query: String) async throws -> [Destination]
+    /// A short street address for a spot, if one can be found.
+    func address(for location: CLLocation) async -> String?
+}
+
+extension PlaceSearching {
+    func address(for location: CLLocation) async -> String? { nil }
 }
 
 nonisolated struct MapKitPlaceSearch: PlaceSearching {
@@ -61,5 +67,20 @@ nonisolated struct MapKitPlaceSearch: PlaceSearching {
         }
         guard !results.isEmpty else { throw DockFinderError.placeNotFound(trimmed) }
         return results
+    }
+
+    func address(for location: CLLocation) async -> String? {
+        guard let request = MKReverseGeocodingRequest(location: location),
+              let item = try? await request.mapItems.first
+        else { return nil }
+        return item.address?.shortAddress ?? item.name
+    }
+
+    /// Straight-line distance from a spot to the nearest Citi Bike station,
+    /// so the app can warn when a saved place is outside the service area.
+    static func distanceToNearestStation(from location: CLLocation, in stations: [StationInformation]) -> CLLocationDistance? {
+        stations
+            .map { location.distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude)) }
+            .min()
     }
 }

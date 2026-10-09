@@ -49,6 +49,23 @@ nonisolated enum Speech {
         return place.map { "\(formatted) from \($0)" } ?? "\(formatted) away"
     }
 
+    /// A rounded distance for settings and ride messages: "0.3 miles",
+    /// "500 feet", "500 meters", "1.2 kilometers".
+    static func length(_ meters: CLLocationDistance, locale: Locale = .autoupdatingCurrent) -> String {
+        let measurement: Measurement<UnitLength>
+        if locale.measurementSystem == .us {
+            let miles = meters / 1_609.344
+            measurement = miles >= 0.1
+                ? Measurement(value: (miles * 10).rounded() / 10, unit: .miles)
+                : Measurement(value: (meters * 3.28084 / 50).rounded() * 50, unit: .feet)
+        } else {
+            measurement = meters >= 1_000
+                ? Measurement(value: (meters / 100).rounded() / 10, unit: .kilometers)
+                : Measurement(value: (meters / 50).rounded() * 50, unit: .meters)
+        }
+        return measurement.formatted(.measurement(width: .wide, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0...1))).locale(locale))
+    }
+
     /// Thousands separators for large counts: "35,393".
     static func number(_ value: Int, locale: Locale = .autoupdatingCurrent) -> String {
         value.formatted(.number.locale(locale))

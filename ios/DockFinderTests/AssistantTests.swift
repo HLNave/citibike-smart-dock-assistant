@@ -53,7 +53,7 @@ private actor BackendSpy: AssistantBackend {
     }
 }
 
-private struct StubPlaces: PlaceSearching {
+struct StubPlaces: PlaceSearching {
     var results: [String: Destination] = [:]
 
     func search(_ query: String) async throws -> [Destination] {
@@ -89,7 +89,8 @@ struct AssistantRouterTests {
                 now: { referenceNow }
             ),
             placeSearch: places,
-            savedPlaces: saved,
+            store: testStore(saved),
+            rides: RideSpy(),
             parsers: parsers,
             backend: backend,
             location: StubLocation(result: .success(LocationFix(location: userLocation, isApproximate: false))),

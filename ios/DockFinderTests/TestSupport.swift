@@ -59,3 +59,34 @@ struct StubLocation: LocationProviding {
         try result.get()
     }
 }
+
+/// A saved-places store backed by throwaway defaults.
+@MainActor
+func testStore(_ places: [SavedPlace] = []) -> SavedPlacesStore {
+    let store = SavedPlacesStore(defaults: UserDefaults(suiteName: "test-\(UUID())")!, onChange: {})
+    places.forEach(store.add)
+    return store
+}
+
+@MainActor
+final class RideSpy: RideControlling {
+    var currentRide: Ride?
+    var canTrackInBackground: Bool
+    private(set) var started: [Ride] = []
+    private(set) var endCount = 0
+
+    init(currentRide: Ride? = nil, canTrackInBackground: Bool = true) {
+        self.currentRide = currentRide
+        self.canTrackInBackground = canTrackInBackground
+    }
+
+    func start(_ ride: Ride) async {
+        started.append(ride)
+        currentRide = ride
+    }
+
+    func end() async {
+        endCount += 1
+        currentRide = nil
+    }
+}

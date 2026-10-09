@@ -23,6 +23,24 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             systemImageName: "bicycle.circle"
         )
         AppShortcut(
+            intent: StartRideIntent(),
+            phrases: [
+                "Start a ride with \(.applicationName)",
+                "Begin a ride with \(.applicationName)",
+            ],
+            shortTitle: "Start Ride",
+            systemImageName: "figure.outdoor.cycle"
+        )
+        AppShortcut(
+            intent: EndRideIntent(),
+            phrases: [
+                "End my ride with \(.applicationName)",
+                "Cancel my ride with \(.applicationName)",
+            ],
+            shortTitle: "End Ride",
+            systemImageName: "flag.checkered"
+        )
+        AppShortcut(
             intent: FindDockIntent(),
             phrases: [
                 "Find a dock with \(.applicationName)",

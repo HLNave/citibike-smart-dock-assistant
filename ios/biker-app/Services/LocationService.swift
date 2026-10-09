@@ -56,6 +56,13 @@ final class LocationService: NSObject, LocationProviding {
         }
     }
 
+    /// Asks to upgrade to Always, which rides need to track with the phone
+    /// locked. iOS shows the prompt at most once; after that the rider has
+    /// to change it in Settings.
+    func requestAlwaysAuthorization() {
+        manager.requestAlwaysAuthorization()
+    }
+
     nonisolated func currentLocation() async throws -> LocationFix {
         try await fetchCurrentLocation()
     }

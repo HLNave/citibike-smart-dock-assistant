@@ -43,10 +43,19 @@ nonisolated struct DockFinderService: Sendable {
     }
 
     /// Finds a dock near a destination. If the rider has a usual dock there,
-    /// it's preferred while it has room; otherwise the answer says why and
-    /// reroutes to the nearest station with space.
-    func findDock(near destination: Destination, usualStationID: String? = nil) async throws -> DestinationDockResult {
-        Self.dock(near: destination, usualStationID: usualStationID, in: try await loadNetwork())
+    /// it's preferred while it has room; then their backup dock; otherwise
+    /// the answer says why and reroutes to the nearest station with space.
+    func findDock(
+        near destination: Destination,
+        usualStationID: String? = nil,
+        backupStationID: String? = nil
+    ) async throws -> DestinationDockResult {
+        Self.dock(near: destination, usualStationID: usualStationID, backupStationID: backupStationID, in: try await loadNetwork())
+    }
+
+    /// A saved place's usual and backup docks, checked in that order.
+    func findDock(for place: SavedPlace) async throws -> DestinationDockResult {
+        try await findDock(near: place.destination, usualStationID: place.usualStationID, backupStationID: place.backupStationID)
     }
 
     /// Live status of one station, matched by ID or by a spoken name.
@@ -95,7 +104,12 @@ nonisolated struct DockFinderService: Sendable {
         return nearest
     }
 
-    static func dock(near destination: Destination, usualStationID: String?, in network: StationNetwork) -> DestinationDockResult {
+    static func dock(
+        near destination: Destination,
+        usualStationID: String?,
+        backupStationID: String? = nil,
+        in network: StationNetwork
+    ) -> DestinationDockResult {
         let usual = usualStationID.flatMap { network.station(id: $0) }
         let usualProblem = usual.flatMap { network.problem(with: $0) }
 
@@ -109,11 +123,21 @@ nonisolated struct DockFinderService: Sendable {
             )
         }
 
-        let selected = network.returnableStations(
-            around: destination.location,
-            within: StationNetwork.nearbyRadius,
-            excluding: usual?.id
-        ).first
+        if let backup = backupStationID.flatMap({ network.station(id: $0) }),
+           backup.id != usual?.id,
+           network.canReturn(backup) {
+            return DestinationDockResult(
+                destination: destination,
+                usualDock: usual,
+                usualDockProblem: usualProblem,
+                selected: DockStation(snapshot: backup, distance: destination.location.distance(from: backup.location)),
+                selectedIsBackup: true
+            )
+        }
+
+        let excluded: Set<String> = Set([usual?.id, backupStationID].compactMap { $0 })
+        let selected = network.returnableStations(around: destination.location, within: StationNetwork.nearbyRadius)
+            .first { !excluded.contains($0.id) }
         return DestinationDockResult(destination: destination, usualDock: usual, usualDockProblem: usualProblem, selected: selected)
     }
 
