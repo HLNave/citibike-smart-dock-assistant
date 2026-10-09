@@ -70,6 +70,20 @@ nonisolated enum StationNameMatcher {
         return score
     }
 
+    /// A stricter match for a station name said on its own, with nothing
+    /// else to suggest it's a station: every word must match, and a single
+    /// word ("Broadway") only counts if it's the station's whole name.
+    static func confidentMatch(for query: String, in stations: [StationInformation]) -> StationInformation? {
+        let queryTokens = tokens(query)
+        guard !queryTokens.isEmpty else { return nil }
+        let best = stations
+            .map { (station: $0, score: score(name: $0.name, query: query)) }
+            .sorted { ($0.score, -$0.station.name.count) > ($1.score, -$1.station.name.count) }
+            .first
+        guard let best, best.score >= 1_000 else { return nil }
+        return queryTokens.count >= 2 || best.score >= 10_000 ? best.station : nil
+    }
+
     /// Exact, or one typo apart for longer words ("Bleeker" ≈ "Bleecker").
     private static func similar(_ a: String, _ b: String) -> Bool {
         if a == b { return true }

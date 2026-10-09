@@ -10,7 +10,18 @@
 import AppIntents
 
 struct DockFinderShortcutsProvider: AppShortcutsProvider {
+    /// The first shortcut is the one to teach riders: a single short phrase,
+    /// then Siri asks for the details. The rest are one-step alternatives.
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: AskDockFinderIntent(),
+            phrases: [
+                "Ask \(.applicationName)",
+                "Talk to \(.applicationName)",
+            ],
+            shortTitle: "Ask Dock Finder",
+            systemImageName: "bicycle.circle"
+        )
         AppShortcut(
             intent: FindDockIntent(),
             phrases: [
@@ -58,15 +69,6 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Citywide Status",
             systemImageName: "chart.bar"
-        )
-        AppShortcut(
-            intent: AskDockFinderIntent(),
-            phrases: [
-                "Ask \(.applicationName)",
-                "Talk to \(.applicationName)",
-            ],
-            shortTitle: "Ask Dock Finder",
-            systemImageName: "bubble.left"
         )
     }
 

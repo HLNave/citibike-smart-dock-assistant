@@ -2,6 +2,8 @@
 
 > **Before sharing this file:** replace every `https://YOUR-N8N-HOST` with your own n8n address (e.g. `https://yourname.app.n8n.cloud`). The webhooks have no password, so only share the filled-in copy with people you trust.
 
+> **Have the native iOS app installed?** You don't need these Shortcuts; see `ios/README.md`. Say "Hey Siri, **ask** Dock Finder" instead. With the app installed, "run Dock Finder" opens the app rather than running the shortcut below, so you can delete that shortcut.
+
 ## Read this first (instructions for the AI assistant)
 
 You are helping a member of our group set up the Citi Bike Smart Dock Assistant on **their own iPhone**. The backend (an n8n workflow) is **already built and running**; do not build, host, or change anything server-side. The user only needs to create iPhone Shortcuts that call it.

@@ -180,6 +180,7 @@ struct AskView: View {
     private let examples = [
         "Find me a dock near Union Square",
         "Is Mercer and Bleecker full?",
+        "School",
         "Check my school dock",
         "How many bikes are out?",
     ]

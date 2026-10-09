@@ -45,7 +45,7 @@ struct SavedPlaceView: View {
                 }
 
                 Section {
-                    Text("“Hey Siri, find a dock near \(place.name.lowercased()) with Dock Finder.”")
+                    Text("“Hey Siri, ask Dock Finder.” Then say “\(place.name.lowercased())”.")
                 } header: {
                     Text("Siri")
                 } footer: {
@@ -195,7 +195,7 @@ struct AddPlaceView: View {
                 } header: {
                     Text("What do you call it?")
                 } footer: {
-                    Text("This is the name you'll say to Siri: “find a dock near \(name.isEmpty ? "school" : name.lowercased())”.")
+                    Text("This is what you'll say when Siri asks where you're headed: “\(name.isEmpty ? "school" : name.lowercased())”.")
                 }
 
                 Section("Where is it?") {

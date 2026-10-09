@@ -142,14 +142,19 @@ struct SetUsualDockIntent: AppIntent {
     }
 }
 
+/// The main Siri entry point: "Hey Siri, ask Dock Finder", then Siri asks
+/// what you need. ("Run Dock Finder" can't be used: Siri treats "run" or
+/// "open" plus an app's name as "open the app", which needs an unlock.) Siri only has to recognize that one short phrase; the
+/// answer to the follow-up comes to the app as plain text, so Siri can't
+/// mistake it for a Maps search ("dock" heard as "doc" → doctors nearby).
 struct AskDockFinderIntent: AppIntent {
     static let title: LocalizedStringResource = "Ask Dock Finder"
     static let description = IntentDescription(
-        "Ask anything in your own words. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
+        "Asks where you're headed, then answers in one sentence: a dock near a place or saved place, a station's status, or the nearest dock to you. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Request", requestValueDialog: "What do you need?")
+    @Parameter(title: "Request", requestValueDialog: "Where are you headed, or which station?")
     var request: String
 
     @MainActor
