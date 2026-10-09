@@ -8,6 +8,7 @@ import SwiftUI
 @main
 struct DockFinderApp: App {
     @State private var onboarding = OnboardingState()
+    @State private var savedPlaces = SavedPlacesStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct DockFinderApp: App {
                 }
             }
             .environment(onboarding)
+            .environment(savedPlaces)
         }
     }
 }

@@ -5,12 +5,12 @@
 
 import SwiftUI
 
-/// A find button plus its result, shared by the home and Siri screens.
+/// A "find nearest dock" button plus its result, shared by the home and Siri screens.
 struct DockLookupSection: View {
     let buttonTitle: LocalizedStringKey
     let prominent: Bool
 
-    @State private var model = DockLookupModel()
+    @State private var model = AnswerModel()
 
     var body: some View {
         VStack(spacing: 16) {
@@ -22,25 +22,20 @@ struct DockLookupSection: View {
                 }
             }
             .controlSize(.large)
-            .disabled(model.phase == .searching)
+            .disabled(model.isLoading)
 
-            switch model.phase {
-            case .idle:
-                EmptyView()
-            case .searching:
-                ProgressView("Checking live availability…")
-            case .found(let result):
-                DockResultCard(result: result)
-            case .failed(let error):
-                DockErrorCard(error: error)
-            }
+            AnswerView(phase: model.phase)
         }
         .animation(.default, value: model.phase)
     }
 
     private var findButton: some View {
         Button {
-            Task { await model.findNearestDock() }
+            Task {
+                await model.run(needsLocation: true) {
+                    try await DockFinderService.live.findNearestDock().answer
+                }
+            }
         } label: {
             Label(buttonTitle, systemImage: "location.fill")
                 .frame(maxWidth: .infinity)
@@ -48,31 +43,55 @@ struct DockLookupSection: View {
     }
 }
 
-private struct DockResultCard: View {
-    let result: DockSearchResult
+/// Shows whatever phase a lookup is in: nothing, a spinner, the answer, or the error.
+struct AnswerView: View {
+    let phase: AnswerModel.Phase
+
+    var body: some View {
+        switch phase {
+        case .idle:
+            EmptyView()
+        case .loading:
+            ProgressView("Checking live availability…")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+        case .answered(let answer):
+            AnswerCard(answer: answer)
+        case .failed(let error):
+            ErrorCard(error: error)
+        }
+    }
+}
+
+struct AnswerCard: View {
+    let answer: DockAnswer
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(result.station.name, systemImage: "bicycle")
-                .font(.headline)
-
-            Text(result.summary)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let observedAt = result.station.observedAt {
-                Text("Station reported \(observedAt, format: .relative(presentation: .named)). Availability can change at any time.")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+            if let station = answer.station {
+                Label(station.name, systemImage: "bicycle")
+                    .font(.headline)
             }
 
-            if let mapsURL {
-                Link(destination: mapsURL) {
-                    Label("Open in Maps", systemImage: "map")
+            Text(answer.text)
+                .font(answer.station == nil ? .body : .subheadline)
+                .foregroundStyle(answer.station == nil ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let station = answer.station {
+                if let observedAt = station.observedAt {
+                    Text("Station reported \(observedAt, format: .relative(presentation: .named)). Distances are in a straight line, and availability can change at any time.")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.subheadline.weight(.semibold))
+                DirectionsLinks(station: station)
+            }
+
+            if answer.source != .onDevice {
+                Label(sourceDescription, systemImage: answer.source == .server ? "cloud" : "sparkles")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,17 +99,57 @@ private struct DockResultCard: View {
         .background(.background.secondary, in: .rect(cornerRadius: 16))
     }
 
-    private var mapsURL: URL? {
+    private var sourceDescription: LocalizedStringKey {
+        answer.source == .server
+            ? "Answered by the Dock Finder server"
+            : "Understood by Apple Intelligence on your iPhone"
+    }
+}
+
+/// Cycling directions to a station.
+struct DirectionsLinks: View {
+    let station: DockStation
+
+    var body: some View {
+        HStack(spacing: 20) {
+            if let appleMaps {
+                Link(destination: appleMaps) {
+                    Label("Apple Maps", systemImage: "map")
+                }
+            }
+            if let googleMaps {
+                Link(destination: googleMaps) {
+                    Label("Google Maps", systemImage: "bicycle")
+                }
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+    }
+
+    private var coordinate: String { "\(station.latitude),\(station.longitude)" }
+
+    private var appleMaps: URL? {
         var components = URLComponents(string: "https://maps.apple.com/")
         components?.queryItems = [
-            URLQueryItem(name: "daddr", value: "\(result.station.latitude),\(result.station.longitude)"),
-            URLQueryItem(name: "q", value: result.station.name),
+            URLQueryItem(name: "daddr", value: coordinate),
+            URLQueryItem(name: "q", value: station.name),
+        ]
+        return components?.url
+    }
+
+    /// Google Maps supports a cycling mode in its universal link.
+    private var googleMaps: URL? {
+        var components = URLComponents(string: "https://www.google.com/maps/dir/")
+        components?.queryItems = [
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "destination", value: coordinate),
+            URLQueryItem(name: "travelmode", value: "bicycling"),
         ]
         return components?.url
     }
 }
 
-private struct DockErrorCard: View {
+struct ErrorCard: View {
     let error: DockFinderError
 
     var body: some View {

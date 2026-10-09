@@ -1,0 +1,14 @@
+// Copy this file to Local.xcconfig (same folder) and fill it in.
+// Local.xcconfig is gitignored, so your team ID and the server host never get committed.
+
+// Your Apple Developer team ID. Xcode → Settings → Accounts shows your teams;
+// for a free Apple ID it's the "(Personal Team)" one. Leave the Team menu in
+// Signing & Capabilities on whatever this resolves to instead of changing it there.
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// Something unique to you.
+DOCKFINDER_BUNDLE_ID = com.yourname.dockfinder
+
+// Optional: the group's n8n host, without https://. Ask a teammate for it.
+// The webhook has no password, so don't post it anywhere public.
+DOCKFINDER_BACKEND_HOST = YOUR-N8N-HOST

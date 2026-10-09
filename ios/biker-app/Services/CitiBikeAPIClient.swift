@@ -69,3 +69,32 @@ nonisolated struct CitiBikeAPIClient: CitiBikeFeedProviding {
         }
     }
 }
+
+/// Keeps station metadata (names and locations) for an hour, since it
+/// rarely changes and is the larger of the two feeds. Live status is
+/// always fetched fresh.
+actor CachedStationFeeds: CitiBikeFeedProviding {
+    static let shared = CachedStationFeeds(base: CitiBikeAPIClient())
+
+    private static let informationLifetime: TimeInterval = 60 * 60
+
+    private let base: any CitiBikeFeedProviding
+    private var cachedInformation: (feed: GBFSFeed<StationInformationPayload>, fetchedAt: Date)?
+
+    init(base: any CitiBikeFeedProviding) {
+        self.base = base
+    }
+
+    func fetchStationInformation() async throws -> GBFSFeed<StationInformationPayload> {
+        if let cachedInformation, -cachedInformation.fetchedAt.timeIntervalSinceNow < Self.informationLifetime {
+            return cachedInformation.feed
+        }
+        let feed = try await base.fetchStationInformation()
+        cachedInformation = (feed, Date())
+        return feed
+    }
+
+    func fetchStationStatus() async throws -> GBFSFeed<StationStatusPayload> {
+        try await base.fetchStationStatus()
+    }
+}
