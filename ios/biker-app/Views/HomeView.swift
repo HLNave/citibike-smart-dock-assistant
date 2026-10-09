@@ -29,7 +29,9 @@ struct HomeView: View {
 
                     DockLookupSection(buttonTitle: "Find Nearest Dock", prominent: true)
 
-                    HomeCard(title: "Saved Places") {
+                    RideCard()
+
+                    HomeCard(title: "Saved Places", trailing: savedPlaces.places.count > 1 ? .manage : nil) {
                         if savedPlaces.places.isEmpty {
                             Text("Save school, work or home to check your usual dock there, by voice or with an arrival automation.")
                                 .font(.subheadline)
@@ -83,6 +85,7 @@ struct HomeView: View {
             .navigationDestination(for: HomeRoute.self) { route in
                 switch route {
                 case .savedPlace(let id): SavedPlaceView(placeID: id)
+                case .managePlaces: ManagePlacesView()
                 case .placeSearch: PlaceSearchView()
                 case .stationSearch: StationSearchView()
                 case .citywide: CitywideView()
@@ -103,6 +106,7 @@ struct HomeView: View {
 
 enum HomeRoute: Hashable {
     case savedPlace(UUID)
+    case managePlaces
     case placeSearch
     case stationSearch
     case citywide
@@ -110,13 +114,23 @@ enum HomeRoute: Hashable {
 }
 
 private struct HomeCard<Content: View>: View {
+    enum Trailing { case manage }
+
     let title: LocalizedStringKey
+    var trailing: Trailing? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.headline)
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                if trailing == .manage {
+                    NavigationLink("Edit", value: HomeRoute.managePlaces)
+                        .font(.subheadline)
+                }
+            }
             content
                 .buttonStyle(.plain)
         }
@@ -158,4 +172,5 @@ private struct HomeRow: View {
 #Preview {
     HomeView()
         .environment(SavedPlacesStore(defaults: UserDefaults(suiteName: "preview")!, onChange: {}))
+        .environment(RideTracker(defaults: UserDefaults(suiteName: "preview")!))
 }

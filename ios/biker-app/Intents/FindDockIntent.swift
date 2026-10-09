@@ -56,7 +56,7 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
             throw DockFinderError.savedPlaceNotFound
         }
         return try await DockFinderService.live
-            .findDock(near: saved.destination, usualStationID: saved.usualStationID)
+            .findDock(for: saved)
             .answer.intentResult
     }
 }
@@ -139,6 +139,37 @@ struct SetUsualDockIntent: AppIntent {
         }
         SavedPlacesStore.shared.setUsualDock(stationID: station.id, stationName: station.name, for: place.id)
         return DockAnswer(text: "Got it. \(Speech.stationName(station.name)) is your \(place.name) dock.").intentResult
+    }
+}
+
+struct StartRideIntent: AppIntent {
+    static let title: LocalizedStringResource = "Start Ride"
+    static let description = IntentDescription(
+        "Watches your ride to a saved place or any destination, and tells you where to dock when you're close. Works with your phone locked when Dock Finder has Always location access."
+    )
+    static let supportedModes: IntentModes = .background
+
+    @Parameter(title: "Destination", requestValueDialog: "Where are you riding to?")
+    var destination: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Start a ride to \(\.$destination)")
+    }
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        try await AssistantRouter.live().handle(.startRide(destination)).intentResult
+    }
+}
+
+struct EndRideIntent: AppIntent {
+    static let title: LocalizedStringResource = "End Ride"
+    static let description = IntentDescription("Stops watching your current ride.")
+    static let supportedModes: IntentModes = .background
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        try await AssistantRouter.live().handle(.endRide).intentResult
     }
 }
 

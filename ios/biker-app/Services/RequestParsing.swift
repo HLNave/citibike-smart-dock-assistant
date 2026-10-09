@@ -20,6 +20,14 @@ nonisolated enum ParsedRequest: Sendable, Equatable {
     /// A station name. May also be "my school dock" / "my usual dock".
     case station(String)
     case citywide
+    /// "Start a ride to school": watch for arrival and say where to dock.
+    /// Empty when no destination was named.
+    case startRide(String)
+    case endRide
+    /// "My school dock is Mercer and Bleecker".
+    case setUsualDock(place: String, station: String)
+    /// "Save this spot as gym".
+    case savePlace(String)
 }
 
 nonisolated protocol RequestParsing: Sendable {
@@ -54,6 +62,15 @@ nonisolated struct KeywordRequestParser: RequestParsing {
     static func parse(_ text: String) -> ParsedRequest? {
         let request = normalize(text)
         guard !request.isEmpty else { return nil }
+
+        // Rides and saved-place edits first, since "start a ride to the
+        // park near my office" would otherwise read as a place search.
+        if let ride = parseRide(request) {
+            return ride
+        }
+        if let edit = parsePlaceEdit(request) {
+            return edit
+        }
 
         // "How many docks at Mercer and Bleecker" is about one station, so it
         // is checked before the citywide phrases.
@@ -90,6 +107,55 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         return nil
     }
 
+    private static let rideEndings: Set<String> = [
+        "end ride", "end my ride", "end the ride", "stop ride", "stop my ride", "stop the ride",
+        "cancel ride", "cancel my ride", "cancel the ride", "finish ride", "finish my ride",
+        "i'm done riding", "im done riding", "i am done riding", "end trip", "cancel trip",
+    ]
+
+    private static func parseRide(_ request: String) -> ParsedRequest? {
+        if rideEndings.contains(request) {
+            return .endRide
+        }
+        if request.range(of: #"^(?:start|begin)(?: a| my| the)? (?:ride|trip)$"#, options: .regularExpression) != nil {
+            return .startRide("")
+        }
+        let patterns = [
+            #"^(?:start|begin)(?: a| my| the)? (?:ride|trip)(?: now)? (?:to|for|towards) (.+)$"#,
+            #"^(?:i'm|im|i am) (?:riding|biking|cycling|heading|going) (?:to|towards) (.+)$"#,
+            #"^(?:ride|bike|riding|biking) (?:to|towards) (.+)$"#,
+            #"^(?:take me|navigate|guide me) to (.+)$"#,
+        ]
+        for pattern in patterns {
+            if let destination = capture(pattern, in: request) {
+                return .startRide(destination)
+            }
+        }
+        return nil
+    }
+
+    /// Words that make "my school dock is ___" a status question, not a setting.
+    private static let statusWords: Set<String> = ["full", "empty", "open", "closed", "available", "busy", "packed", "free"]
+
+    private static func parsePlaceEdit(_ request: String) -> ParsedRequest? {
+        if let groups = captures(#"^(?:my|the) (.+?) dock is (?:now )?(.+)$"#, in: request) {
+            // "My school dock is full?" asks about the dock instead of setting it.
+            return statusWords.contains(groups[1])
+                ? .station("my \(groups[0]) dock")
+                : .setUsualDock(place: groups[0], station: groups[1])
+        }
+        if let groups = captures(#"^(?:set|change|make) (?:my |the )?(.+?) dock (?:to|as) (.+)$"#, in: request) {
+            return .setUsualDock(place: groups[0], station: groups[1])
+        }
+        if let groups = captures(#"^(?:use|make) (.+?) (?:as )?my (.+?) dock$"#, in: request) {
+            return .setUsualDock(place: groups[1], station: groups[0])
+        }
+        if let name = capture(#"^(?:save|remember|add) (?:this place|this spot|this location|here|my location|my current location|where i am)(?: as| called)? (.+)$"#, in: request) {
+            return .savePlace(name)
+        }
+        return nil
+    }
+
     /// Lowercased, without "hey siri"/"please" and trailing punctuation.
     static func normalize(_ text: String) -> String {
         var request = text.lowercased()
@@ -108,6 +174,18 @@ nonisolated struct KeywordRequestParser: RequestParsing {
     }
 
     private static let homophones = ["doc": "dock", "docs": "docks", "doc's": "dock's"]
+
+    private static func captures(_ pattern: String, in text: String) -> [String]? {
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))
+        else { return nil }
+        let groups = (1..<match.numberOfRanges).compactMap { index -> String? in
+            Range(match.range(at: index), in: text).map {
+                text[$0].trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            }
+        }
+        return groups.contains(where: \.isEmpty) ? nil : groups
+    }
 
     private static func capture(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -152,15 +230,17 @@ nonisolated enum ModelRequestKind {
     case place
     case station
     case citywide
+    case startRide
+    case endRide
     case unknown
 }
 
 @Generable
 nonisolated struct ModelParsedRequest {
-    @Guide(description: "nearMe: a dock near the rider's current location. place: a dock near a named place, address, landmark, business or neighborhood. station: whether one named Citi Bike station has room. citywide: totals for the whole Citi Bike system. unknown: anything else.")
+    @Guide(description: "nearMe: a dock near the rider's current location. place: a dock near a named place, address, landmark, business or neighborhood. station: whether one named Citi Bike station has room. citywide: totals for the whole Citi Bike system. startRide: the rider is starting a ride to a destination and wants to be told where to dock on arrival. endRide: stop or cancel the current ride. unknown: anything else.")
     var kind: ModelRequestKind
 
-    @Guide(description: "For place: what to search for on a map of New York City, such as 'Union Square' or '44 West 4th Street'. Otherwise empty.")
+    @Guide(description: "For place or startRide: the destination, as said or as a New York City address or landmark, such as 'Union Square' or '44 West 4th Street'. Otherwise empty.")
     var place: String
 
     @Guide(description: "For station: the station name as said, such as 'Mercer and Bleecker'. Otherwise empty.")
@@ -193,6 +273,8 @@ nonisolated struct OnDeviceModelParser: RequestParsing {
             case .place: return place.isEmpty ? nil : .place(place)
             case .station: return station.isEmpty ? nil : .station(station)
             case .citywide: return .citywide
+            case .startRide: return .startRide(place)
+            case .endRide: return .endRide
             case .unknown: return nil
             }
         } catch {

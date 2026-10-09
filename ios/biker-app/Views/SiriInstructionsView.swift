@@ -98,16 +98,18 @@ struct SiriInstructionsView: View {
     }
 
     static let answers = [
+        "a ride: “start a ride to school”, and hear where to dock as you get close",
         "a saved place: “school”",
         "a place: “near Union Square”",
         "a station: “Mercer and Bleecker”",
         "“near me”",
         "“how many bikes are out?”",
+        "a setting: “my school dock is Mercer and Bleecker”, “save this spot as gym”",
     ]
 
     static let oneStepPhrases = [
         "“Hey Siri, find a dock with Dock Finder.”",
-        "“Hey Siri, find a dock near school with Dock Finder.”",
+        "“Hey Siri, check my school dock with Dock Finder.”",
         "“Hey Siri, check a station with Dock Finder.”",
         "“Hey Siri, Citi Bike status in Dock Finder.”",
     ]

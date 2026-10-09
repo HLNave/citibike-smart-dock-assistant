@@ -41,6 +41,16 @@ struct SpeechTests {
         #expect(uk.contains("met"))
     }
 
+    @Test func roundedLengths() {
+        let us = Locale(identifier: "en_US")
+        let metric = Locale(identifier: "en_GB")
+        #expect(Speech.length(500, locale: us) == "0.3 miles")
+        #expect(Speech.length(1_200, locale: us) == "0.7 miles")
+        #expect(Speech.length(100, locale: us) == "350 feet")
+        #expect(Speech.length(500, locale: metric) == "500 metres")
+        #expect(Speech.length(1_200, locale: metric) == "1.2 kilometres")
+    }
+
     @Test func countsAndNumbers() {
         #expect(Speech.docksOpen(1) == "1 dock open")
         #expect(Speech.docksOpen(5) == "5 docks open")

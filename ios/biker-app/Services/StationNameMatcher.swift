@@ -91,7 +91,7 @@ nonisolated enum StationNameMatcher {
         return editDistance(a, b) <= 1
     }
 
-    private static func editDistance(_ a: String, _ b: String) -> Int {
+    static func editDistance(_ a: String, _ b: String) -> Int {
         let a = Array(a), b = Array(b)
         var previous = Array(0...b.count)
         for i in 1...a.count {
