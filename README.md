@@ -67,6 +67,10 @@ n8n/
 docs/
   iphone-setup-handoff.md                        # step-by-step iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
+ios/
+  biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app (Siri App Intent); see ios/README.md
+  biker-app/                                     # app source
+  DockFinderTests/                               # unit tests
 ```
 
 The workflow JSON is the source of truth; `code-nodes/` holds copies of the six Code nodes so the logic is easy to read and review on GitHub.
