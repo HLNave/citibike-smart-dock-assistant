@@ -81,6 +81,8 @@ Always say "**run** Dock Finder". Without "run", Siri may treat it as a search o
 
 ## For whoever shares the shortcuts
 
+What each shortcut does, step by step, is in [shortcuts.md](shortcuts.md). It updates itself on every push.
+
 The shortcut files contain the group's n8n address, and the webhooks have no password. That's why they aren't in the repo. Build them from the latest code before sending:
 
 ```bash

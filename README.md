@@ -66,10 +66,12 @@ n8n/
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
 docs/
   onboarding.md                                  # start here as a new rider
+  shortcuts.md                                   # how every shared shortcut works, step by step (auto-updated on each push)
   iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
 shortcuts/
   build_shortcuts.py                             # builds the signed, shareable .shortcut files (output in shortcuts/dist/, gitignored)
+  generate_docs.py                               # regenerates docs/shortcuts.md (CI runs it on every push)
 ios/
   biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app: dock logic runs on the iPhone, n8n only for free-form questions; see ios/README.md
   biker-app/                                     # app source

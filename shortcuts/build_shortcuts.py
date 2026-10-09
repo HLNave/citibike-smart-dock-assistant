@@ -11,6 +11,9 @@ so rebuilding after a `git pull` always matches the current backend.
 
 Output goes to shortcuts/dist/ (gitignored: the files contain the n8n host,
 and the webhooks have no password). Signing uses macOS's `shortcuts sign`.
+
+docs/shortcuts.md describes every shortcut built here; it's regenerated from
+this file by shortcuts/generate_docs.py (and by CI on every push).
 """
 import argparse
 import json
@@ -139,6 +142,20 @@ def dock_arrival(arrival_url, place):
     ], color=4251333119)
 
 
+def catalog(arrival_url, siri_url):
+    """Every shortcut the group shares, with how a rider triggers it. Used by the build and by generate_docs.py."""
+    return [
+        {"name": "Dock Finder", "trigger": 'Say "Hey Siri, run Dock Finder", then answer the question out loud.',
+         "build": dock_finder, "workflow": dock_finder(siri_url)},
+        {"name": "Nearest Dock", "trigger": "Press the Action Button (Settings → Action Button → Shortcut), or tap it.",
+         "build": nearest_dock, "workflow": nearest_dock(arrival_url)},
+        *[{"name": f"Dock Arrival - {place.title()}",
+           "trigger": f"Runs by itself from an Arrive automation set ~500 m around the rider's {place}.",
+           "build": dock_arrival, "workflow": dock_arrival(arrival_url, place)}
+          for place in ("school", "work", "home")],
+    ]
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", required=True, help="n8n host, e.g. yourname.app.n8n.cloud (no https://)")
@@ -152,14 +169,8 @@ def main():
 
     out = Path(args.out)
     (out / "unsigned").mkdir(parents=True, exist_ok=True)
-    shortcuts = {
-        "Dock Finder": dock_finder(siri_url),
-        "Nearest Dock": nearest_dock(arrival_url),
-        "Dock Arrival - School": dock_arrival(arrival_url, "school"),
-        "Dock Arrival - Work": dock_arrival(arrival_url, "work"),
-        "Dock Arrival - Home": dock_arrival(arrival_url, "home"),
-    }
-    for name, wf in shortcuts.items():
+    for item in catalog(arrival_url, siri_url):
+        name, wf = item["name"], item["workflow"]
         raw = out / "unsigned" / f"{name}.shortcut"
         raw.write_bytes(plistlib.dumps(wf, fmt=plistlib.FMT_BINARY))
         if args.unsigned:
