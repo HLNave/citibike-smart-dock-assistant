@@ -75,6 +75,8 @@ ios/
 
 The workflow JSON is the source of truth; `code-nodes/` holds copies of the six Code nodes so the logic is easy to read and review on GitHub.
 
+To try the native iOS app (developer preview) on your own iPhone, follow [Testing the developer preview on your own iPhone](ios/README.md#testing-the-developer-preview-on-your-own-iphone).
+
 ## Set it up
 
 ### 1. Backend (n8n)
