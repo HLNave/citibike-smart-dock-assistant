@@ -68,7 +68,7 @@ docs/
   iphone-setup-handoff.md                        # step-by-step iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
 ios/
-  biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app (Siri App Intent); see ios/README.md
+  biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app: dock logic runs on the iPhone, n8n only for free-form questions; see ios/README.md
   biker-app/                                     # app source
   DockFinderTests/                               # unit tests
 ```

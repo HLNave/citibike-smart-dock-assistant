@@ -19,11 +19,16 @@ func info(_ id: String, _ name: String, _ lat: Double, _ lon: Double) -> Station
 func status(
     _ id: String,
     docks: Int,
+    bikes: Int = 0,
+    ebikes: Int = 0,
     installed: Bool = true,
     returning: Bool = true,
     reported: Date? = referenceNow.addingTimeInterval(-30)
 ) -> StationStatus {
-    StationStatus(stationID: id, numDocksAvailable: docks, isInstalled: installed, isReturning: returning, lastReported: reported)
+    StationStatus(
+        stationID: id, numDocksAvailable: docks, numBikesAvailable: bikes, numEbikesAvailable: ebikes,
+        isInstalled: installed, isReturning: returning, lastReported: reported
+    )
 }
 
 func informationFeed(_ stations: [StationInformation], updated: Date = referenceNow) -> GBFSFeed<StationInformationPayload> {

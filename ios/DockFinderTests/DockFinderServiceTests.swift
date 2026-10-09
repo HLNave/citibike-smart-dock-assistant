@@ -39,14 +39,20 @@ struct DockFinderServiceTests {
 
     @Test func joinsInformationAndStatusByStationID() throws {
         // Status order differs from information order; join must use IDs.
-        let station = try select([near, mid], [status("mid", docks: 9), status("near", docks: 1)])
+        let station = try select([near, mid], [status("mid", docks: 9), status("near", docks: 2)])
         #expect(station.id == "near")
-        #expect(station.availableDocks == 1)
+        #expect(station.availableDocks == 2)
         #expect(station.latitude == near.latitude)
     }
 
     @Test func excludesStationsWithZeroDocks() throws {
         let station = try select([near, mid], [status("near", docks: 0), status("mid", docks: 2)])
+        #expect(station.id == "mid")
+    }
+
+    @Test func excludesStationsWithOnlyOneDock() throws {
+        // Matches the backend: one open dock is often broken or gone on arrival.
+        let station = try select([near, mid], [status("near", docks: 1), status("mid", docks: 2)])
         #expect(station.id == "mid")
     }
 
@@ -142,18 +148,15 @@ struct DockFinderServiceTests {
 
     // MARK: - Spoken summary
 
-    @Test func summaryUsesRealStationData() {
+    @Test func summaryUsesSpokenStationNames() {
         let station = DockStation(
-            id: "x", name: "Smith St & Bergen St", latitude: 0, longitude: 0,
-            availableDocks: 1, straightLineDistance: 300, observedAt: nil
+            id: "x", name: "W 15 St & 6 Ave", latitude: 0, longitude: 0,
+            availableDocks: 1, straightLineDistance: 20, observedAt: nil
         )
         let precise = DockSearchResult(station: station, locationIsApproximate: false)
-        #expect(precise.summary.contains("Smith St & Bergen St"))
-        #expect(precise.summary.contains("1 open dock."))
-        #expect(precise.summary.contains("straight line"))
-        #expect(!precise.summary.contains("approximate"))
+        #expect(precise.summary == "West 15th and 6th has 1 dock open, right there.")
 
         let approximate = DockSearchResult(station: station, locationIsApproximate: true)
-        #expect(approximate.summary.contains("approximate"))
+        #expect(approximate.summary.hasSuffix("Your location is approximate, so a closer dock may exist."))
     }
 }

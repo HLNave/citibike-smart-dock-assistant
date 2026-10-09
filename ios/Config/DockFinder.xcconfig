@@ -1,0 +1,15 @@
+// Shared build settings for the Dock Finder app target.
+//
+// Per-person settings (signing team, bundle ID, the n8n server host) go in
+// Local.xcconfig next to this file. It's gitignored; copy
+// Local.example.xcconfig to create it. See ios/README.md.
+
+// Bundle IDs are unique across all Apple accounts, so each tester sets their own.
+DOCKFINDER_BUNDLE_ID = spork.biker-app
+
+// Host of the n8n workflow, e.g. yourname.app.n8n.cloud. Empty means the app
+// never contacts a server; free-form questions it can't understand on device
+// get a help message instead.
+DOCKFINDER_BACKEND_HOST =
+
+#include? "Local.xcconfig"

@@ -19,6 +19,9 @@
 /* Begin PBXFileReference section */
 		3DF390E530783FC0009B23C2 /* Dock Finder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Dock Finder.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000001 /* DockFinderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockFinderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000000000000000000000C /* DockFinder.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DockFinder.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000000D /* Local.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.example.xcconfig; sourceTree = "<group>"; };
+		AA000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -57,6 +60,7 @@
 			children = (
 				3DF390E730783FC0009B23C2 /* biker-app */,
 				AA0000000000000000000002 /* DockFinderTests */,
+				AA000000000000000000000F /* Config */,
 				3DF390E630783FC0009B23C2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,6 +72,16 @@
 				AA0000000000000000000001 /* DockFinderTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000000F /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AA000000000000000000000C /* DockFinder.xcconfig */,
+				AA000000000000000000000D /* Local.example.xcconfig */,
+				AA000000000000000000000E /* Info.plist */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -321,6 +335,7 @@
 		};
 		3DF390F130783FC1009B23C2 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000000C /* DockFinder.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -328,6 +343,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Dock Finder";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dock Finder uses your location to find nearby Citi Bike docking stations.";
@@ -341,7 +357,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "spork.biker-app";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DOCKFINDER_BUNDLE_ID)";
 				PRODUCT_MODULE_NAME = DockFinder;
 				PRODUCT_NAME = "Dock Finder";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -356,6 +372,7 @@
 		};
 		3DF390F230783FC1009B23C2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA000000000000000000000C /* DockFinder.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -363,6 +380,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Dock Finder";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Dock Finder uses your location to find nearby Citi Bike docking stations.";
@@ -376,7 +394,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "spork.biker-app";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(DOCKFINDER_BUNDLE_ID)";
 				PRODUCT_MODULE_NAME = DockFinder;
 				PRODUCT_NAME = "Dock Finder";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

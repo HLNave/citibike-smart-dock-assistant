@@ -19,6 +19,10 @@ nonisolated enum DockFinderError: Error, Equatable, Sendable {
     case staleData(lastUpdated: Date)
     case noAvailableDocks
     case outsideServiceArea
+    case placeNotFound(String)
+    case stationNotFound(String)
+    case savedPlaceNotFound
+    case backendUnavailable
 }
 
 extension DockFinderError: CustomLocalizedStringResourceConvertible, LocalizedError {
@@ -46,6 +50,14 @@ extension DockFinderError: CustomLocalizedStringResourceConvertible, LocalizedEr
             "Dock Finder couldn't find a Citi Bike station with an open dock right now."
         case .outsideServiceArea:
             "There are no Citi Bike stations with open docks near you. Citi Bike operates in New York City, Jersey City, and Hoboken."
+        case .placeNotFound(let query):
+            "Dock Finder couldn't find \(query) on the map. Try a street address, an intersection, or a more specific name."
+        case .stationNotFound(let query):
+            "Dock Finder couldn't find a Citi Bike station called \(query)."
+        case .savedPlaceNotFound:
+            "That saved place no longer exists. Open Dock Finder to add it again."
+        case .backendUnavailable:
+            "Dock Finder couldn't reach its server to answer that. Try asking for a dock near you or near a place."
         }
     }
 

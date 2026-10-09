@@ -96,6 +96,10 @@ nonisolated struct StationInformation: Decodable, Sendable, Equatable {
 nonisolated struct StationStatus: Decodable, Sendable, Equatable {
     let stationID: String
     let numDocksAvailable: Int
+    /// Bikes ready to rent, including e-bikes. Optional in the feed.
+    let numBikesAvailable: Int
+    /// The e-bike subset of `numBikesAvailable`. Optional in the feed.
+    let numEbikesAvailable: Int
     let isInstalled: Bool
     let isReturning: Bool
     /// When the station itself last reported to the system, if present.
@@ -104,14 +108,26 @@ nonisolated struct StationStatus: Decodable, Sendable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case stationID = "station_id"
         case numDocksAvailable = "num_docks_available"
+        case numBikesAvailable = "num_bikes_available"
+        case numEbikesAvailable = "num_ebikes_available"
         case isInstalled = "is_installed"
         case isReturning = "is_returning"
         case lastReported = "last_reported"
     }
 
-    init(stationID: String, numDocksAvailable: Int, isInstalled: Bool, isReturning: Bool, lastReported: Date?) {
+    init(
+        stationID: String,
+        numDocksAvailable: Int,
+        numBikesAvailable: Int = 0,
+        numEbikesAvailable: Int = 0,
+        isInstalled: Bool,
+        isReturning: Bool,
+        lastReported: Date?
+    ) {
         self.stationID = stationID
         self.numDocksAvailable = numDocksAvailable
+        self.numBikesAvailable = numBikesAvailable
+        self.numEbikesAvailable = numEbikesAvailable
         self.isInstalled = isInstalled
         self.isReturning = isReturning
         self.lastReported = lastReported
@@ -121,6 +137,8 @@ nonisolated struct StationStatus: Decodable, Sendable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         stationID = try container.decode(String.self, forKey: .stationID)
         numDocksAvailable = try container.decode(Int.self, forKey: .numDocksAvailable)
+        numBikesAvailable = (try? container.decodeIfPresent(Int.self, forKey: .numBikesAvailable)) ?? 0
+        numEbikesAvailable = (try? container.decodeIfPresent(Int.self, forKey: .numEbikesAvailable)) ?? 0
         // The spec says booleans, but Citi Bike publishes 0/1 integers.
         isInstalled = try container.decodeFlexibleBool(forKey: .isInstalled)
         isReturning = try container.decodeFlexibleBool(forKey: .isReturning)

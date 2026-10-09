@@ -28,15 +28,26 @@ struct SiriInstructionsView: View {
                 }
                 .multilineTextAlignment(.center)
 
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("Just say")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text("“Hey Siri, find a dock with Dock Finder.”")
-                        .font(.title3.weight(.semibold))
-                        .multilineTextAlignment(.center)
+                    ForEach(Self.phrases, id: \.self) { phrase in
+                        Label {
+                            Text(phrase)
+                                .font(.body.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "mic.fill")
+                                .foregroundStyle(.tint)
+                        }
+                    }
+                    Text("Saved-place phrases work for any place you add, like “near work” or “near home”.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(.background.secondary, in: .rect(cornerRadius: 16))
 
@@ -70,6 +81,15 @@ struct SiriInstructionsView: View {
             }
         }
     }
+
+    static let phrases = [
+        "“Hey Siri, find a dock with Dock Finder.”",
+        "“Hey Siri, find a dock near school with Dock Finder.”",
+        "“Hey Siri, find a dock near a place with Dock Finder.”",
+        "“Hey Siri, check a station with Dock Finder.”",
+        "“Hey Siri, Citi Bike status in Dock Finder.”",
+        "“Hey Siri, ask Dock Finder.”",
+    ]
 
     private var locationIsUnavailable: Bool {
         authorizationStatus == .denied || authorizationStatus == .restricted

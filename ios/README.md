@@ -1,39 +1,61 @@
 # Dock Finder
 
-A minimal SwiftUI app that exposes a **Find Dock** App Intent to Siri and Shortcuts. It finds the nearest Citi Bike station that is accepting returns and has at least one open dock, using Citi Bike's public GBFS feeds.
+A SwiftUI app that answers Citi Bike dock questions through Siri, Shortcuts and its own screens. Everything that can run on the iPhone does. It reads Citi Bike's public GBFS feeds directly and uses Apple's map search for places. Only free-form questions the phone can't understand go to the group's n8n workflow.
 
-> "Hey Siri, find a dock with Dock Finder."
+> "Hey Siri, find a dock near school with Dock Finder."
+> "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
+
+## What runs where
+
+| Feature | Runs on | Siri phrase |
+| --- | --- | --- |
+| Nearest dock to you | iPhone | "Find a dock with Dock Finder" |
+| Dock near a saved place (school, work, home…), checking your usual dock first and rerouting if it's full | iPhone | "Find a dock near school with Dock Finder", "Check my school dock with Dock Finder" |
+| Arrival alert ~500 m before a saved place | iPhone (Shortcuts **Arrive** automation → *Find Dock Near Saved Place* → Speak Text) | none, automatic |
+| Dock near any address, landmark or neighborhood | iPhone (Apple map search) | "Find a dock near a place with Dock Finder", then say the place |
+| Is a station full, and where to go instead | iPhone | "Check a station with Dock Finder", then say the station |
+| Citywide totals | iPhone | "Citi Bike status in Dock Finder" |
+| Set a usual dock | iPhone (in the app, or the *Set Usual Dock* action in Shortcuts) | none |
+| Cycling directions | Apple Maps / Google Maps links in the app | none |
+| Free-form questions ("Ask Dock Finder", then anything) | iPhone first (phrase rules, then Apple Intelligence where available), **n8n backend** only when neither understands the request or can find the place/station | "Ask Dock Finder" |
+
+Dock rules match the n8n workflow: a station counts only if it's installed, accepting returns, has **at least 2** open docks, and reported in the last hour. Destination searches stay within **1.2 km**. Station names are spoken the way New Yorkers say them ("W 15 St & 6 Ave" → "West 15th and 6th").
+
+Every answer is one sentence. Siri speaks it, the app shows it, and Shortcuts receives it as text (so automations can pipe it into **Speak Text**).
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `biker-app/App/DockFinderApp.swift` | Entry point; shows onboarding or home based on `OnboardingState` |
-| `biker-app/Views/` | `WelcomeView` (+ onboarding flow), `SiriInstructionsView`, `HomeView`, shared `DockLookupSection` / `DockLookupModel` |
-| `biker-app/Intents/` | `FindDockIntent`, `DockFinderShortcutsProvider` |
-| `biker-app/Services/` | `DockFinderService` (pipeline + selection), `CitiBikeAPIClient` (GBFS), `LocationService` (one-shot When In Use), `DockFinderError` |
-| `biker-app/Models/` | GBFS feed models, `DockStation` / `DockSearchResult` |
-| `biker-app/State/OnboardingState.swift` | Persisted walkthrough flag (`UserDefaults`) |
+| `biker-app/App/DockFinderApp.swift` | Entry point; shows onboarding or home |
+| `biker-app/Views/` | Home, saved places (add, check, usual-dock picker), dock near a place, station check, citywide, Ask, Siri instructions, onboarding |
+| `biker-app/Intents/` | App Intents (`FindDockIntent.swift`), Siri phrases (`DockFinderShortcutsProvider`), saved place and station entities |
+| `biker-app/Services/DockFinderService.swift` | Every on-device feature, shared by Siri and the UI |
+| `biker-app/Models/StationNetwork.swift` | Joined station snapshot and the dock rules |
+| `biker-app/Services/Speech.swift` | Spoken sentences and station-name rewriting (port of n8n's `make-it-speakable`) |
+| `biker-app/Services/StationNameMatcher.swift` | Fuzzy matching of spoken station names |
+| `biker-app/Services/PlaceSearch.swift` | Apple map search, limited to the Citi Bike service area |
+| `biker-app/Services/RequestParsing.swift` | Free-form request understanding: phrase rules, then Apple's on-device model |
+| `biker-app/Services/AssistantRouter.swift` | Decides between on-device answers and the backend |
+| `biker-app/Services/AssistantBackend.swift` | n8n Siri webhook client |
+| `biker-app/State/` | Saved places (`UserDefaults`, on this device only) and onboarding state |
+| `Config/` | Build settings; your personal `Local.xcconfig` lives here (gitignored) |
 | `DockFinderTests/` | Swift Testing unit tests |
-
-Siri and the in-app buttons go through the same code: `DockFinderService.live.findNearestDock()`.
-
-## How it works
-
-1. Get one location fix (`CLLocationManager.requestLocation`, 15 s timeout, nothing persisted).
-2. Fetch `station_information.json` and `station_status.json` concurrently from `gbfs.citibikenyc.com`.
-3. Reject the status feed if `last_updated` is more than 15 minutes old.
-4. Join on `station_id`. Keep stations that are installed, have `is_returning` set, have `num_docks_available > 0`, and reported within the last hour.
-5. Pick the minimum **straight-line** distance. If it's more than 10 km away, report "outside service area".
-
-Citi Bike publishes the GBFS booleans as `0`/`1` integers. The decoder accepts booleans, integers, or strings. A malformed station is skipped instead of failing the whole feed.
-
-Distances are formatted for your locale (feet/miles in the US). They are always described as "in a straight line", never as a route distance.
 
 ## Building
 
-- Xcode 26.6, iOS 26.5 deployment target (from the existing project).
-- **Set a Development Team** (target `biker-app` → Signing & Capabilities). Without a Team ID, iOS's App Intents daemon (`linkd`) rejects the app, with "Unable to get teamId … Rejecting invalid client due to requiresValidBundle". Find Dock still *appears* in Shortcuts but fails with "Unable to run App Shortcut". This happens in the Simulator too.
+- Xcode 26.6, iOS 26.5 deployment target.
+- Personal settings live in `Config/Local.xcconfig`, which is gitignored. Create it once:
+
+  ```bash
+  cp ios/Config/Local.example.xcconfig ios/Config/Local.xcconfig
+  ```
+
+  Then fill in:
+  - `DEVELOPMENT_TEAM`: your team ID (Xcode → Settings → Accounts → your Apple ID → the team shows its ID).
+  - `DOCKFINDER_BUNDLE_ID`: something unique to you, e.g. `com.yourname.dockfinder`.
+  - `DOCKFINDER_BACKEND_HOST` (optional): the group's n8n host, e.g. `yourname.app.n8n.cloud`. Ask a teammate. Leave it empty and the app never contacts a server; anything it can't answer on device gets a short help message instead.
+- **A Development Team is required, even in the Simulator.** Without a Team ID, iOS's App Intents daemon (`linkd`) rejects the app with "Unable to get teamId … Rejecting invalid client due to requiresValidBundle". The intents still *appear* in Shortcuts but fail with "Unable to run App Shortcut".
 
 ```bash
 xcodebuild -project biker-app.xcodeproj -scheme biker-app -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
@@ -44,6 +66,16 @@ To also run the opt-in test against the live Citi Bike feeds:
 ```bash
 TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -scheme biker-app -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
+
+## Arrival alerts (replaces the n8n arrival webhook)
+
+1. In Dock Finder, **Add a Place** (e.g. School), then open it and pick its **Usual Dock**.
+2. In the Shortcuts app: **Automation** tab → **+** → **Arrive** → choose the location and drag the circle to about 500 m → **Run Immediately** → **Next** → **New Blank Automation**.
+3. **Add Action** → search **Dock Finder** → **Find Dock Near Saved Place** → set Place to School.
+4. **Add Action** → **Speak Text**, with the input set to the previous action's result. Turn on **Wait Until Finished**.
+5. Tap **▶︎** to test. You should hear something like "Your usual dock has 25 docks open."
+
+No server is involved, so it answers in about a second.
 
 ## Testing the developer preview on your own iPhone
 
@@ -63,10 +95,7 @@ There's no TestFlight build yet, so each tester installs the app on their own iP
    Then open `ios/biker-app.xcodeproj` in Xcode.
 2. **Connect your iPhone**, unlock it, and tap **Trust This Computer**.
 3. **Turn on Developer Mode** on the iPhone: Settings → Privacy & Security → **Developer Mode**. The phone restarts; confirm when asked. If the option isn't there, do step 5 first and it will appear.
-4. **Set up signing.** In Xcode, select the blue **biker-app** project in the sidebar, then the **biker-app** target, then the **Signing & Capabilities** tab:
-   - Check **Automatically manage signing**.
-   - Set **Team** to your own team. With a free Apple ID, that's "*Your Name* (Personal Team)".
-   - Change **Bundle Identifier** to something unique to you, e.g. `com.yourname.dockfinder`. Bundle IDs are unique across all Apple accounts, so the default `spork.biker-app` only works for its owner.
+4. **Set up signing** in `ios/Config/Local.xcconfig` (see [Building](#building)): copy `Local.example.xcconfig`, then set `DEVELOPMENT_TEAM` to your own team ID and `DOCKFINDER_BUNDLE_ID` to something unique to you, e.g. `com.yourname.dockfinder`. Bundle IDs are unique across all Apple accounts, so the default `spork.biker-app` only works for its owner. With a free Apple ID, your team is "*Your Name* (Personal Team)". After reopening the project, **Signing & Capabilities** should show that team with **Automatically manage signing** checked.
 5. **Choose your iPhone as the run destination** in the device menu at the top of the Xcode window, not a simulator. With a free team, Xcode only registers your phone (and creates a provisioning profile) once the phone is selected here. If Signing & Capabilities showed "Your team has no devices" or "No profiles found", click **Try Again** now.
 6. **Build and run** with **⌘R**.
 7. **Trust your developer certificate.** The first launch is blocked with "Untrusted Developer". On the iPhone, go to Settings → General → **VPN & Device Management**, tap your Apple ID, then **Trust**. Press ⌘R again.
@@ -76,19 +105,22 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 ### Things to know
 
 - **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
-- **Don't commit your signing changes.** Setting a Team and Bundle Identifier writes them into `project.pbxproj`. Before committing, run `git diff` and leave those lines out, or run `git checkout -- ios/biker-app.xcodeproj/project.pbxproj` if they're the only changes in that file.
+- **Keep signing out of the project file.** Set your team and bundle ID in `Local.xcconfig`, not with the Team menu in Xcode. The menu writes them into `project.pbxproj`, which is shared. If that happens, run `git diff` before committing and leave those lines out.
 - **Siri needs a Development Team.** Without one, Find Dock appears in Shortcuts but fails with "Unable to run App Shortcut" (see Building above).
 - **Report results.** Work through the checklist below and post what you found (with screenshots of any errors) in the group chat or as a GitHub issue.
 
 ## Manual verification checklist (physical iPhone)
 
-These can't be automated and **have not yet been verified on a device**:
+These can't be automated and **have not yet been verified on a device**. The Simulator runs have covered the in-app screens with live data:
 
 - [ ] Fresh install → Welcome screen → button shows the location prompt → Siri instructions screen.
-- [ ] `SiriTipView` shows the phrase. It renders as a placeholder in the Simulator.
-- [ ] "Dock Finder shortcuts" link opens Shortcuts and shows **Find Dock**.
-- [ ] Running Find Dock from Shortcuts speaks or shows a real station.
+- [ ] "Dock Finder shortcuts" link opens Shortcuts and shows all six actions.
 - [ ] "Hey Siri, find a dock with Dock Finder" works **without opening the app** (`supportedModes = .background`).
+- [ ] After adding School, "Hey Siri, find a dock near school with Dock Finder" works. The phrase can take a minute to register after adding the place.
+- [ ] "Hey Siri, find a dock near a place with Dock Finder" → Siri asks "Where are you headed?" → "Union Square" gets an answer.
+- [ ] "Hey Siri, check a station with Dock Finder" → "Mercer and Bleecker" gets an answer.
+- [ ] "Hey Siri, ask Dock Finder" → "find me a dock near Union Square" is answered on device; a question it can't understand is answered by the server (if `DOCKFINDER_BACKEND_HOST` is set).
+- [ ] An Arrive automation running *Find Dock Near Saved Place* → Speak Text speaks the answer through headphones with the phone locked.
 - [ ] Location permission never granted → Siri says to open Dock Finder.
 - [ ] Location revoked in Settings → Siri reports permission denied, and the app shows the Settings notice.
 - [ ] Airplane mode → "couldn't reach Citi Bike".
@@ -102,16 +134,10 @@ The three supplied `.shortcut` files are signed Apple Encrypted Archives. They w
 
 **Dock Finder.shortcut**: Ask for Input ("What do you need?") → Get Current Location → `POST https://YOUR-N8N-HOST/webhook/citibike-siri` with `{text, lat, lon, sessionId: "<name>"}` → Speak the response.
 
-- All station-selection logic lives in the remote n8n workflow, which isn't included. There was no algorithm in the shortcut to preserve.
-- Differences in the native app:
-  - No free-text question: the intent always answers "nearest station with an open return dock".
-  - No third-party backend: the data comes straight from Citi Bike's GBFS feeds.
-  - No hardcoded session ID.
-  - Behavior is deterministic and covered by unit tests.
-- If the n8n workflow did more (for example finding bikes, e-bikes, or ranking by more than distance), that behavior isn't reproduced here.
+- The app's **Ask Dock Finder** intent replaces this shortcut. It answers on device when it can and sends the same `{text, lat, lon, sessionId}` body to the same webhook otherwise, with a random per-install session ID instead of a first name.
 
 **School Automation.shortcut** + **CitiBike App Detection.shortcut**: a personal-automation pair.
 
 - *App Detection* (presumably triggered when the Citi Bike app opens) writes the current ISO-8601 timestamp to `ride.txt`.
 - *School Automation* (presumably a location trigger) reads `ride.txt`. If more than 60 minutes have passed, it exits. Otherwise it geocodes "44 W 4th Street", POSTs `{place: "school", destLat, destLon}` to `…/webhook/citibike-arrival`, speaks the response, and resets `ride.txt` to `2000-01-01`.
-- These are user-created automations and aren't installed or recreated by the app (out of scope per the PRD). A future "dock near my destination" intent could cover the same need natively.
+- The app's **Find Dock Near Saved Place** intent covers the same need on device (see [Arrival alerts](#arrival-alerts-replaces-the-n8n-arrival-webhook)). The ride-detection timestamp trick isn't reproduced; use a Time Range on the Arrive automation instead.
