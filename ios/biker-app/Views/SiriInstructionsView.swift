@@ -32,7 +32,7 @@ struct SiriInstructionsView: View {
                     Text("Just say")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    PhraseRow(text: "“Hey Siri, run Dock Finder.”", systemImage: "mic.fill")
+                    PhraseRow(text: "“Hey Siri, ask Dock Finder.”", systemImage: "mic.fill")
                         .font(.title3.weight(.semibold))
                     PhraseRow(text: "Siri asks: “Where are you headed, or which station?”", systemImage: "bubble.left.fill")
                         .foregroundStyle(.secondary)
@@ -57,7 +57,7 @@ struct SiriInstructionsView: View {
                         PhraseRow(text: phrase, systemImage: "mic")
                             .font(.subheadline)
                     }
-                    Text("Faster when Siri hears them right, but Siri sometimes mistakes “dock” for “doc”. If that happens, use “run Dock Finder” instead.")
+                    Text("Faster when Siri hears them right, but Siri sometimes mistakes “dock” for “doc”. If that happens, use “ask Dock Finder” instead.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

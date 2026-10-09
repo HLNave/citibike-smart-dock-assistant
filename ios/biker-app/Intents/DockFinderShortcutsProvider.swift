@@ -16,12 +16,10 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: AskDockFinderIntent(),
             phrases: [
-                "Run \(.applicationName)",
                 "Ask \(.applicationName)",
                 "Talk to \(.applicationName)",
-                "Start \(.applicationName)",
             ],
-            shortTitle: "Run Dock Finder",
+            shortTitle: "Ask Dock Finder",
             systemImageName: "bicycle.circle"
         )
         AppShortcut(

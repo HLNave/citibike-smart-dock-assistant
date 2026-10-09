@@ -45,7 +45,7 @@ struct SavedPlaceView: View {
                 }
 
                 Section {
-                    Text("“Hey Siri, run Dock Finder.” Then say “\(place.name.lowercased())”.")
+                    Text("“Hey Siri, ask Dock Finder.” Then say “\(place.name.lowercased())”.")
                 } header: {
                     Text("Siri")
                 } footer: {
