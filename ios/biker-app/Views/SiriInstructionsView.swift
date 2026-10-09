@@ -109,7 +109,7 @@ struct SiriInstructionsView: View {
 
     static let oneStepPhrases = [
         "“Hey Siri, find a dock with Dock Finder.”",
-        "“Hey Siri, find a dock near school with Dock Finder.”",
+        "“Hey Siri, check my school dock with Dock Finder.”",
         "“Hey Siri, check a station with Dock Finder.”",
         "“Hey Siri, Citi Bike status in Dock Finder.”",
     ]

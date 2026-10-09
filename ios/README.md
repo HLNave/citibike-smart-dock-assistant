@@ -21,7 +21,12 @@ A SwiftUI app that answers Citi Bike dock questions through Siri, Shortcuts and 
 
 Splitting it into two steps is more reliable than one long phrase. Siri only has to recognize "ask Dock Finder", and your answer goes to the app as plain text, so Siri can't turn it into a Maps search. ("Dock" sounds like "doc", so "find a dock near school" can come out as a search for doctors.) The app treats a dictated "doc" as "dock", and "Doc Finder" is registered as an alternate app name (`INAlternativeAppNames` in `Config/Info.plist`).
 
-One-step phrases ("Find a dock with Dock Finder", "Find a dock near school with Dock Finder", "Check a station with Dock Finder", "Citi Bike status in Dock Finder") still work and are faster when Siri hears them correctly.
+One-step phrases still work and are faster when Siri hears them correctly:
+
+- **"Find a dock with Dock Finder"** (also "find me a dock", "find the nearest dock", "find an open dock", "nearest dock in Dock Finder"): the nearest station to you with room. No follow-up question.
+- "Check my school dock with Dock Finder", "Check a station with Dock Finder", "Citi Bike status in Dock Finder", "Start a ride with Dock Finder".
+
+Only Find Dock has phrases starting with "find a dock". Siri matches phrases loosely, so a second "find a dock near …" phrase could win instead and ask "where are you headed?", which turns the one-step request into a conversation. Docks near a destination go through "ask Dock Finder".
 
 > **Why not "run Dock Finder"?** Siri treats "run", "open", "launch" or "start" plus an app's name as "open the app", which beats the app's own phrases and needs the phone unlocked. App phrases must include the app's name, so no "run …" phrase can work from the app itself.
 >
@@ -34,7 +39,7 @@ One-step phrases ("Find a dock with Dock Finder", "Find a dock near school with 
 | Feature | Runs on | Siri phrase |
 | --- | --- | --- |
 | Nearest dock to you | iPhone | "Ask Dock Finder" → "near me" (or "Find a dock with Dock Finder") |
-| Dock near a saved place (school, work, home…), checking your usual dock first and rerouting if it's full | iPhone | "Ask Dock Finder" → "school" (or one step: "Find a dock near school with Dock Finder") |
+| Dock near a saved place (school, work, home…), checking your usual dock first and rerouting if it's full | iPhone | "Ask Dock Finder" → "school" (or one step: "Check my school dock with Dock Finder") |
 | **Ride alert**: start a ride to a saved place or anywhere, hear the best dock when you're ~500 m out, with the phone locked | iPhone (background location + speech) | "Ask Dock Finder" → "start a ride to school" (or "Start a ride with Dock Finder") |
 | Arrival alert from a Shortcuts **Arrive** automation (older approach) | iPhone (*Find Dock Near Saved Place* → Speak Text) | none, automatic |
 | Dock near any address, landmark or neighborhood | iPhone (Apple map search) | "Ask Dock Finder" → "near Union Square" |
@@ -168,7 +173,8 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Answering "school", "near Union Square", "Mercer and Bleecker", "near me" and "how many bikes are out" each gets the right answer.
 - [ ] Saying "Hey Siri, ask Doc Finder" (or Siri showing "doc") still reaches the app.
 - [ ] A question it can't understand is answered by the server (if `DOCKFINDER_BACKEND_HOST` is set).
-- [ ] One-step phrases: "Hey Siri, find a dock with Dock Finder" and, after adding School, "Hey Siri, find a dock near school with Dock Finder". The second can take a minute to register after adding the place.
+- [ ] "Hey Siri, find a dock with Dock Finder" (and "find me a dock…", "find the nearest dock…") answers with the nearest dock **without asking anything first**.
+- [ ] After adding School, "Hey Siri, check my school dock with Dock Finder" works. It can take a minute to register after adding the place.
 - [ ] "Ask Dock Finder" → "start a ride to school", lock the phone, ride: about 500 m out, the answer is spoken through headphones (music ducks) and shows as a notification. Then the ride card is gone.
 - [ ] The Always location prompt appears when starting a ride from the app, and the ride card's notice goes away once it's allowed.
 - [ ] If iOS closes the app mid-ride (after using lots of other apps), the geofence still alerts on arrival. Also try swiping the app away during a ride, to learn whether iOS relaunches a force-quit app for it.
