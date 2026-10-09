@@ -65,9 +65,11 @@ n8n/
   citibike-smart-dock-assistant.workflow.json   # import this into n8n
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
 docs/
-  onboarding.md                                  # start here as a new rider: picks the app or Shortcuts-only path
+  onboarding.md                                  # start here as a new rider
   iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
+shortcuts/
+  build_shortcuts.py                             # builds the signed, shareable .shortcut files (output in shortcuts/dist/, gitignored)
 ios/
   biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app: dock logic runs on the iPhone, n8n only for free-form questions; see ios/README.md
   biker-app/                                     # app source
@@ -80,7 +82,7 @@ To try the native iOS app (developer preview) on your own iPhone, follow [Testin
 
 ## Set it up
 
-**New rider? Start with [docs/onboarding.md](docs/onboarding.md).** It picks the right path for you: the Dock Finder app (no URLs or coordinates, needs a Mac to install) or Shortcuts only (no Mac). The steps below set up the shared n8n backend, which Path B needs and the app uses for free-form questions.
+**New rider? Start with [docs/onboarding.md](docs/onboarding.md).** Riders add a few shortcut files a teammate sends them, answer two questions, and make one automation per place: no URLs or coordinates. Whoever shares the files builds them with `shortcuts/build_shortcuts.py`. The steps below set up the shared n8n backend, which Path B needs and the app uses for free-form questions.
 
 ### 1. Backend (n8n)
 
