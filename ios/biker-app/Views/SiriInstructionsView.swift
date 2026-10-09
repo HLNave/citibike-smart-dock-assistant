@@ -28,21 +28,36 @@ struct SiriInstructionsView: View {
                 }
                 .multilineTextAlignment(.center)
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text("Just say")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    ForEach(Self.phrases, id: \.self) { phrase in
-                        Label {
-                            Text(phrase)
-                                .font(.body.weight(.semibold))
+                    PhraseRow(text: "“Hey Siri, run Dock Finder.”", systemImage: "mic.fill")
+                        .font(.title3.weight(.semibold))
+                    PhraseRow(text: "Siri asks: “Where are you headed, or which station?”", systemImage: "bubble.left.fill")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Then answer with")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        ForEach(Self.answers, id: \.self) { answer in
+                            Text("• \(answer)")
                                 .fixedSize(horizontal: false, vertical: true)
-                        } icon: {
-                            Image(systemName: "mic.fill")
-                                .foregroundStyle(.tint)
                         }
                     }
-                    Text("Saved-place phrases work for any place you add, like “near work” or “near home”.")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.background.secondary, in: .rect(cornerRadius: 16))
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("One-step shortcuts")
+                        .font(.headline)
+                    ForEach(Self.oneStepPhrases, id: \.self) { phrase in
+                        PhraseRow(text: phrase, systemImage: "mic")
+                            .font(.subheadline)
+                    }
+                    Text("Faster when Siri hears them right, but Siri sometimes mistakes “dock” for “doc”. If that happens, use “run Dock Finder” instead.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -51,7 +66,7 @@ struct SiriInstructionsView: View {
                 .padding()
                 .background(.background.secondary, in: .rect(cornerRadius: 16))
 
-                SiriTipView(intent: FindDockIntent())
+                SiriTipView(intent: AskDockFinderIntent())
 
                 if locationIsUnavailable {
                     LocationRequiredNotice()
@@ -82,17 +97,38 @@ struct SiriInstructionsView: View {
         }
     }
 
-    static let phrases = [
+    static let answers = [
+        "a saved place: “school”",
+        "a place: “near Union Square”",
+        "a station: “Mercer and Bleecker”",
+        "“near me”",
+        "“how many bikes are out?”",
+    ]
+
+    static let oneStepPhrases = [
         "“Hey Siri, find a dock with Dock Finder.”",
         "“Hey Siri, find a dock near school with Dock Finder.”",
-        "“Hey Siri, find a dock near a place with Dock Finder.”",
         "“Hey Siri, check a station with Dock Finder.”",
         "“Hey Siri, Citi Bike status in Dock Finder.”",
-        "“Hey Siri, ask Dock Finder.”",
     ]
 
     private var locationIsUnavailable: Bool {
         authorizationStatus == .denied || authorizationStatus == .restricted
+    }
+}
+
+private struct PhraseRow: View {
+    let text: String
+    let systemImage: String
+
+    var body: some View {
+        Label {
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(.tint)
+        }
     }
 }
 

@@ -4,5 +4,28 @@
 <dict>
 	<key>DockFinderBackendHost</key>
 	<string>$(DOCKFINDER_BACKEND_HOST)</string>
+	<!-- "Dock" and "doc" sound the same, so Siri often transcribes the app's
+	     name as "Doc Finder". These names let Siri match it anyway. -->
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Doc Finder</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>dock finder</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Dockfinder</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>dock finder</string>
+		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Docks Finder</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>docks finder</string>
+		</dict>
+	</array>
 </dict>
 </plist>

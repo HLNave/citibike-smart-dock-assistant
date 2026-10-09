@@ -230,3 +230,59 @@ struct SavedPlacesStoreTests {
         #expect(SavedPlacesStore(defaults: defaults, onChange: {}).places.isEmpty)
     }
 }
+
+// MARK: - "Run Dock Finder" follow-up answers
+
+struct FollowUpAnswerTests {
+    @Test(arguments: [
+        ("find me a doc near union square", ParsedRequest.place("union square")),
+        ("is there a doc by school", .place("school")),
+        ("nearest doc", .nearMe),
+        ("here", .nearMe),
+        ("Near me.", .nearMe),
+        ("nearest", .nearMe),
+    ])
+    func dictationQuirksAndShortAnswers(request: String, expected: ParsedRequest) {
+        #expect(KeywordRequestParser.parse(request) == expected)
+    }
+
+    @Test func doctorIsNotRewritten() {
+        #expect(KeywordRequestParser.normalize("find a doctor") == "find a doctor")
+    }
+
+    private let directory = [
+        info("1", "Mercer St & Bleecker St", 40.7271, -73.9965),
+        info("2", "Broadway & W 60 St", 40.7695, -73.9819),
+        info("3", "Broadway & E 14 St", 40.7345, -73.9907),
+        info("4", "Broadway", 40.7000, -73.9900),
+    ]
+
+    private var parser: ShortAnswerParser {
+        ShortAnswerParser(
+            savedPlaces: [SavedPlace(name: "School", latitude: 40.729, longitude: -73.996)],
+            service: DockFinderService(
+                location: StubLocation(result: .failure(.locationUnavailable)),
+                feeds: StubFeeds(information: .success(informationFeed(directory)), status: .failure(.networkUnavailable)),
+                now: { referenceNow }
+            )
+        )
+    }
+
+    @Test func savedPlaceNamesAlone() async {
+        #expect(await parser.parse("School") == .place("school"))
+        #expect(await parser.parse("my school") == .place("my school"))
+    }
+
+    @Test func stationNamesAlone() async {
+        #expect(await parser.parse("Mercer and Bleecker") == .station("1"))
+        #expect(await parser.parse("Mercer and Bleeker") == .station("1"))
+        #expect(await parser.parse("broadway and east 14th") == .station("3"))
+    }
+
+    @Test func ambiguousOrUnrelatedAnswersAreLeftForTheNextStep() async {
+        #expect(await parser.parse("mercer") == nil, "one word only counts if it's a station's whole name")
+        #expect(await parser.parse("broadway") == .station("4"))
+        #expect(await parser.parse("tell me a joke") == nil)
+        #expect(await parser.parse("") == nil)
+    }
+}

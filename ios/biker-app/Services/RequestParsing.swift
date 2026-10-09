@@ -63,6 +63,10 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         if citywidePhrases.contains(where: request.contains) {
             return .citywide
         }
+        // Short answers to "Where are you headed, or which station?".
+        if selfReferences.contains(request) || ["nearest", "closest", "nearest one", "closest one"].contains(request) {
+            return .nearMe
+        }
         if let target = capture(#"\b(?:near|nearest to|closest to|close to|next to|around|by)\s+(.+)$"#, in: request) {
             return selfReferences.contains(target) ? .nearMe : .place(target)
         }
@@ -97,8 +101,13 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         for suffix in [" please", " right now", " now"] where request.hasSuffix(suffix) {
             request.removeLast(suffix.count)
         }
-        return request.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        // Dictation often writes "dock" as "doc", since they sound the same.
+        return request.split(whereSeparator: \.isWhitespace)
+            .map { homophones[String($0)] ?? String($0) }
+            .joined(separator: " ")
     }
+
+    private static let homophones = ["doc": "dock", "docs": "docks", "doc's": "dock's"]
 
     private static func capture(_ pattern: String, in text: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -107,6 +116,31 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         else { return nil }
         let value = text[range].trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
         return value.isEmpty ? nil : value
+    }
+}
+
+// MARK: - Short answers
+
+/// Handles a bare answer to "Where are you headed, or which station?", such
+/// as "school" (a saved place) or "Mercer and Bleecker" (a station), which
+/// the phrase rules can't classify without knowing the rider's places and
+/// the station list.
+nonisolated struct ShortAnswerParser: RequestParsing {
+    var savedPlaces: [SavedPlace]
+    var service: DockFinderService
+
+    var answerSource: DockAnswer.Source { .onDevice }
+
+    func parse(_ text: String) async -> ParsedRequest? {
+        let request = KeywordRequestParser.normalize(text)
+        guard !request.isEmpty else { return nil }
+        if savedPlaces.contains(where: { $0.matches(request) }) {
+            return .place(request)
+        }
+        guard let directory = try? await service.stationDirectory(),
+              let station = StationNameMatcher.confidentMatch(for: request, in: directory)
+        else { return nil }
+        return .station(station.stationID)
     }
 }
 

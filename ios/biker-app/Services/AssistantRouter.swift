@@ -21,14 +21,20 @@ struct AssistantRouter {
     var location: any LocationProviding
     var sessionID: String
 
-    static let helpText = "You can ask for a dock near you, near a place, or near a saved place, whether a station has room, or for citywide totals. For example, find me a dock near Union Square."
+    static let helpText = "Say where you're headed, like school or Union Square, a station name, or near me. You can also ask how many bikes are out."
 
     static func live() -> AssistantRouter {
-        AssistantRouter(
-            service: .live,
+        let service = DockFinderService.live
+        let savedPlaces = SavedPlacesStore.shared.places
+        return AssistantRouter(
+            service: service,
             placeSearch: MapKitPlaceSearch(),
-            savedPlaces: SavedPlacesStore.shared.places,
-            parsers: [KeywordRequestParser(), OnDeviceModelParser()],
+            savedPlaces: savedPlaces,
+            parsers: [
+                KeywordRequestParser(),
+                ShortAnswerParser(savedPlaces: savedPlaces, service: service),
+                OnDeviceModelParser(),
+            ],
             backend: N8NAssistantClient.configured(),
             location: LocationService.shared,
             sessionID: AssistantSession.id()
