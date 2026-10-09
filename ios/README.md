@@ -45,6 +45,41 @@ To also run the opt-in test against the live Citi Bike feeds:
 TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -scheme biker-app -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
+## Testing the developer preview on your own iPhone
+
+There's no TestFlight build yet, so each tester installs the app on their own iPhone from Xcode. A free Apple ID is enough.
+
+### What you need
+
+- A Mac with **Xcode 26.6 or newer**, signed in to your Apple ID (Xcode → Settings → Accounts → **+** → Apple ID).
+- An iPhone on **iOS 26.5 or newer** and a USB cable. Wi-Fi works after the first install.
+
+### One-time setup
+
+1. **Get the code.**
+   ```bash
+   git clone https://github.com/HLNave/citibike-smart-dock-assistant.git
+   ```
+   Then open `ios/biker-app.xcodeproj` in Xcode.
+2. **Connect your iPhone**, unlock it, and tap **Trust This Computer**.
+3. **Turn on Developer Mode** on the iPhone: Settings → Privacy & Security → **Developer Mode**. The phone restarts; confirm when asked. If the option isn't there, do step 5 first and it will appear.
+4. **Set up signing.** In Xcode, select the blue **biker-app** project in the sidebar, then the **biker-app** target, then the **Signing & Capabilities** tab:
+   - Check **Automatically manage signing**.
+   - Set **Team** to your own team. With a free Apple ID, that's "*Your Name* (Personal Team)".
+   - Change **Bundle Identifier** to something unique to you, e.g. `com.yourname.dockfinder`. Bundle IDs are unique across all Apple accounts, so the default `spork.biker-app` only works for its owner.
+5. **Choose your iPhone as the run destination** in the device menu at the top of the Xcode window, not a simulator. With a free team, Xcode only registers your phone (and creates a provisioning profile) once the phone is selected here. If Signing & Capabilities showed "Your team has no devices" or "No profiles found", click **Try Again** now.
+6. **Build and run** with **⌘R**.
+7. **Trust your developer certificate.** The first launch is blocked with "Untrusted Developer". On the iPhone, go to Settings → General → **VPN & Device Management**, tap your Apple ID, then **Trust**. Press ⌘R again.
+
+Optional: Window → Devices and Simulators → select your phone → **Connect via network**, so later installs don't need the cable.
+
+### Things to know
+
+- **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
+- **Don't commit your signing changes.** Setting a Team and Bundle Identifier writes them into `project.pbxproj`. Before committing, run `git diff` and leave those lines out, or run `git checkout -- ios/biker-app.xcodeproj/project.pbxproj` if they're the only changes in that file.
+- **Siri needs a Development Team.** Without one, Find Dock appears in Shortcuts but fails with "Unable to run App Shortcut" (see Building above).
+- **Report results.** Work through the checklist below and post what you found (with screenshots of any errors) in the group chat or as a GitHub issue.
+
 ## Manual verification checklist (physical iPhone)
 
 These can't be automated and **have not yet been verified on a device**:
