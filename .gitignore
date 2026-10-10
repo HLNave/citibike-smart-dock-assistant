@@ -8,3 +8,7 @@ build/
 
 # Per-person iOS build settings (team ID, bundle ID, n8n host)
 ios/Config/Local.xcconfig
+
+# Built, signed shortcut files contain the group n8n host; never commit them
+shortcuts/dist/
+__pycache__/

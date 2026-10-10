@@ -1,23 +1,22 @@
 
 // called by the ios shortcut arrival automation. returns one short sentence for speak text.
-const body = $('arrival webhook').first().json.body ?? {};
+// where to look: set by "arrival place", or by "save place" when the address had to be looked up
+const p = $('save place').isExecuted ? $('save place').first().json : $('arrival place').first().json;
 const info = $('arrival station information').first().json;
 const status = $('arrival station status').first().json;
 
-const num = v => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null; };
-const place = String(body.place ?? '').trim() || 'your destination';
-const usualDock = String(body.usualDock ?? '').trim();
-const destLat = num(body.destLat), destLon = num(body.destLon);
-const curLat = num(body.lat), curLon = num(body.lon);
-const useDest = destLat !== null && destLon !== null;
-const centerLat = useDest ? destLat : curLat;
-const centerLon = useDest ? destLon : curLon;
+const place = p.place;
+const usualDock = p.usualDock;
+const useDest = Boolean(p.useDest);
+const centerLat = p.lat, centerLon = p.lon;
 const fromWhere = useDest ? place : 'you';
 
-if (centerLat === null || centerLon === null) {
-  const text = 'no location from your phone.';
+if (p.failed || !Number.isFinite(centerLat) || !Number.isFinite(centerLon)) {
+  const text = p.failed || 'no location from your phone.';
   return [{json:{text,spokenText:text}}];
 }
+// the first time an address is looked up, say what we found so the rider can catch a wrong match during setup
+const found = p.isNew && p.label ? `${place} is ${p.label}. ` : '';
 
 function meters(lat1,lon1,lat2,lon2) {
   const R=6371000, r=x=>x*Math.PI/180;
@@ -46,7 +45,7 @@ function matchScore(name,q) {
   return s-Math.abs(a.length-b.length);
 }
 function howFar(m) {
-  if (m < 75) return useDest ? `right at ${place}` : 'right there';
+  if (m < 75) return useDest ? `right next to ${place}` : 'right there';
   return useDest ? `${Math.round(m/50)*50} meters from ${place}` : `${Math.round(m/50)*50} meters away`;
 }
 const docks = n => `${n} ${n===1?'dock':'docks'} open`;
@@ -96,10 +95,11 @@ if (usual && canReturn(usual)) {
 }
 
 return [{json:{
-  text,
-  spokenText:text,
+  text: found + text,
+  spokenText: found + text,
   selectedStation:selected,
   usualMatched:usual ? usual.name : null,
   centeredOn:useDest ? 'destination' : 'current location',
+  matchedPlace:p.label ?? null,
   lastUpdated:status?.last_updated ?? null
 }}];

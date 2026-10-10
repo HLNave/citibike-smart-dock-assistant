@@ -65,8 +65,13 @@ n8n/
   citibike-smart-dock-assistant.workflow.json   # import this into n8n
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
 docs/
-  iphone-setup-handoff.md                        # step-by-step iPhone setup, written for an AI assistant to walk a rider through
+  onboarding.md                                  # start here as a new rider
+  shortcuts.md                                   # how every shared shortcut works, step by step (auto-updated on each push)
+  iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
+shortcuts/
+  build_shortcuts.py                             # builds the signed, shareable .shortcut files (output in shortcuts/dist/, gitignored)
+  generate_docs.py                               # regenerates docs/shortcuts.md (CI runs it on every push)
 ios/
   biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app: dock logic runs on the iPhone, n8n only for free-form questions; see ios/README.md
   biker-app/                                     # app source
@@ -78,6 +83,8 @@ The workflow JSON is the source of truth; `code-nodes/` holds copies of the six 
 To try the native iOS app (developer preview) on your own iPhone, follow [Testing the developer preview on your own iPhone](ios/README.md#testing-the-developer-preview-on-your-own-iphone).
 
 ## Set it up
+
+**New rider? Start with [docs/onboarding.md](docs/onboarding.md).** Riders add a few shortcut files a teammate sends them, answer two questions, and make one automation per place: no URLs or coordinates. Whoever shares the files builds them with `shortcuts/build_shortcuts.py`. The steps below set up the shared n8n backend, which Path B needs and the app uses for free-form questions.
 
 ### 1. Backend (n8n)
 
@@ -94,7 +101,7 @@ curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-arrival" -H "Content-Type: 
 
 ### 2. iPhone
 
-Open [`docs/iphone-setup-handoff.md`](docs/iphone-setup-handoff.md), replace `https://YOUR-N8N-HOST` with your n8n address, then attach it to ChatGPT or Claude and say "help me set this up on my iPhone". It covers the required iPhone settings, the arrival automations, the Dock Finder Siri shortcut, and a troubleshooting table of every mistake we hit. You need iOS 17 or newer and about 15 minutes.
+See [docs/onboarding.md](docs/onboarding.md). For the Shortcuts-only path: open [`docs/iphone-setup-handoff.md`](docs/iphone-setup-handoff.md), replace `https://YOUR-N8N-HOST` with your n8n address, then attach it to ChatGPT or Claude and say "help me set this up on my iPhone". It covers the required iPhone settings, the arrival automations, the Dock Finder Siri shortcut, and a troubleshooting table of every mistake we hit. You need iOS 17 or newer and about 15 minutes.
 
 **Webhook URLs have no authentication.** Anyone with them can query the assistant and spend your AI credits on Siri requests. Share filled-in copies only with people you trust.
 

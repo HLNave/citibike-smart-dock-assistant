@@ -16,6 +16,8 @@ function forSpeech(s) {
     .replace(/&/g,' and ')
     .replace(/\bE\b(?=\s+\d)/g,'East')
     .replace(/\bW\b(?=\s+\d)/g,'West')
+    .replace(/\bN\b(?=\s+(\d|[A-Z][a-z]))/g,'North')
+    .replace(/\bS\b(?=\s+(\d|[A-Z][a-z]))/g,'South')
     .replace(/\b(\d+)\s+(St|Ave)\b/g,(m,n)=>ordinal(Number(n)))
     .replace(/\s+(St|Ave|Pl|Blvd|Rd|Dr)\b(?!\s+[A-Z0-9])/g,'')
     .replace(/\bAve\b/g,'Avenue')

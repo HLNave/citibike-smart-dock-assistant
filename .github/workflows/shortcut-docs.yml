@@ -1,0 +1,37 @@
+name: Shortcut docs
+
+# Regenerates the generated sections of docs/shortcuts.md on every push, so the
+# shortcut reference always matches shortcuts/build_shortcuts.py, the n8n
+# workflow and the app's Siri phrases. Commits back only when something changed.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shortcut-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Regenerate docs/shortcuts.md
+        run: python3 shortcuts/generate_docs.py
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- docs/shortcuts.md; then
+            echo "docs/shortcuts.md already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898583+github-actions[bot]@users.noreply.github.com"
+          git add docs/shortcuts.md
+          git commit -m "Update docs/shortcuts.md from the latest code"
+          git push
