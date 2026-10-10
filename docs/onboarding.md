@@ -31,7 +31,7 @@ A teammate sends you the shortcut files (or iCloud links). For each one:
 2. Tap **Add Shortcut** (or **Set Up Shortcut**).
 3. Answer its questions:
    - **Dock Finder** asks for your **first name**. It keeps your conversation separate from everyone else's.
-   - **Dock Arrival** asks for the place's **address, with the city**, e.g. `44 W 4th St, New York, NY`. It also asks for your **usual dock** there, exactly as the Citi Bike app names it (e.g. `Mercer St & Bleecker St`). Leave that blank if you don't have one.
+   - **Dock Arrival** asks for the place's **address or name**: `44 W 4th St`, `NYU Stern` and `JPMC HQ` all work, and you don't need the city. It also asks for your **usual dock** there: just its two cross streets, e.g. `Mercer and Bleecker`. Leave that blank and it finds the closest dock with space.
    - **Nearest Dock** asks nothing.
 
 Only add the Dock Arrival ones you need (School, Work, Home).
@@ -59,7 +59,7 @@ Settings → **Action Button** → swipe to **Shortcut** → choose **Nearest Do
 
 - With AirPods in and the phone locked: "Hey Siri, **run Dock Finder**", then "find me a dock near me".
 - Things you can ask: "is Mercer and Bleecker full?", "find me a dock near Union Square", "how many bikes are out?", "my school dock is Mercer and Bleecker".
-- Open **Dock Arrival - School** in the Shortcuts app and tap **▶︎** to hear what the arrival alert will say.
+- Open **Dock Arrival - School** in the Shortcuts app and tap **▶︎**. The first time, it tells you where it thinks your school is ("school is NYU Stern School of Business, 44 West 4th Street, Manhattan."), then the dock. If that place is wrong, fix the address (see Troubleshooting).
 
 Always say "**run** Dock Finder". Without "run", Siri may treat it as a search or a message.
 
@@ -71,8 +71,9 @@ Always say "**run** Dock Finder". Without "run", Siri may treat it as a search o
 | It works unlocked but not in your pocket | Turn on **Allow Siri When Locked** (step 1) |
 | "Near me" picks a station far away | Turn on **Precise Location** for Shortcuts (step 1) |
 | A popup asks before the arrival alert runs | Edit the automation and choose **Run Immediately** |
-| Arrival alert names a station near the wrong place | The address was too vague. Open the Dock Arrival shortcut and fix the address text at the top. Include the street number, city and state |
-| "Your usual dock…" never comes up | The usual dock name doesn't match a station. Copy it exactly from the Citi Bike app |
+| The first test says the wrong place ("school is …") | Open the Dock Arrival shortcut and change the address text at the top to a street address, e.g. `44 W 4th St`. Run ▶︎ again; it confirms the new place |
+| "couldn't find … in new york city" | Same fix: use a street address with the number |
+| "Your usual dock…" never comes up | The cross streets didn't match a station near that place. Check the dock's name in the Citi Bike app and use its two streets |
 | A shortcut asks for permission mid-ride | Run it once from the Shortcuts app and choose **Always Allow** (step 3) |
 | "The network connection was lost" | Try again. If it keeps happening, delete that shortcut and add it again from the file |
 | Nothing happens and there's no error | Tell the group. Whoever runs the server can check if your request arrived |

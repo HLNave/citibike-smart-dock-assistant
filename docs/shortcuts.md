@@ -132,8 +132,8 @@ flowchart LR
 
 | # | Question | Fills step |
 |---|---|---|
-| 1 | Address of your school, with the city (e.g. 44 W 4th St, New York, NY) | 1 (Text) |
-| 2 | Your usual Citi Bike dock near your school, as it appears in the Citi Bike app (e.g. Mercer St & Bleecker St). Leave blank if you don't have one | 2 (Text) |
+| 1 | Address or name of your school (e.g. 44 W 4th St, or NYU Stern) | 1 (Text) |
+| 2 | Your usual Citi Bike dock near your school: its two cross streets, e.g. Mercer and Bleecker. Leave blank to just get the closest dock with space | 2 (Text) |
 
 **Steps, in order:**
 
@@ -149,8 +149,7 @@ flowchart LR
 | JSON field | Value |
 |---|---|
 | `place` | `"school"` (fixed) |
-| `destLat` | **Text** from step 1 as a Location (the phone geocodes the address) → Latitude |
-| `destLon` | **Text** from step 1 as a Location (the phone geocodes the address) → Longitude |
+| `address` | **Text** from step 1 |
 | `usualDock` | **Text** from step 2 |
 
 ```mermaid
@@ -171,8 +170,8 @@ flowchart LR
 
 | # | Question | Fills step |
 |---|---|---|
-| 1 | Address of your work, with the city (e.g. 44 W 4th St, New York, NY) | 1 (Text) |
-| 2 | Your usual Citi Bike dock near your work, as it appears in the Citi Bike app (e.g. Mercer St & Bleecker St). Leave blank if you don't have one | 2 (Text) |
+| 1 | Address or name of your work (e.g. 44 W 4th St, or NYU Stern) | 1 (Text) |
+| 2 | Your usual Citi Bike dock near your work: its two cross streets, e.g. Mercer and Bleecker. Leave blank to just get the closest dock with space | 2 (Text) |
 
 **Steps, in order:**
 
@@ -188,8 +187,7 @@ flowchart LR
 | JSON field | Value |
 |---|---|
 | `place` | `"work"` (fixed) |
-| `destLat` | **Text** from step 1 as a Location (the phone geocodes the address) → Latitude |
-| `destLon` | **Text** from step 1 as a Location (the phone geocodes the address) → Longitude |
+| `address` | **Text** from step 1 |
 | `usualDock` | **Text** from step 2 |
 
 ```mermaid
@@ -210,8 +208,8 @@ flowchart LR
 
 | # | Question | Fills step |
 |---|---|---|
-| 1 | Address of your home, with the city (e.g. 44 W 4th St, New York, NY) | 1 (Text) |
-| 2 | Your usual Citi Bike dock near your home, as it appears in the Citi Bike app (e.g. Mercer St & Bleecker St). Leave blank if you don't have one | 2 (Text) |
+| 1 | Address or name of your home (e.g. 44 W 4th St, or NYU Stern) | 1 (Text) |
+| 2 | Your usual Citi Bike dock near your home: its two cross streets, e.g. Mercer and Bleecker. Leave blank to just get the closest dock with space | 2 (Text) |
 
 **Steps, in order:**
 
@@ -227,8 +225,7 @@ flowchart LR
 | JSON field | Value |
 |---|---|
 | `place` | `"home"` (fixed) |
-| `destLat` | **Text** from step 1 as a Location (the phone geocodes the address) → Latitude |
-| `destLon` | **Text** from step 1 as a Location (the phone geocodes the address) → Longitude |
+| `address` | **Text** from step 1 |
 | `usualDock` | **Text** from step 2 |
 
 ```mermaid
@@ -248,13 +245,20 @@ Read from `n8n/citibike-smart-dock-assistant.workflow.json`. URLs use `YOUR-N8N-
 
 - **Called by:** Nearest Dock, Dock Arrival - School, Dock Arrival - Work, Dock Arrival - Home
 - **Responds:** plain text, one sentence (response mode `responseNode`)
-- **Nodes it can pass through** (every branch, in order):
+- **Routes a request can take** (3; each ends in the reply):
 
-  - arrival station information *(httpRequest)*
-  - arrival station status *(httpRequest)*
-  - pick arrival dock *(code)* ([code](../n8n/code-nodes/pick-arrival-dock.js))
-  - make it speakable *(code)* ([code](../n8n/code-nodes/make-it-speakable.js))
-  - speak this *(respondToWebhook)*
+  - arrival place → arrival route → arrival station information → arrival station status → pick arrival dock → make it speakable → speak this
+  - arrival place → arrival route → place lookup → place lookup result → lookup route → save place → arrival station information → arrival station status → pick arrival dock → make it speakable → speak this
+  - arrival place → arrival route → place lookup → place lookup result → lookup route → ai address → ai place lookup → ai place lookup result → save place → arrival station information → arrival station status → pick arrival dock → make it speakable → speak this
+
+- **Code nodes on those routes:**
+
+  - arrival place ([code](../n8n/code-nodes/arrival-place.js))
+  - pick arrival dock ([code](../n8n/code-nodes/pick-arrival-dock.js))
+  - make it speakable ([code](../n8n/code-nodes/make-it-speakable.js))
+  - place lookup result ([code](../n8n/code-nodes/place-lookup-result.js))
+  - save place ([code](../n8n/code-nodes/save-place.js))
+  - ai place lookup result ([code](../n8n/code-nodes/ai-place-lookup-result.js))
 
 - **Sentence templates it can speak** (straight from the code; `${...}` is filled from live data):
 
@@ -267,36 +271,30 @@ Read from `n8n/citibike-smart-dock-assistant.workflow.json`. URLs use `YOUR-N8N-
 
 - **Called by:** Dock Finder
 - **Responds:** plain text, one sentence (response mode `responseNode`)
-- **Nodes it can pass through** (every branch, in order):
+- **Routes a request can take** (6; each ends in the reply):
 
-  - normalize siri input *(code)*
-  - input envelope *(code)*
-  - understand request *(agent)*
-  - request fields *(code)*
-  - what does the user want *(switch)*
-  - station information *(httpRequest)*
-  - geocode destination *(httpRequest)*
-  - network live status *(httpRequest)*
-  - remember response *(code)* ([code](../n8n/code-nodes/remember-response.js))
-  - help response *(code)*
-  - station live status *(httpRequest)*
-  - nearby station information *(httpRequest)*
-  - summarize the network *(code)* ([code](../n8n/code-nodes/summarize-the-network.js))
-  - final response *(code)*
-  - check the station *(code)* ([code](../n8n/code-nodes/check-the-station.js))
-  - nearby station status *(httpRequest)*
-  - where should the answer go *(switch)*
-  - pick a dock near the destination *(code)* ([code](../n8n/code-nodes/pick-a-dock-near-the-destination.js))
-  - return chat answer *(code)*
-  - make it speakable *(code)* ([code](../n8n/code-nodes/make-it-speakable.js))
-  - speak this *(respondToWebhook)*
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → station information → station live status → check the station → final response → where should the answer go → make it speakable → speak this
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → geocode destination → nearby station information → nearby station status → pick a dock near the destination → final response → where should the answer go → make it speakable → speak this
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → geocode destination → nearby station information → nearby station status → pick a dock near the destination → final response → where should the answer go → make it speakable → speak this
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → network live status → summarize the network → final response → where should the answer go → make it speakable → speak this
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → remember response → final response → where should the answer go → make it speakable → speak this
+  - normalize siri input → input envelope → understand request → request fields → what does the user want → help response → final response → where should the answer go → make it speakable → speak this
+
+- **Code nodes on those routes:**
+
+  - normalize siri input
+  - input envelope
+  - request fields
+  - check the station ([code](../n8n/code-nodes/check-the-station.js))
+  - final response
+  - make it speakable ([code](../n8n/code-nodes/make-it-speakable.js))
+  - pick a dock near the destination ([code](../n8n/code-nodes/pick-a-dock-near-the-destination.js))
+  - summarize the network ([code](../n8n/code-nodes/summarize-the-network.js))
+  - remember response ([code](../n8n/code-nodes/remember-response.js))
+  - help response
 
 - **Sentence templates it can speak** (straight from the code; `${...}` is filled from live data):
 
-  - *remember response:* `? (req.alias ? `got it, ${req.rememberedStation} is your ${req.alias} dock.` : `got it, ill remember ${req.rememberedStation}.`)`
-  - *help response:* `: `you can ask me to check a specific citibike station, find a good return station near a place, remember what you call a usual dock, or use gps coordinates. for example: "find me a dock near nyu stern" or "gps 40.7295, -73.9965 going to union square".`;`
-  - *help response:* `: `you can ask if a station has room, or for a dock near a place or near you. for example, find me a dock near union square.`;`
-  - *summarize the network:* `const spokenText=`${bikes.toLocaleString()} bikes and ${docks.toLocaleString()} open docks citywide. ${full.toLocaleString()} stations are full.`;`
   - *check the station:* `return [{json:{text,spokenText:`couldnt find a station called ${query}.`}}];`
   - *check the station:* `spokenText = `${target.name} has ${target.openDocks} docks open.`;`
   - *check the station:* `spokenText = `${target.name} ${problem(target)}. go to ${selected.name}, ${selected.openDocks} docks, ${away(selected.distanceMeters)}.`;`
@@ -306,6 +304,10 @@ Read from `n8n/citibike-smart-dock-assistant.workflow.json`. URLs use `YOUR-N8N-
   - *pick a dock near the destination:* `spokenText=`your usual dock has ${selected.openDocks} docks open.`;`
   - *pick a dock near the destination:* `spokenText=`your usual dock ${problem(usual)}. go to ${selected.name}, ${selected.openDocks} docks, ${where}.`;`
   - *pick a dock near the destination:* `spokenText=`${selected.name} has ${selected.openDocks} docks open, ${where}.`;`
+  - *summarize the network:* `const spokenText=`${bikes.toLocaleString()} bikes and ${docks.toLocaleString()} open docks citywide. ${full.toLocaleString()} stations are full.`;`
+  - *remember response:* `? (req.alias ? `got it, ${req.rememberedStation} is your ${req.alias} dock.` : `got it, ill remember ${req.rememberedStation}.`)`
+  - *help response:* `: `you can ask me to check a specific citibike station, find a good return station near a place, remember what you call a usual dock, or use gps coordinates. for example: "find me a dock near nyu stern" or "gps 40.7295, -73.9965 going to union square".`;`
+  - *help response:* `: `you can ask if a station has room, or for a dock near a place or near you. for example, find me a dock near union square.`;`
 
 ### Dock rules (from the Code nodes)
 

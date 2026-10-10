@@ -51,8 +51,6 @@ def prop(name):
     return {"Type": "WFPropertyVariableAggrandizement", "PropertyName": name}
 
 
-AS_LOCATION = {"Type": "WFCoercionVariableAggrandizement", "CoercionItemClass": "WFLocationContentItem"}
-
 
 def action(identifier, **params):
     params["UUID"] = str(uuid.uuid4()).upper()
@@ -127,18 +125,17 @@ def dock_arrival(arrival_url, place):
     """Run by an Arrive automation: your usual dock near this place, or where to go instead."""
     address = text_action()
     usual = text_action()
-    # The address text is turned into a location on the phone (Apple's geocoder), then into lat/lon.
+    # The server looks the address up (within NYC), so it can be partial or a place name.
     post = post_json(arrival_url, {
         "place": place,
-        "destLat": token(output(address, "Text", AS_LOCATION, prop("Latitude"))),
-        "destLon": token(output(address, "Text", AS_LOCATION, prop("Longitude"))),
+        "address": token(output(address, "Text")),
         "usualDock": token(output(usual, "Text")),
     })
     actions = [address, usual, post, speak(post)]
     return workflow(actions, [
-        question(actions, address, f"Address of your {place}, with the city (e.g. 44 W 4th St, New York, NY)"),
-        question(actions, usual, f"Your usual Citi Bike dock near your {place}, as it appears in the Citi Bike app "
-                                 "(e.g. Mercer St & Bleecker St). Leave blank if you don't have one"),
+        question(actions, address, f"Address or name of your {place} (e.g. 44 W 4th St, or NYU Stern)"),
+        question(actions, usual, f"Your usual Citi Bike dock near your {place}: its two cross streets, e.g. Mercer and Bleecker. "
+                                 "Leave blank to just get the closest dock with space"),
     ], color=4251333119)
 
 

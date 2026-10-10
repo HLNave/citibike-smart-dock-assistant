@@ -567,7 +567,7 @@
     },
     {
       "parameters": {
-        "content": "ios arrival mode (commuters)\n\nan iphone shortcuts \"arrive\" automation POSTs here when you get near school/work/home.\nbody: {\"place\":\"school\",\"destLat\":40.73,\"destLon\":-73.99,\"usualDock\":\"E 17 St & Broadway\"}\nusualDock is optional. if destLat/destLon are missing it uses lat/lon (current location).\nreturns ONE plain-text sentence; the shortcut speaks it with Speak Text over your headphones.\nno ai step here: fixed inputs, so its fast and free.",
+        "content": "ios arrival mode (commuters)\n\nshortcuts POST here: an Arrive automation near school/work/home, or the Action Button.\nbody: {\"place\":\"school\",\"address\":\"44 W 4th St\",\"usualDock\":\"Mercer and Bleecker\"}  (or destLat/destLon, or lat/lon for 'near me')\naddress can be a name (\"NYU Stern\"). it's looked up in openstreetmap within NYC; if that fails the model turns it into a street address and we try again.\neach address is looked up once and remembered (workflow static data). the first answer for a new address says what was found.",
         "height": 260,
         "width": 520
       },
@@ -607,7 +607,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        -288,
+        1952,
         1520
       ]
     },
@@ -621,20 +621,20 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        -48,
+        2192,
         1520
       ]
     },
     {
       "parameters": {
-        "jsCode": "\n// called by the ios shortcut arrival automation. returns one short sentence for speak text.\nconst body = $('arrival webhook').first().json.body ?? {};\nconst info = $('arrival station information').first().json;\nconst status = $('arrival station status').first().json;\n\nconst num = v => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null; };\nconst place = String(body.place ?? '').trim() || 'your destination';\nconst usualDock = String(body.usualDock ?? '').trim();\nconst destLat = num(body.destLat), destLon = num(body.destLon);\nconst curLat = num(body.lat), curLon = num(body.lon);\nconst useDest = destLat !== null && destLon !== null;\nconst centerLat = useDest ? destLat : curLat;\nconst centerLon = useDest ? destLon : curLon;\nconst fromWhere = useDest ? place : 'you';\n\nif (centerLat === null || centerLon === null) {\n  const text = 'no location from your phone.';\n  return [{json:{text,spokenText:text}}];\n}\n\nfunction meters(lat1,lon1,lat2,lon2) {\n  const R=6371000, r=x=>x*Math.PI/180;\n  const dLat=r(lat2-lat1), dLon=r(lon2-lon1);\n  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;\n  return 2*R*Math.asin(Math.sqrt(a));\n}\nfunction norm(s) {\n  return String(s ?? '').toLowerCase()\n    .replace(/&/g,' and ')\n    .replace(/\\bstreet\\b/g,' st ')\n    .replace(/\\bavenue\\b/g,' ave ')\n    .replace(/[^a-z0-9]+/g,' ')\n    .replace(/\\s+/g,' ').trim();\n}\nfunction matchScore(name,q) {\n  const a=norm(name), b=norm(q);\n  if(!a||!b) return -999;\n  if(a===b) return 10000;\n  let s=0;\n  if(a.includes(b)||b.includes(a)) s+=1800;\n  const A=new Set(a.split(' ')), B=new Set(b.split(' '));\n  let overlap=0;\n  for(const t of B) if(A.has(t)) overlap++;\n  s+=(overlap/Math.max(B.size,1))*1000;\n  return s-Math.abs(a.length-b.length);\n}\nfunction howFar(m) {\n  if (m < 75) return useDest ? `right at ${place}` : 'right there';\n  return useDest ? `${Math.round(m/50)*50} meters from ${place}` : `${Math.round(m/50)*50} meters away`;\n}\nconst docks = n => `${n} ${n===1?'dock':'docks'} open`;\n\nconst statuses = status?.data?.stations ?? [];\nconst byId = new Map(statuses.map(s=>[String(s.station_id),s]));\nconst stations = (info?.data?.stations ?? []).map(s=>{\n  const l=byId.get(String(s.station_id)) ?? {};\n  const lat=Number(s.lat), lon=Number(s.lon);\n  return {\n    stationId:String(s.station_id),\n    name:String(s.name),\n    lat,lon,\n    openDocks:Number(l.num_docks_available ?? 0),\n    isReturning:l.is_returning === undefined ? true : Boolean(l.is_returning),\n    isInstalled:l.is_installed === undefined ? true : Boolean(l.is_installed),\n    distanceMeters:Math.round(meters(centerLat,centerLon,lat,lon))\n  };\n}).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon));\n\nconst canReturn = s => s && s.isInstalled && s.isReturning && s.openDocks >= 2;\nconst good = stations.filter(s=>s.distanceMeters<=1200 && canReturn(s))\n  .sort((a,b)=>a.distanceMeters-b.distanceMeters || b.openDocks-a.openDocks);\n\nlet usual = null;\nif (usualDock) {\n  const ranked = stations.map(s=>({s,score:matchScore(s.name,usualDock)})).sort((a,b)=>b.score-a.score);\n  if (ranked.length && ranked[0].score >= 250) usual = ranked[0].s;\n}\n\nlet text, selected = null;\nif (usual && canReturn(usual)) {\n  selected = usual;\n  text = `your usual dock has ${docks(usual.openDocks)}.`;\n} else {\n  let lead = '';\n  if (usual) {\n    const problem = !usual.isInstalled || !usual.isReturning ? 'is closed'\n      : usual.openDocks === 0 ? 'is full' : 'is almost full';\n    lead = `your usual dock ${problem}. `;\n  }\n  selected = good.find(s=>!usual || s.stationId!==usual.stationId) ?? null;\n  text = selected\n    ? (lead ? `${lead}go to ${selected.name}, ${selected.openDocks} docks, ${howFar(selected.distanceMeters)}.`\n            : `${selected.name} has ${docks(selected.openDocks)}, ${howFar(selected.distanceMeters)}.`)\n    : `${lead}no docks with space near ${fromWhere}.`;\n}\n\nreturn [{json:{\n  text,\n  spokenText:text,\n  selectedStation:selected,\n  usualMatched:usual ? usual.name : null,\n  centeredOn:useDest ? 'destination' : 'current location',\n  lastUpdated:status?.last_updated ?? null\n}}];\n"
+        "jsCode": "\n// called by the ios shortcut arrival automation. returns one short sentence for speak text.\n// where to look: set by \"arrival place\", or by \"save place\" when the address had to be looked up\nconst p = $('save place').isExecuted ? $('save place').first().json : $('arrival place').first().json;\nconst info = $('arrival station information').first().json;\nconst status = $('arrival station status').first().json;\n\nconst place = p.place;\nconst usualDock = p.usualDock;\nconst useDest = Boolean(p.useDest);\nconst centerLat = p.lat, centerLon = p.lon;\nconst fromWhere = useDest ? place : 'you';\n\nif (p.failed || !Number.isFinite(centerLat) || !Number.isFinite(centerLon)) {\n  const text = p.failed || 'no location from your phone.';\n  return [{json:{text,spokenText:text}}];\n}\n// the first time an address is looked up, say what we found so the rider can catch a wrong match during setup\nconst found = p.isNew && p.label ? `${place} is ${p.label}. ` : '';\n\nfunction meters(lat1,lon1,lat2,lon2) {\n  const R=6371000, r=x=>x*Math.PI/180;\n  const dLat=r(lat2-lat1), dLon=r(lon2-lon1);\n  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLon/2)**2;\n  return 2*R*Math.asin(Math.sqrt(a));\n}\nfunction norm(s) {\n  return String(s ?? '').toLowerCase()\n    .replace(/&/g,' and ')\n    .replace(/\\bstreet\\b/g,' st ')\n    .replace(/\\bavenue\\b/g,' ave ')\n    .replace(/[^a-z0-9]+/g,' ')\n    .replace(/\\s+/g,' ').trim();\n}\nfunction matchScore(name,q) {\n  const a=norm(name), b=norm(q);\n  if(!a||!b) return -999;\n  if(a===b) return 10000;\n  let s=0;\n  if(a.includes(b)||b.includes(a)) s+=1800;\n  const A=new Set(a.split(' ')), B=new Set(b.split(' '));\n  let overlap=0;\n  for(const t of B) if(A.has(t)) overlap++;\n  s+=(overlap/Math.max(B.size,1))*1000;\n  return s-Math.abs(a.length-b.length);\n}\nfunction howFar(m) {\n  if (m < 75) return useDest ? `right next to ${place}` : 'right there';\n  return useDest ? `${Math.round(m/50)*50} meters from ${place}` : `${Math.round(m/50)*50} meters away`;\n}\nconst docks = n => `${n} ${n===1?'dock':'docks'} open`;\n\nconst statuses = status?.data?.stations ?? [];\nconst byId = new Map(statuses.map(s=>[String(s.station_id),s]));\nconst stations = (info?.data?.stations ?? []).map(s=>{\n  const l=byId.get(String(s.station_id)) ?? {};\n  const lat=Number(s.lat), lon=Number(s.lon);\n  return {\n    stationId:String(s.station_id),\n    name:String(s.name),\n    lat,lon,\n    openDocks:Number(l.num_docks_available ?? 0),\n    isReturning:l.is_returning === undefined ? true : Boolean(l.is_returning),\n    isInstalled:l.is_installed === undefined ? true : Boolean(l.is_installed),\n    distanceMeters:Math.round(meters(centerLat,centerLon,lat,lon))\n  };\n}).filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon));\n\nconst canReturn = s => s && s.isInstalled && s.isReturning && s.openDocks >= 2;\nconst good = stations.filter(s=>s.distanceMeters<=1200 && canReturn(s))\n  .sort((a,b)=>a.distanceMeters-b.distanceMeters || b.openDocks-a.openDocks);\n\nlet usual = null;\nif (usualDock) {\n  const ranked = stations.map(s=>({s,score:matchScore(s.name,usualDock)})).sort((a,b)=>b.score-a.score);\n  if (ranked.length && ranked[0].score >= 250) usual = ranked[0].s;\n}\n\nlet text, selected = null;\nif (usual && canReturn(usual)) {\n  selected = usual;\n  text = `your usual dock has ${docks(usual.openDocks)}.`;\n} else {\n  let lead = '';\n  if (usual) {\n    const problem = !usual.isInstalled || !usual.isReturning ? 'is closed'\n      : usual.openDocks === 0 ? 'is full' : 'is almost full';\n    lead = `your usual dock ${problem}. `;\n  }\n  selected = good.find(s=>!usual || s.stationId!==usual.stationId) ?? null;\n  text = selected\n    ? (lead ? `${lead}go to ${selected.name}, ${selected.openDocks} docks, ${howFar(selected.distanceMeters)}.`\n            : `${selected.name} has ${docks(selected.openDocks)}, ${howFar(selected.distanceMeters)}.`)\n    : `${lead}no docks with space near ${fromWhere}.`;\n}\n\nreturn [{json:{\n  text: found + text,\n  spokenText: found + text,\n  selectedStation:selected,\n  usualMatched:usual ? usual.name : null,\n  centeredOn:useDest ? 'destination' : 'current location',\n  matchedPlace:p.label ?? null,\n  lastUpdated:status?.last_updated ?? null\n}}];\n"
       },
       "id": "13ffb2d6-eb62-4d98-bbde-9a5a4467782d",
       "name": "pick arrival dock",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        192,
+        2432,
         1520
       ]
     },
@@ -731,6 +731,344 @@
       ],
       "id": "faa09f5a-7d2e-4d7a-90e1-8125bd906466",
       "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// works out where to look for docks: coordinates the phone sent, an address we've already looked up,\n// or an address that still needs looking up (route \"lookup\")\nconst body = $json.body ?? {};\nconst num = v => { const n = Number(v); return Number.isFinite(n) && n !== 0 ? n : null; };\nconst base = {\n  place: String(body.place ?? '').trim() || 'your destination',\n  usualDock: String(body.usualDock ?? '').trim(),\n  address: String(body.address ?? '').trim(),\n};\nconst destLat = num(body.destLat), destLon = num(body.destLon), lat = num(body.lat), lon = num(body.lon);\n\nif (destLat !== null && destLon !== null) {\n  return [{json:{...base, route:'ready', lat:destLat, lon:destLon, useDest:true}}];\n}\nif (base.address) {\n  const key = base.address.toLowerCase().replace(/\\s+/g,' ');\n  const cached = ($getWorkflowStaticData('global').places ?? {})[key];\n  if (cached) return [{json:{...base, route:'ready', lat:cached.lat, lon:cached.lon, useDest:true, label:cached.label}}];\n  return [{json:{...base, route:'lookup', key}}];\n}\nif (lat !== null && lon !== null) {\n  return [{json:{...base, route:'ready', lat, lon, useDest:false}}];\n}\nreturn [{json:{...base, route:'ready', failed:'no location from your phone.'}}];\n"
+      },
+      "id": "86e27f67-4810-4c25-8de0-d5e0f48dd95e",
+      "name": "arrival place",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cfeb0728-cd46-40a7-b80d-e29e5e391ba0",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ready",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ready"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7afc0852-c5e2-4a1b-bb44-05bec6069e0f",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "lookup",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lookup"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ede61baa-a88b-42dc-9682-8d770e206929",
+      "name": "arrival route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -48,
+        1520
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.address }}"
+            },
+            {
+              "name": "format",
+              "value": "jsonv2"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "us"
+            },
+            {
+              "name": "bounded",
+              "value": "1"
+            },
+            {
+              "name": "viewbox",
+              "value": "-74.26,40.92,-73.70,40.49"
+            },
+            {
+              "name": "addressdetails",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "citibike-course-agent/1.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a49a9d9f-fc96-4beb-9812-309c717abe46",
+      "name": "place lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        192,
+        1760
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// reads the openstreetmap lookup of the rider's address. not found -> route \"ai\" so the model can\n// turn a nickname like \"jpmc hq\" into a street address and we try again\nconst req = $('arrival place').first().json;\nconst hit = $json; // one nominatim result, or {} when nothing matched\nconst lat = Number(hit.lat), lon = Number(hit.lon);\nif (!Number.isFinite(lat) || !Number.isFinite(lon)) return [{json:{...req, route:'ai'}}];\nconst a = hit.address ?? {};\nconst street = [a.house_number, a.road].filter(Boolean).join(' ');\n// include the borough so a rider can tell a brooklyn match from a manhattan one\nconst borough = a.suburb || a.city_district || a.borough || '';\nconst spot = hit.name && street && hit.name !== street ? `${hit.name}, ${street}` : (street || hit.name || req.address);\nconst label = borough && !spot.includes(borough) ? `${spot}, ${borough}` : spot;\nreturn [{json:{...req, route:'ready', lat, lon, useDest:true, label, isNew:true}}];\n"
+      },
+      "id": "e6424ac2-d92e-4330-a97f-213cb707ccf3",
+      "name": "place lookup result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "fe96396e-6e73-4af1-b62e-c7d155fa287e",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ready",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ready"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "47f3b753-e5c4-42e2-8351-57a72ece7faa",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ai"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dbcd93ea-2f44-482c-b696-ae96a68899f0",
+      "name": "lookup route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        672,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You turn a description of a place in New York City into its street address so a map lookup can find it.\nReply with only the street address and borough, like \"270 Park Avenue, Manhattan\". No other words.\nIf it is already an address, return it cleaned up. If you don't know the place, reply UNKNOWN.\n\nPlace: {{ $('arrival place').first().json.address }}",
+        "hasOutputParser": false
+      },
+      "id": "9a522c03-2e84-4879-84fa-de3280af07f4",
+      "name": "ai address",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        912,
+        1960
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://nominatim.openstreetmap.org/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ String($json.text ?? '').trim() }}"
+            },
+            {
+              "name": "format",
+              "value": "jsonv2"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "countrycodes",
+              "value": "us"
+            },
+            {
+              "name": "bounded",
+              "value": "1"
+            },
+            {
+              "name": "viewbox",
+              "value": "-74.26,40.92,-73.70,40.49"
+            },
+            {
+              "name": "addressdetails",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "citibike-course-agent/1.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "afb33a1e-853c-4640-a602-0c10276454a0",
+      "name": "ai place lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1232,
+        1960
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// second try: the model's street address, looked up in openstreetmap\nconst req = $('arrival place').first().json;\nconst hit = $json;\nconst lat = Number(hit.lat), lon = Number(hit.lon);\nif (!Number.isFinite(lat) || !Number.isFinite(lon)) {\n  return [{json:{...req, route:'ready',\n    failed:`couldnt find ${req.address} in new york city. open the dock arrival shortcut and change the address at the top.`}}];\n}\nconst a = hit.address ?? {};\nconst street = [a.house_number, a.road].filter(Boolean).join(' ');\n// include the borough so a rider can tell a brooklyn match from a manhattan one\nconst borough = a.suburb || a.city_district || a.borough || '';\nconst spot = hit.name && street && hit.name !== street ? `${hit.name}, ${street}` : (street || hit.name || req.address);\nconst label = borough && !spot.includes(borough) ? `${spot}, ${borough}` : spot;\nreturn [{json:{...req, route:'ready', lat, lon, useDest:true, label, isNew:true}}];\n"
+      },
+      "id": "65224672-944b-4f5d-8bee-e94c7ecc3515",
+      "name": "ai place lookup result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        1960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// remember looked-up addresses so each one is only looked up once.\n// n8n only keeps this on successful runs of the published workflow.\nconst p = $json;\nif (p.isNew && p.key && Number.isFinite(p.lat) && Number.isFinite(p.lon)) {\n  const data = $getWorkflowStaticData('global');\n  data.places = data.places ?? {};\n  data.places[p.key] = { lat:p.lat, lon:p.lon, label:p.label };\n}\nreturn [{json:p}];\n"
+      },
+      "id": "03271f72-33f3-475a-a27b-2bd91735691e",
+      "name": "save place",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-6-luna",
+          "mode": "list",
+          "cachedResultName": "gpt-6-luna",
+          "cachedResultUrl": ""
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        912,
+        2160
+      ],
+      "id": "bf646911-5ebc-40f4-b933-25ee40c1b40b",
+      "name": "address model",
       "credentials": {
         "openAiApi": {
           "id": null,
@@ -1018,7 +1356,7 @@
       "main": [
         [
           {
-            "node": "arrival station information",
+            "node": "arrival place",
             "type": "main",
             "index": 0
           }
@@ -1096,6 +1434,130 @@
         [
           {
             "node": "understand request",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arrival place": {
+      "main": [
+        [
+          {
+            "node": "arrival route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "arrival route": {
+      "main": [
+        [
+          {
+            "node": "arrival station information",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "place lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "place lookup": {
+      "main": [
+        [
+          {
+            "node": "place lookup result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "place lookup result": {
+      "main": [
+        [
+          {
+            "node": "lookup route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lookup route": {
+      "main": [
+        [
+          {
+            "node": "save place",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ai address",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ai address": {
+      "main": [
+        [
+          {
+            "node": "ai place lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ai place lookup": {
+      "main": [
+        [
+          {
+            "node": "ai place lookup result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ai place lookup result": {
+      "main": [
+        [
+          {
+            "node": "save place",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save place": {
+      "main": [
+        [
+          {
+            "node": "arrival station information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "address model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ai address",
             "type": "ai_languageModel",
             "index": 0
           }

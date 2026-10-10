@@ -138,15 +138,17 @@ def backend_section():
         if n["type"] != "n8n-nodes-base.webhook":
             continue
         p = n["parameters"]
-        order, seen, queue = [], {name}, [name]
-        while queue:
-            cur = queue.pop(0)
-            for outs in conns.get(cur, {}).get("main", []):
-                for c in outs:
-                    if c["node"] not in seen:
-                        seen.add(c["node"])
-                        order.append(c["node"])
-                        queue.append(c["node"])
+        # every route a request can take from this webhook to the node that sends the reply
+        paths, stack = [], [[name]]
+        while stack:
+            path = stack.pop()
+            nexts = [c["node"] for outs in conns.get(path[-1], {}).get("main", []) for c in outs]
+            if not nexts:
+                if nodes[path[-1]]["type"] == "n8n-nodes-base.respondToWebhook":
+                    paths.append(path[1:])
+                continue
+            stack += [path + [n] for n in reversed(nexts) if n not in path]
+        order = list(dict.fromkeys(n for path in paths for n in path))
         users = [c["name"] for c in b.catalog(f"https://{HOST}/webhook/{b.webhook_paths()[0]}",
                                                f"https://{HOST}/webhook/{b.webhook_paths()[1]}")
                  if any(a["WFWorkflowActionParameters"].get("WFURL", "").endswith("/" + p["path"])
@@ -154,12 +156,16 @@ def backend_section():
         out += [f"### `{p.get('httpMethod', 'GET')} /webhook/{p['path']}` (n8n node: {name})", "",
                 f"- **Called by:** {', '.join(users) or 'no shared shortcut'}",
                 f"- **Responds:** plain text, one sentence (response mode `{p.get('responseMode')}`)",
-                "- **Nodes it can pass through** (every branch, in order):", ""]
+                f"- **Routes a request can take** ({len(paths)}; each ends in the reply):", ""]
+        for path in paths:
+            out.append("  - " + " → ".join(path))
+        out += ["", "- **Code nodes on those routes:**", ""]
         for node in order:
             nn = nodes[node]
-            f = code_node_file(node) if nn["type"] == "n8n-nodes-base.code" else None
-            link = f" ([code](../{f.relative_to(REPO)}))" if f else ""
-            out.append(f"  - {node} *({nn['type'].split('.')[-1]})*{link}")
+            if nn["type"] != "n8n-nodes-base.code":
+                continue
+            f = code_node_file(node)
+            out.append(f"  - {node}" + (f" ([code](../{f.relative_to(REPO)}))" if f else ""))
         out.append("")
         spoken = []
         for node in order:
