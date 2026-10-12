@@ -4,6 +4,12 @@
 // Local.xcconfig next to this file. It's gitignored; copy
 // Local.example.xcconfig to create it. See ios/README.md.
 
+// Bump whenever the Siri phrases (DockFinderShortcutsProvider) change.
+// iOS caches which phrase runs which action and re-reads the list when the
+// build number changes; without a bump, an update can leave phrases running
+// the wrong action.
+CURRENT_PROJECT_VERSION = 2
+
 // Bundle IDs are unique across all Apple accounts, so each tester sets their own.
 DOCKFINDER_BUNDLE_ID = spork.biker-app
 

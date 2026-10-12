@@ -10,17 +10,28 @@
 import AppIntents
 
 struct DockFinderShortcutsProvider: AppShortcutsProvider {
-    /// The two phrases to teach riders come first: "find a dock" (the
-    /// nearest dock now, no questions) and "start a ride" (asks where you're
-    /// heading, then alerts on arrival). The rest are one-step extras.
+    /// **Never reorder or remove these; only append.** iOS remembers which
+    /// phrase belongs to which position in this list and doesn't always
+    /// re-read it when the app is updated, so reordering made "start a ride"
+    /// run Find Dock and "find a dock" run the saved-place shortcut. If the
+    /// list ever has to change shape, also bump `CURRENT_PROJECT_VERSION` in
+    /// `Config/DockFinder.xcconfig`, which makes iOS re-read it.
     ///
     /// Only Find Dock may use phrases that start with "find a dock". Siri
     /// matches phrases loosely, so any other "find a dock near/at …" phrase
-    /// can win instead and ask a follow-up question, which turns a one-step
-    /// request into a conversation. ("Run/start Dock Finder" can't be used
-    /// at all: Siri treats a launch verb plus the app's name as "open the
-    /// app", which needs an unlock.)
+    /// can win instead and ask a follow-up question. ("Run/start Dock
+    /// Finder" can't be used at all: Siri treats a launch verb plus the
+    /// app's name as "open the app", which needs an unlock.)
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: AskDockFinderIntent(),
+            phrases: [
+                "Ask \(.applicationName)",
+                "Talk to \(.applicationName)",
+            ],
+            shortTitle: "Ask Dock Finder",
+            systemImageName: "bubble.left"
+        )
         AppShortcut(
             intent: StartRideIntent(),
             phrases: [
@@ -31,6 +42,15 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Start Ride",
             systemImageName: "figure.outdoor.cycle"
+        )
+        AppShortcut(
+            intent: EndRideIntent(),
+            phrases: [
+                "End my ride with \(.applicationName)",
+                "Cancel my ride with \(.applicationName)",
+            ],
+            shortTitle: "End Ride",
+            systemImageName: "flag.checkered"
         )
         AppShortcut(
             intent: FindDockIntent(),
@@ -46,15 +66,6 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Find Dock",
             systemImageName: "bicycle"
-        )
-        AppShortcut(
-            intent: EndRideIntent(),
-            phrases: [
-                "End my ride with \(.applicationName)",
-                "Cancel my ride with \(.applicationName)",
-            ],
-            shortTitle: "End Ride",
-            systemImageName: "flag.checkered"
         )
         // Find Dock Near a Place has no Siri phrase on purpose (see above);
         // it's still an action in the Shortcuts app.
@@ -83,15 +94,6 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Citywide Status",
             systemImageName: "chart.bar"
-        )
-        AppShortcut(
-            intent: AskDockFinderIntent(),
-            phrases: [
-                "Ask \(.applicationName)",
-                "Talk to \(.applicationName)",
-            ],
-            shortTitle: "Ask Dock Finder",
-            systemImageName: "bubble.left"
         )
     }
 

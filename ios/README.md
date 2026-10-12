@@ -162,6 +162,7 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 - **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
 - **Keep signing out of the project file.** Set your team and bundle ID in `Local.xcconfig`, not with the Team menu in Xcode. The menu writes them into `project.pbxproj`, which is shared. If that happens, run `git diff` before committing and leave those lines out.
 - **Siri needs a Development Team.** Without one, Find Dock appears in Shortcuts but fails with "Unable to run App Shortcut" (see Building above).
+- **If Siri runs the wrong action or keeps re-asking a question** after installing a new build, delete Dock Finder from the phone and install it again. iOS caches which phrase runs which action. For developers: never reorder or remove entries in `DockFinderShortcutsProvider` (append only), and bump `CURRENT_PROJECT_VERSION` in `Config/DockFinder.xcconfig` whenever the phrases change. `SiriPhraseTests` fails if the order changes.
 - **Report results.** Work through the checklist below and post what you found (with screenshots of any errors) in the group chat or as a GitHub issue.
 
 ## Manual verification checklist (physical iPhone)

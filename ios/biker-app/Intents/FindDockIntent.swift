@@ -43,8 +43,11 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Place", requestValueDialog: "Which place?")
-    var place: SavedPlaceEntity
+    /// Optional on purpose. With a required saved-place parameter, Siri
+    /// re-asks "Which place?" forever whenever it can't match the answer to
+    /// a saved place (or there are none). The app answers instead.
+    @Parameter(title: "Place")
+    var place: SavedPlaceEntity?
 
     static var parameterSummary: some ParameterSummary {
         Summary("Find a dock near \(\.$place)")
@@ -52,12 +55,25 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
+        guard let place else {
+            return DockAnswer(text: Self.whichPlaceHelp(SavedPlacesStore.shared.places)).intentResult
+        }
         guard let saved = SavedPlacesStore.shared.place(id: place.id) else {
             throw DockFinderError.savedPlaceNotFound
         }
         return try await DockFinderService.live
             .findDock(for: saved)
             .answer.intentResult
+    }
+}
+
+extension FindDockNearSavedPlaceIntent {
+    static func whichPlaceHelp(_ places: [SavedPlace]) -> String {
+        guard let first = places.first else {
+            return "You don't have any saved places yet. Add one in Dock Finder."
+        }
+        let names = places.map(\.name).formatted(.list(type: .and))
+        return "Your saved places are \(names). Say, for example, check my \(first.name.lowercased()) dock with Dock Finder."
     }
 }
 
@@ -89,8 +105,11 @@ struct CheckStationIntent: AppIntent {
     )
     static let supportedModes: IntentModes = .background
 
+    /// Plain text rather than a station entity, so Siri accepts whatever
+    /// the rider says once and the app does the fuzzy matching. An entity
+    /// parameter makes Siri re-ask when it can't resolve the answer.
     @Parameter(title: "Station", requestValueDialog: "Which station?")
-    var station: StationEntity
+    var station: String
 
     static var parameterSummary: some ParameterSummary {
         Summary("Check \(\.$station)")
@@ -98,7 +117,9 @@ struct CheckStationIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await DockFinderService.live.checkStation(station.id).answer.intentResult
+        try await AssistantRouter.live()
+            .handle(.station(KeywordRequestParser.normalize(station)))
+            .intentResult
     }
 }
 
