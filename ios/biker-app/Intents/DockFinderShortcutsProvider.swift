@@ -10,14 +10,18 @@
 import AppIntents
 
 struct DockFinderShortcutsProvider: AppShortcutsProvider {
-    /// The first shortcut is the one to teach riders: a single short phrase,
-    /// then Siri asks for the details. The rest are one-step alternatives.
+    /// **Never reorder or remove these; only append.** iOS remembers which
+    /// phrase belongs to which position in this list and doesn't always
+    /// re-read it when the app is updated, so reordering made "start a ride"
+    /// run Find Dock and "find a dock" run the saved-place shortcut. If the
+    /// list ever has to change shape, also bump `CURRENT_PROJECT_VERSION` in
+    /// `Config/DockFinder.xcconfig`, which makes iOS re-read it.
     ///
     /// Only Find Dock may use phrases that start with "find a dock". Siri
     /// matches phrases loosely, so any other "find a dock near/at …" phrase
-    /// can win instead and ask a follow-up question, which turns a one-step
-    /// request into a conversation. Destination requests go through "ask
-    /// Dock Finder" instead.
+    /// can win instead and ask a follow-up question. ("Run/start Dock
+    /// Finder" can't be used at all: Siri treats a launch verb plus the
+    /// app's name as "open the app", which needs an unlock.)
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: AskDockFinderIntent(),
@@ -26,13 +30,15 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 "Talk to \(.applicationName)",
             ],
             shortTitle: "Ask Dock Finder",
-            systemImageName: "bicycle.circle"
+            systemImageName: "bubble.left"
         )
         AppShortcut(
             intent: StartRideIntent(),
             phrases: [
                 "Start a ride with \(.applicationName)",
                 "Begin a ride with \(.applicationName)",
+                "Start riding with \(.applicationName)",
+                "New ride with \(.applicationName)",
             ],
             shortTitle: "Start Ride",
             systemImageName: "figure.outdoor.cycle"

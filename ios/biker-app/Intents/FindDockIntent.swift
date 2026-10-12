@@ -43,8 +43,11 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Place", requestValueDialog: "Which place?")
-    var place: SavedPlaceEntity
+    /// Optional on purpose. With a required saved-place parameter, Siri
+    /// re-asks "Which place?" forever whenever it can't match the answer to
+    /// a saved place (or there are none). The app answers instead.
+    @Parameter(title: "Place")
+    var place: SavedPlaceEntity?
 
     static var parameterSummary: some ParameterSummary {
         Summary("Find a dock near \(\.$place)")
@@ -52,12 +55,25 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
+        guard let place else {
+            return DockAnswer(text: Self.whichPlaceHelp(SavedPlacesStore.shared.places)).intentResult
+        }
         guard let saved = SavedPlacesStore.shared.place(id: place.id) else {
             throw DockFinderError.savedPlaceNotFound
         }
         return try await DockFinderService.live
             .findDock(for: saved)
             .answer.intentResult
+    }
+}
+
+extension FindDockNearSavedPlaceIntent {
+    static func whichPlaceHelp(_ places: [SavedPlace]) -> String {
+        guard let first = places.first else {
+            return "You don't have any saved places yet. Add one in Dock Finder."
+        }
+        let names = places.map(\.name).formatted(.list(type: .and))
+        return "Your saved places are \(names). Say, for example, check my \(first.name.lowercased()) dock with Dock Finder."
     }
 }
 
@@ -89,8 +105,11 @@ struct CheckStationIntent: AppIntent {
     )
     static let supportedModes: IntentModes = .background
 
+    /// Plain text rather than a station entity, so Siri accepts whatever
+    /// the rider says once and the app does the fuzzy matching. An entity
+    /// parameter makes Siri re-ask when it can't resolve the answer.
     @Parameter(title: "Station", requestValueDialog: "Which station?")
-    var station: StationEntity
+    var station: String
 
     static var parameterSummary: some ParameterSummary {
         Summary("Check \(\.$station)")
@@ -98,7 +117,9 @@ struct CheckStationIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await DockFinderService.live.checkStation(station.id).answer.intentResult
+        try await AssistantRouter.live()
+            .handle(.station(KeywordRequestParser.normalize(station)))
+            .intentResult
     }
 }
 
@@ -142,14 +163,18 @@ struct SetUsualDockIntent: AppIntent {
     }
 }
 
+/// The main Siri flow: "Hey Siri, start a ride with Dock Finder" → "Where
+/// are you heading?" → "school" / "Union Square". Siri only has to match
+/// that one phrase; the destination reaches the app as plain text, so Siri
+/// can't mistake it for a Maps search.
 struct StartRideIntent: AppIntent {
     static let title: LocalizedStringResource = "Start Ride"
     static let description = IntentDescription(
-        "Watches your ride to a saved place or any destination, and tells you where to dock when you're close. Works with your phone locked when Dock Finder has Always location access."
+        "Asks where you're heading, then tells you where to dock when you're close. The destination can be a saved place or anywhere Apple Maps finds. Works with your phone locked when Dock Finder has Always location access."
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Destination", requestValueDialog: "Where are you riding to?")
+    @Parameter(title: "Destination", requestValueDialog: "Where are you heading?")
     var destination: String
 
     static var parameterSummary: some ParameterSummary {
@@ -173,19 +198,18 @@ struct EndRideIntent: AppIntent {
     }
 }
 
-/// The main Siri entry point: "Hey Siri, ask Dock Finder", then Siri asks
-/// what you need. ("Run Dock Finder" can't be used: Siri treats "run" or
-/// "open" plus an app's name as "open the app", which needs an unlock.) Siri only has to recognize that one short phrase; the
-/// answer to the follow-up comes to the app as plain text, so Siri can't
-/// mistake it for a Maps search ("dock" heard as "doc" → doctors nearby).
+/// "Hey Siri, ask Dock Finder" → "What do you need?" → anything in your own
+/// words: a station check, citywide totals, a usual-dock setting, or a
+/// question only the server can answer. Rides and the nearest dock have
+/// their own one-step phrases.
 struct AskDockFinderIntent: AppIntent {
     static let title: LocalizedStringResource = "Ask Dock Finder"
     static let description = IntentDescription(
-        "Asks where you're headed, then answers in one sentence: a dock near a place or saved place, a station's status, or the nearest dock to you. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
+        "Ask anything in your own words, like whether a station is full or how many bikes are out. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Request", requestValueDialog: "Where are you headed, or which station?")
+    @Parameter(title: "Request", requestValueDialog: "What do you need?")
     var request: String
 
     @MainActor
