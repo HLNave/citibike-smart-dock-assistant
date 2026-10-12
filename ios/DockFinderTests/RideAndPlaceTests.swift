@@ -154,7 +154,7 @@ struct RideRouterTests {
         let rides = RideSpy()
         let answer = try await router(store: testStore(), rides: rides).answer("start a ride")
         #expect(rides.started.isEmpty)
-        #expect(answer.text.hasPrefix("Where are you riding to?"))
+        #expect(answer.text.hasPrefix("Where are you heading?"))
     }
 
     @Test func endingARide() async throws {
@@ -324,5 +324,68 @@ struct SavedPlaceRobustnessTests {
         #expect(store.places.map(\.name) == ["C", "A", "B"])
         store.move(fromOffsets: IndexSet(integer: 0), toOffset: 3)
         #expect(store.places.map(\.name) == ["A", "B", "C"])
+    }
+}
+
+// MARK: - "Start a ride with Dock Finder" → "Where are you heading?"
+
+struct HeadingAnswerTests {
+    @Test(arguments: [
+        ("School", "school"),
+        ("to school", "school"),
+        ("I'm going to Union Square.", "union square"),
+        ("heading to NYU Stern", "nyu stern"),
+        ("towards the met", "the met"),
+        ("start a ride to work", "work"),
+        ("44 West 4th Street", "44 west 4th street"),
+    ])
+    func destinationIsReadFromTheAnswer(answer: String, destination: String) {
+        #expect(KeywordRequestParser.destination(from: answer) == destination)
+    }
+}
+
+@MainActor
+struct StartRideAnswerTests {
+    let near = info("near", "Smith St & Bergen St", 40.6861, -73.9906)
+
+    private func router(_ store: SavedPlacesStore, _ rides: RideSpy, places: StubPlaces = StubPlaces()) -> AssistantRouter {
+        let fix = LocationFix(location: CLLocation(latitude: 40.7130, longitude: -73.9900), isApproximate: false)
+        return AssistantRouter(
+            service: DockFinderService(
+                location: StubLocation(result: .success(fix)),
+                feeds: StubFeeds(information: .success(informationFeed([near])), status: .success(statusFeed([status("near", docks: 5)]))),
+                now: { referenceNow }
+            ),
+            placeSearch: places,
+            store: store,
+            rides: rides,
+            parsers: [KeywordRequestParser()],
+            backend: nil,
+            location: StubLocation(result: .success(fix)),
+            sessionID: "app-test"
+        )
+    }
+
+    @Test func savedPlaceAnswer() async throws {
+        let school = SavedPlace(name: "School", latitude: 40.6861, longitude: -73.9906)
+        let rides = RideSpy()
+        _ = try await router(testStore([school]), rides).handle(.startRide("to my school"))
+        #expect(rides.started.first?.savedPlaceID == school.id)
+    }
+
+    @Test func landmarkAnswer() async throws {
+        let rides = RideSpy()
+        let places = StubPlaces(results: ["union square": Destination(name: "Union Square Park", latitude: 40.7359, longitude: -73.9911)])
+        _ = try await router(testStore(), rides, places: places).handle(.startRide("I'm heading to Union Square"))
+        #expect(rides.started.first?.destination.name == "union square")
+    }
+
+    @Test(arguments: ["home", "work", "my office", "the office"])
+    func unsavedPersonalPlacesArentSearchedOnTheMap(answer: String) async throws {
+        let rides = RideSpy()
+        // An empty map search would throw placeNotFound if it were used.
+        let reply = try await router(testStore(), rides).handle(.startRide(answer))
+        #expect(rides.started.isEmpty)
+        #expect(reply.text.hasPrefix("You don't have a saved place called "))
     }
 }

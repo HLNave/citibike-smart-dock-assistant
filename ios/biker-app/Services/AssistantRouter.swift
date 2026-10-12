@@ -22,7 +22,14 @@ struct AssistantRouter {
     var location: any LocationProviding
     var sessionID: String
 
-    static let helpText = "Say where you're headed, like school or Union Square, a station name, or near me. You can also say start a ride to school."
+    static let helpText = "You can ask whether a station has room, like is Mercer and Bleecker full, or how many bikes are out. To get docking directions on the way somewhere, say start a ride to school."
+
+    /// Names riders use for their own places. If one isn't saved, a map
+    /// search would find some business called "Home" or "Gym" instead.
+    static let personalPlaceNames: Set<String> = [
+        "home", "work", "school", "office", "the office", "gym", "class", "campus", "job",
+        "my place", "apartment", "house", "dorm", "my dorm",
+    ]
 
     static func live() -> AssistantRouter {
         let service = DockFinderService.live
@@ -114,14 +121,18 @@ struct AssistantRouter {
 
     // MARK: - Rides
 
-    private func startRide(to spoken: String) async throws -> DockAnswer {
+    private func startRide(to answer: String) async throws -> DockAnswer {
+        let spoken = KeywordRequestParser.destination(from: answer)
         guard !spoken.isEmpty else {
-            return DockAnswer(text: "Where are you riding to? Say, for example, start a ride to school.")
+            return DockAnswer(text: "Where are you heading? Say, for example, start a ride to school.")
         }
 
         let ride: Ride
         if let saved = store.place(matching: spoken) {
             ride = Ride(destination: saved.destination, savedPlaceID: saved.id, alertDistance: saved.alertDistance)
+        } else if Self.personalPlaceNames.contains(spoken) || spoken.hasPrefix("my ") {
+            let name = SavedPlace.normalizedName(spoken)
+            return DockAnswer(text: "You don't have a saved place called \(name). Add it in Dock Finder, or say an address or landmark instead.")
         } else {
             ride = Ride(destination: try await searchedDestination(spoken))
         }

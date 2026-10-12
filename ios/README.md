@@ -2,35 +2,36 @@
 
 A SwiftUI app that answers Citi Bike dock questions through Siri, Shortcuts and its own screens. Everything that can run on the iPhone does. It reads Citi Bike's public GBFS feeds directly and uses Apple's map search for places. Only free-form questions the phone can't understand go to the group's n8n workflow.
 
-> "Hey Siri, ask Dock Finder."
-> Siri: "Where are you headed, or which station?"
+> "Hey Siri, start a ride with Dock Finder."
+> Siri: "Where are you heading?"
 > "School."
-> Siri: "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
+> Siri: "Got it. I'll tell you where to dock when you're about 0.3 miles from School."
+> *…as you get close:* "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
 
 ## Using it with Siri
 
-**"Hey Siri, ask Dock Finder"** (or "talk to Dock Finder") is the main phrase. It works with the phone locked. Siri asks "Where are you headed, or which station?", and you answer with:
+Two phrases cover what riders need:
 
-- a ride: "start a ride to school", "I'm riding to Union Square" (see [Rides](#rides))
-- a saved place: "school", "my work dock"
-- any place: "near Union Square", "find a dock by NYU Stern"
-- a station: "Mercer and Bleecker", "is West 15th and 6th full?"
-- "near me"
-- "how many bikes are out?"
-- a setting: "my school dock is Mercer and Bleecker", "save this spot as gym", "end my ride"
+- **"Hey Siri, start a ride with Dock Finder."** Siri asks **"Where are you heading?"** Answer with a saved place ("school", "my office" if you saved it), a landmark ("Union Square", "NYU Stern") or an address. Dock Finder starts a [ride](#rides) and tells you where to dock as you get close, even with the phone locked. (Also: "begin a ride…", "start riding…", "new ride with Dock Finder".)
+- **"Hey Siri, find a dock with Dock Finder."** Answers straight away with the nearest station to you that has room. No follow-up question. (Also: "find me a dock", "find the nearest dock", "find an open dock", "nearest dock in Dock Finder".)
 
-Splitting it into two steps is more reliable than one long phrase. Siri only has to recognize "ask Dock Finder", and your answer goes to the app as plain text, so Siri can't turn it into a Maps search. ("Dock" sounds like "doc", so "find a dock near school" can come out as a search for doctors.) The app treats a dictated "doc" as "dock", and "Doc Finder" is registered as an alternate app name (`INAlternativeAppNames` in `Config/Info.plist`).
+Why it's built this way: "where are you heading?" only makes sense when you're starting a ride, and nobody needs a dock *at* a place before they've ridden there. If you need one right now, it's near you.
 
-One-step phrases still work and are faster when Siri hears them correctly:
+The destination reaches the app as plain text, so Siri can't turn it into a Maps search. ("Dock" sounds like "doc", so a one-step "find a dock near school" can come out as a search for doctors.) The app treats a dictated "doc" as "dock", and "Doc Finder" is registered as an alternate app name (`INAlternativeAppNames` in `Config/Info.plist`). If you name a personal place that isn't saved ("home", "the office", "my gym"), Dock Finder asks you to add it instead of guessing a business with that name on the map.
 
-- **"Find a dock with Dock Finder"** (also "find me a dock", "find the nearest dock", "find an open dock", "nearest dock in Dock Finder"): the nearest station to you with room. No follow-up question.
-- "Check my school dock with Dock Finder", "Check a station with Dock Finder", "Citi Bike status in Dock Finder", "Start a ride with Dock Finder".
+More phrases:
 
-Only Find Dock has phrases starting with "find a dock". Siri matches phrases loosely, so a second "find a dock near …" phrase could win instead and ask "where are you headed?", which turns the one-step request into a conversation. Docks near a destination go through "ask Dock Finder".
+- "End my ride with Dock Finder"
+- "Check my school dock with Dock Finder" (your usual dock's status right now)
+- "Check a station with Dock Finder" → Siri asks which station
+- "Citi Bike status in Dock Finder" (citywide totals)
+- **"Ask Dock Finder"** → "What do you need?" → anything in your own words: "is Mercer and Bleecker full?", "how many bikes are out?", "my school dock is Court and State", "save this spot as gym". Requests it can't answer on the phone go to the n8n server if one is configured.
 
-> **Why not "run Dock Finder"?** Siri treats "run", "open", "launch" or "start" plus an app's name as "open the app", which beats the app's own phrases and needs the phone unlocked. App phrases must include the app's name, so no "run …" phrase can work from the app itself.
+Only Find Dock has phrases starting with "find a dock". Siri matches phrases loosely, so a second "find a dock near …" phrase could win instead and ask a question, which turns the one-step request into a conversation.
+
+> **Why not "run Dock Finder"?** Siri treats "run", "open", "launch" or "start" plus an app's name as "open the app", which beats the app's own phrases and needs the phone unlocked. "Start a ride with Dock Finder" works because it isn't just a verb plus the app name.
 >
-> **If you'd rather say "run …"**, make a personal shortcut: Shortcuts app → **+** → add Dock Finder's **Ask Dock Finder** action → name the shortcut something other than "Dock Finder", e.g. **Dock Check**. Then "Hey Siri, run Dock Check" (or just "Hey Siri, Dock Check") works the same way, locked or not. One person can build it and share the iCloud link with the group.
+> **If you'd rather say something shorter**, make a personal shortcut: Shortcuts app → **+** → add Dock Finder's **Start Ride** action → name the shortcut something other than "Dock Finder", e.g. **Ride Check**. Then "Hey Siri, ride check" works the same way, locked or not. One person can build it and share the iCloud link with the group.
 >
 > **If you set up the group's Shortcuts version** (`docs/iphone-setup-handoff.md`), you can delete your personal **Dock Finder** shortcut. With the app installed, "run Dock Finder" opens the app instead of running it.
 
@@ -38,12 +39,12 @@ Only Find Dock has phrases starting with "find a dock". Siri matches phrases loo
 
 | Feature | Runs on | Siri phrase |
 | --- | --- | --- |
-| Nearest dock to you | iPhone | "Ask Dock Finder" → "near me" (or "Find a dock with Dock Finder") |
-| Dock near a saved place (school, work, home…), checking your usual dock first and rerouting if it's full | iPhone | "Ask Dock Finder" → "school" (or one step: "Check my school dock with Dock Finder") |
-| **Ride alert**: start a ride to a saved place or anywhere, hear the best dock when you're ~500 m out, with the phone locked | iPhone (background location + speech) | "Ask Dock Finder" → "start a ride to school" (or "Start a ride with Dock Finder") |
+| **Ride alert**: start a ride to a saved place or anywhere, hear the best dock when you're ~500 m out, with the phone locked | iPhone (background location + speech) | "Start a ride with Dock Finder" → "school" |
+| Nearest dock to you, right now | iPhone | "Find a dock with Dock Finder" |
+| Your usual dock at a saved place, rerouting if it's full | iPhone | "Check my school dock with Dock Finder" |
 | Arrival alert from a Shortcuts **Arrive** automation (older approach) | iPhone (*Find Dock Near Saved Place* → Speak Text) | none, automatic |
-| Dock near any address, landmark or neighborhood | iPhone (Apple map search) | "Ask Dock Finder" → "near Union Square" |
-| Is a station full, and where to go instead | iPhone | "Ask Dock Finder" → "Mercer and Bleecker" |
+| Dock near any address, landmark or neighborhood, right now | iPhone (Apple map search) | In the app (**Dock Near a Place**), or "Ask Dock Finder" → "find a dock near Union Square" |
+| Is a station full, and where to go instead | iPhone | "Check a station with Dock Finder", or "Ask Dock Finder" → "is Mercer and Bleecker full?" |
 | Citywide totals | iPhone | "Ask Dock Finder" → "how many bikes are out?" |
 | Set a usual or backup dock, save a place | iPhone (in the app, the *Set Usual Dock* Shortcuts action, or by voice) | "Ask Dock Finder" → "my school dock is Mercer and Bleecker" / "save this spot as gym" |
 | Cycling directions | Apple Maps / Google Maps links in the app | none |
@@ -101,7 +102,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 
 ## Rides
 
-> "Hey Siri, ask Dock Finder" → "start a ride to school" → *"Got it. I'll tell you where to dock when you're about 0.3 miles from school."* → … → *"Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."*
+> "Hey Siri, start a ride with Dock Finder" → *"Where are you heading?"* → "school" → *"Got it. I'll tell you where to dock when you're about 0.3 miles from school."* → … → *"Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."*
 
 - The destination can be a saved place (uses its usual and backup docks and its own alert distance) or anywhere Apple Maps finds.
 - While a ride is active, the app tracks location in the background, the way navigation apps do, and also sets a geofence around the destination. If iOS closes the app mid-ride, the geofence relaunches it on arrival.
@@ -169,13 +170,13 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 
 - [ ] Fresh install → Welcome screen → button shows the location prompt → Siri instructions screen.
 - [ ] "Dock Finder shortcuts" link opens Shortcuts and shows all six actions.
-- [ ] "Hey Siri, ask Dock Finder" asks "Where are you headed, or which station?" **without opening the app** (`supportedModes = .background`), with the phone locked and headphones in. (Confirmed working on one iPhone 12 Pro; locked + headphones still to check.)
-- [ ] Answering "school", "near Union Square", "Mercer and Bleecker", "near me" and "how many bikes are out" each gets the right answer.
-- [ ] Saying "Hey Siri, ask Doc Finder" (or Siri showing "doc") still reaches the app.
+- [ ] "Hey Siri, start a ride with Dock Finder" asks "Where are you heading?" **without opening the app**, with the phone locked and headphones in. Answering "school", "Union Square" and "44 West 4th Street" each starts a ride; "home" (not saved) asks you to add it.
+- [ ] "Hey Siri, ask Dock Finder" asks "What do you need?" (confirmed reachable on an iPhone 12 Pro), and "is Mercer and Bleecker full?" / "how many bikes are out?" get the right answer.
+- [ ] Saying "Doc Finder" (or Siri showing "doc") still reaches the app.
 - [ ] A question it can't understand is answered by the server (if `DOCKFINDER_BACKEND_HOST` is set).
 - [ ] "Hey Siri, find a dock with Dock Finder" (and "find me a dock…", "find the nearest dock…") answers with the nearest dock **without asking anything first**.
 - [ ] After adding School, "Hey Siri, check my school dock with Dock Finder" works. It can take a minute to register after adding the place.
-- [ ] "Ask Dock Finder" → "start a ride to school", lock the phone, ride: about 500 m out, the answer is spoken through headphones (music ducks) and shows as a notification. Then the ride card is gone.
+- [ ] "Start a ride with Dock Finder" → "school", lock the phone, ride: about 500 m out, the answer is spoken through headphones (music ducks) and shows as a notification. Then the ride card is gone.
 - [ ] The Always location prompt appears when starting a ride from the app, and the ride card's notice goes away once it's allowed.
 - [ ] If iOS closes the app mid-ride (after using lots of other apps), the geofence still alerts on arrival. Also try swiping the app away during a ride, to learn whether iOS relaunches a force-quit app for it.
 - [ ] "Ask Dock Finder" → "end my ride" stops it; "my school dock is Mercer and Bleecker" and "save this spot as gym" update saved places.

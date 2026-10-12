@@ -178,12 +178,11 @@ struct AskView: View {
     @FocusState private var isFocused: Bool
 
     private let examples = [
-        "Start a ride to school",
-        "Find me a dock near Union Square",
         "Is Mercer and Bleecker full?",
-        "School",
         "Check my school dock",
         "How many bikes are out?",
+        "My school dock is Court and State",
+        "Find me a dock near Union Square",
     ]
 
     var body: some View {

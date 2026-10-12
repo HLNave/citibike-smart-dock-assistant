@@ -80,7 +80,7 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         if citywidePhrases.contains(where: request.contains) {
             return .citywide
         }
-        // Short answers to "Where are you headed, or which station?".
+        // Short answers: "here", "nearest".
         if selfReferences.contains(request) || ["nearest", "closest", "nearest one", "closest one"].contains(request) {
             return .nearMe
         }
@@ -156,6 +156,23 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         return nil
     }
 
+    /// The destination in an answer to "Where are you heading?": "to
+    /// school" → "school", "I'm going to Union Square" → "union square".
+    static func destination(from answer: String) -> String {
+        let request = normalize(answer)
+        if case .startRide(let destination)? = parseRide(request), !destination.isEmpty {
+            return destination
+        }
+        let prefixes = [
+            "i'm heading to ", "im heading to ", "i am heading to ", "i'm going to ", "im going to ", "i am going to ",
+            "i'm riding to ", "im riding to ", "heading to ", "going to ", "riding to ", "towards ", "toward ", "to ",
+        ]
+        for prefix in prefixes where request.hasPrefix(prefix) {
+            return String(request.dropFirst(prefix.count))
+        }
+        return request
+    }
+
     /// Lowercased, without "hey siri"/"please" and trailing punctuation.
     static func normalize(_ text: String) -> String {
         var request = text.lowercased()
@@ -199,8 +216,8 @@ nonisolated struct KeywordRequestParser: RequestParsing {
 
 // MARK: - Short answers
 
-/// Handles a bare answer to "Where are you headed, or which station?", such
-/// as "school" (a saved place) or "Mercer and Bleecker" (a station), which
+/// Handles a bare answer to "What do you need?", such as "school" (a saved
+/// place) or "Mercer and Bleecker" (a station), which
 /// the phrase rules can't classify without knowing the rider's places and
 /// the station list.
 nonisolated struct ShortAnswerParser: RequestParsing {

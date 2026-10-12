@@ -204,7 +204,7 @@ struct StartRideView: View {
                 Section {
                     AlwaysLocationNotice()
                 } footer: {
-                    Text("Hands-free: “Hey Siri, ask Dock Finder”, then “start a ride to school”.")
+                    Text("Hands-free: “Hey Siri, start a ride with Dock Finder”, then say where you're heading.")
                 }
             }
             .navigationTitle("Start a Ride")
