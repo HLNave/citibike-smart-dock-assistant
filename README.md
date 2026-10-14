@@ -8,7 +8,7 @@ A hands-free helper for Citi Bike riders in NYC. Tell Siri where you're riding, 
 > Siri: "Got it. I'll tell you where to dock when you're about 0.3 miles from school."
 > *…as you get close:* "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
 
-Built as a group capstone project. The main product is **Dock Finder**, a native iPhone app (SwiftUI, Siri, App Intents) that reads Citi Bike's public live feed directly. An [n8n](https://n8n.io) workflow answers the free-form questions the phone can't understand, and powers an older Shortcuts-only version for riders without the app.
+Built as a group capstone project. The main product is **Dock Finder**, a native iPhone app (SwiftUI, Siri, App Intents) that reads Citi Bike's public live feed directly. An [n8n](https://n8n.io) workflow answers the free-form questions the phone can't understand. (Before the app, an iPhone Shortcuts version was the MVP we used to prove the idea worked. It's no longer used; see [Legacy: the Shortcuts MVP](#legacy-the-shortcuts-mvp).)
 
 ## The problem
 
@@ -72,15 +72,13 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 
 ### Tips
 
-- **Don't say "run Dock Finder" or "open Dock Finder"** if the app is installed. Siri treats a launch verb plus the app's name as "open the app", which needs the phone unlocked. (Riders using only the Shortcuts version, without the app, do say "run Dock Finder"; see [docs/onboarding.md](docs/onboarding.md).)
+- **Don't say "run Dock Finder" or "open Dock Finder"** if the app is installed. Siri treats a launch verb plus the app's name as "open the app", which needs the phone unlocked.
 - **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
 - **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
-- **Only if you built your own automation** (most riders haven't): an *automation* is something you set up in Apple's Shortcuts app to run by itself, e.g. "when I arrive near school, run Dock Finder's *Find Dock Near Saved Place* and read the answer out loud" (that's an **Arrive** automation; see the [iOS README](ios/README.md#arrival-alerts-with-a-shortcuts-automation-older-approach)). Nobody is talking to Siri when an automation runs, so nobody can answer "Want me to direct you there?" In that automation, tap the Dock Finder action and switch **Offer Directions** off. Talking to Siri yourself is unaffected.
 - **If Siri runs the wrong action** after installing a new build, delete the app and install it again; iOS caches which phrase runs which action.
-- **A shorter phrase:** in the Shortcuts app, make a shortcut with Dock Finder's **Start Ride** action and name it something like **Ride Check** (not "Dock Finder"). Then "Hey Siri, ride check" works the same way.
 
 ## Using the app
 
@@ -125,7 +123,6 @@ flowchart LR
 - **On the iPhone first.** Every feature runs on the phone, reading Citi Bike's public [GBFS feed](https://gbfs.citibikenyc.com/gbfs/en/) (no API key) and Apple's map search. Saved places are stored only on the phone.
 - **Rides** track location in the background the way navigation apps do, plus a geofence around the destination that relaunches the app if iOS closed it. At the alert distance it speaks the answer (ducking music) and posts it as a notification, then the ride ends. Rides stop after 60 minutes if you never arrive.
 - **The n8n server is a fallback** for free-form questions the phone can't understand, or places and stations it can't find. A chat model classifies the request into a fixed JSON schema; **it never writes the answer**. Plain JavaScript does, so every number comes from the live feed. OpenStreetMap Nominatim looks up places, and the model rewrites nicknames ("that bagel place by Stern") into addresses when the lookup fails.
-- **Shortcuts-only version.** Before the app, riders used shared iPhone shortcuts ("Hey Siri, run Dock Finder", the Action Button, and an Arrive automation per place) that call the n8n webhooks. They still work; see [docs/onboarding.md](docs/onboarding.md) and [docs/shortcuts.md](docs/shortcuts.md).
 
 ## Repo layout
 
@@ -137,14 +134,10 @@ ios/
 n8n/
   citibike-smart-dock-assistant.workflow.json   # import this into n8n
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
-shortcuts/
-  build_shortcuts.py                             # builds the signed, shareable .shortcut files (output in shortcuts/dist/, gitignored)
-  generate_docs.py                               # regenerates docs/shortcuts.md (CI runs it on every push)
 docs/
-  onboarding.md                                  # new-rider guide (app and Shortcuts-only paths)
-  shortcuts.md                                   # how every shared shortcut works, step by step (auto-updated on each push)
-  iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
   project-summary.pdf                            # one-page-per-topic project overview
+  onboarding.md, shortcuts.md, iphone-setup-handoff.md   # legacy Shortcuts MVP docs (not maintained)
+shortcuts/                                       # legacy Shortcuts MVP build scripts (not maintained)
 ```
 
 The workflow JSON is the source of truth for the server; `code-nodes/` holds copies of its Code nodes so the logic is easy to read and review on GitHub.
@@ -160,19 +153,15 @@ There's no TestFlight build yet, so each tester installs it from Xcode on a Mac 
 1. In n8n (Cloud or self-hosted), create a workflow, then **⋯ → Import from File** and pick `n8n/citibike-smart-dock-assistant.workflow.json`.
 2. Open the chat model nodes (attached to **understand request** and **ai address**) and pick your model and credential (OpenAI, Anthropic, etc.). If a model offers a reasoning-effort setting, use the lowest.
 3. **Save** and **Publish**.
-4. Copy the **Production URL** from the **siri webhook** and **arrival webhook** nodes (use `/webhook/`, not `/webhook-test/`).
+4. The app uses the **siri webhook** (`/webhook/citibike-siri`). Put the n8n host in `DOCKFINDER_BACKEND_HOST` (see the [iOS README](ios/README.md#building)).
 
 Quick test from a terminal:
 
 ```bash
-curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-arrival" -H "Content-Type: application/json" -d '{"lat":40.738,"lon":-73.996}'
+curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-siri" -H "Content-Type: application/json" -d '{"text":"is mercer and bleecker full","lat":40.738,"lon":-73.996,"sessionId":"test"}'
 ```
 
-### 3. Shortcuts-only riders (no app)
-
-See [docs/onboarding.md](docs/onboarding.md). Riders add a few shortcut files a teammate sends them, answer two questions, and make one automation per place. Whoever shares the files builds them with `shortcuts/build_shortcuts.py --host YOUR-N8N-HOST`. For a guided setup, give [`docs/iphone-setup-handoff.md`](docs/iphone-setup-handoff.md) (with your n8n address filled in) to ChatGPT or Claude and say "help me set this up on my iPhone".
-
-**Webhook URLs have no authentication.** Anyone with them can query the assistant and spend your AI credits. Share them, and app builds that contain them, only with people you trust.
+**The webhook has no authentication.** Anyone with its URL can query the assistant and spend your AI credits. Share the host, and app builds that contain it, only with people you trust.
 
 ## Decisions we made
 
@@ -198,6 +187,12 @@ See [docs/onboarding.md](docs/onboarding.md). Riders add a few shortcut files a 
 - The closest dock with ≥2 spaces wins, even if a much roomier one is only slightly farther. Next: prefer stations with a bigger buffer when they're nearly as close.
 - Server conversation memory is in n8n's in-memory store and resets on restart.
 - No TestFlight build yet; free-team installs expire after 7 days.
+
+## Legacy: the Shortcuts MVP
+
+Before the app, Dock Finder was a set of iPhone shortcuts (built in Apple's Shortcuts app) that sent your words or location to the n8n workflow and read the answer aloud. It was the MVP we used to test whether the idea worked at all. **It's no longer used or maintained.** The app replaces all of it.
+
+What's left in the repo from it, kept for reference only: `shortcuts/` (scripts that built the shortcut files), `docs/onboarding.md`, `docs/shortcuts.md` and `docs/iphone-setup-handoff.md` (setup guides), and the n8n workflow's **arrival webhook** (`/webhook/citibike-arrival`), which only the shortcuts called. A GitHub Action still regenerates `docs/shortcuts.md` on every push.
 
 ## Credits
 
