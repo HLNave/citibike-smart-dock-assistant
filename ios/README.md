@@ -75,6 +75,7 @@ Every answer is one sentence. Siri speaks it, the app shows it, and Shortcuts re
 | `biker-app/Services/Announcer.swift` | Speaks the arrival answer (ducking other audio) and posts it as a notification |
 | `biker-app/State/` | Saved places (`UserDefaults`, on this device only) and onboarding state. The active ride is saved too, so tracking survives a relaunch |
 | `Config/` | Build settings; your personal `Local.xcconfig` lives here (gitignored) |
+| `Tools/make_app_icon.py` | Draws the app icon (light, dark and tinted) into `Assets.xcassets/AppIcon.appiconset`; rerun after changing it (needs Pillow) |
 | `DockFinderTests/` | Swift Testing unit tests |
 
 ## Building
