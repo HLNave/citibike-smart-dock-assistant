@@ -99,7 +99,8 @@ struct GuidanceProgressTests {
     @Test func openingSaysHowFarAndTheFirstTurn() {
         var progress = GuidanceProgress(route: testRoute())
         let opening = progress.opening()
-        #expect(opening.contains(" to Bleecker and Mercer. In "))
+        // No first instruction from Maps: the direction comes from the route.
+        #expect(opening.contains(" to Bleecker and Mercer. Head north, then in "))
         #expect(opening.hasSuffix(", turn right onto Bleecker Street."))
     }
 
@@ -109,6 +110,40 @@ struct GuidanceProgressTests {
         // The next thing said is the turn, not the start again.
         let ahead = spoken(progress.update(at: fix(40.7315, -73.9950)))
         #expect(ahead?.hasSuffix(", turn right onto Bleecker Street.") == true)
+    }
+
+    @Test func aBareStartInstructionGetsADirection() {
+        var progress = GuidanceProgress(route: testRoute(firstInstruction: "Start on 6th Ave"))
+        #expect(progress.opening().hasSuffix(" to Bleecker and Mercer. Head north on 6th Avenue."))
+    }
+
+    @Test func startDirectionFromTheRoute() {
+        #expect(testRoute().startHeading == "north")
+        let eastbound = GuidanceRoute(station: dock, legs: [(instruction: "", points: [corner, dockPoint])])
+        #expect(eastbound.startHeading == "east")
+    }
+
+    @Test(arguments: [
+        (29.0, "north"),     // up a Manhattan avenue
+        (119.0, "east"),     // along a Manhattan street, toward the East River
+        (209.0, "south"),
+        (299.0, "west"),
+        (-10.0, "north"),
+        (350.0, "north"),
+    ])
+    func compassPoints(bearing: Double, expected: String) {
+        #expect(GuidanceRoute.compassPoint(bearing) == expected)
+    }
+
+    @Test(arguments: [
+        ("Start on West 14th Street", "Head east on West 14th Street"),
+        ("Proceed to the route", "Head east"),
+        ("Continue on Broadway", "Head east on Broadway"),
+        ("Head west on Bleecker Street", "Head west on Bleecker Street"),
+        ("Turn left onto 7th Avenue", "Turn left onto 7th Avenue"),
+    ])
+    func headingIsAddedOnlyWhenMissing(instruction: String, expected: String) {
+        #expect(GuidanceProgress.addingHeading("east", to: instruction) == expected)
     }
 
     @Test func aMissedTurnIsSkippedSilently() {

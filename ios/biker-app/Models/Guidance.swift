@@ -49,6 +49,31 @@ nonisolated struct GuidanceRoute: Sendable, Equatable {
 
     var length: CLLocationDistance { cumulative.last ?? 0 }
 
+    /// Which way the route sets off, from its first 25 m: "north", "east",
+    /// "south" or "west". Four directions match how riders describe
+    /// Manhattan's tilted grid: avenues run north–south, streets east–west.
+    var startHeading: String? {
+        guard path.count >= 2 else { return nil }
+        let end = cumulative.firstIndex { $0 >= 25 } ?? (path.count - 1)
+        guard end > 0, path[end] != path[0] else { return nil }
+        return Self.compassPoint(Self.bearing(from: path[0], to: path[end]))
+    }
+
+    /// Degrees clockwise from true north.
+    static func bearing(from a: GuidanceCoordinate, to b: GuidanceCoordinate) -> Double {
+        let lat1 = a.latitude * .pi / 180
+        let lat2 = b.latitude * .pi / 180
+        let deltaLon = (b.longitude - a.longitude) * .pi / 180
+        let y = sin(deltaLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(deltaLon)
+        return atan2(y, x) * 180 / .pi
+    }
+
+    static func compassPoint(_ bearing: Double) -> String {
+        let normalized = (bearing.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        return ["north", "east", "south", "west"][Int((normalized + 45) / 90) % 4]
+    }
+
     /// Builds a route from MapKit-shaped legs: each leg is the instruction
     /// for the maneuver at its start, plus the points it covers.
     init(station: DockStation, legs: [(instruction: String, points: [GuidanceCoordinate])]) {
@@ -182,21 +207,46 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
         nextManeuver.map { max($0.offset - along, 0) }
     }
 
-    /// What to say when guidance starts: how far it is, then the first
-    /// maneuver. "0.3 miles to West 4th and Mercer. Head north on 6th Avenue."
+    /// What to say when guidance starts: how far it is, which way to set
+    /// off, then the first maneuver. "0.3 miles to West 4th and Mercer.
+    /// Head north on 6th Avenue." / "… Head east, then in 300 feet, turn
+    /// left onto 7th Avenue."
     mutating func opening() -> String {
         var parts = ["\(Speech.sentence(Speech.length(route.length))) to \(route.station.spokenName)."]
-        if let step = nextManeuver, let distance = distanceToNextManeuver {
-            let instruction = Speech.instruction(step.instruction)
-            if distance <= Self.turnNowDistance, !step.isArrival {
-                parts.append(Speech.period(instruction))
-                nextStep += 1
-            } else {
-                parts.append(Speech.period("In \(Speech.length(distance)), \(Speech.lowercasingFirst(instruction))"))
-                if distance <= Self.prepareDistance { preparedSteps.insert(nextStep) }
-            }
+        let heading = route.startHeading
+        guard let step = nextManeuver, let distance = distanceToNextManeuver else {
+            if let heading { parts.append("Head \(heading).") }
+            return parts.joined(separator: " ")
+        }
+        let instruction = Speech.instruction(step.instruction)
+        if distance <= Self.turnNowDistance, !step.isArrival {
+            parts.append(Speech.period(Self.addingHeading(heading, to: instruction)))
+            nextStep += 1
+        } else {
+            let next = "in \(Speech.length(distance)), \(Speech.lowercasingFirst(instruction))"
+            parts.append(Speech.period(heading.map { "Head \($0), then \(next)" } ?? Speech.sentence(next)))
+            if distance <= Self.prepareDistance { preparedSteps.insert(nextStep) }
         }
         return parts.joined(separator: " ")
+    }
+
+    /// "Start on West 14th Street" → "Head east on West 14th Street". An
+    /// instruction that already says which way ("Head north on…", "Turn
+    /// left onto…") is left alone.
+    static func addingHeading(_ heading: String?, to instruction: String) -> String {
+        guard let heading else { return instruction }
+        let alreadyDirected = #"^(?:(?:Head|Go)\s+(?:north|south|east|west)|(?:Turn|Bear|Keep|Slight|Make|Take)\b)"#
+        if instruction.range(of: alreadyDirected, options: [.regularExpression, .caseInsensitive]) != nil {
+            return instruction
+        }
+        guard let lead = instruction.range(of: #"^(?:Start|Proceed|Continue|Go|Head)(?:\s+(?:on|along|onto|to))?\s+"#, options: [.regularExpression, .caseInsensitive]) else {
+            return instruction
+        }
+        let street = instruction[lead.upperBound...]
+        if street.lowercased().hasPrefix("the route") {
+            return "Head \(heading)"
+        }
+        return "Head \(heading) on \(street)"
     }
 
     /// Advances along the route and returns anything to say or do.
