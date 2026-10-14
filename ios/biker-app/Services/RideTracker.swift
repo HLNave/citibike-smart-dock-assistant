@@ -160,6 +160,8 @@ final class RideTracker: RideControlling {
                     case .riding(let distance):
                         if let distance {
                             self.distanceRemaining = distance
+                            // Directions own the activity while they run.
+                            guard !GuidanceSession.shared.isActive else { continue }
                             await DockFinderLiveActivity.shared.update(
                                 .riding(to: ride.destination.name, remaining: distance),
                                 minInterval: 15

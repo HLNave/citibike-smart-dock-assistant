@@ -102,6 +102,9 @@ final class GuidanceSession: GuidanceControlling {
     @ObservationIgnored private var serviceSession: CLServiceSession?
     @ObservationIgnored private var backgroundSession: CLBackgroundActivitySession?
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
+    /// Bumped each time tracking starts, so a finishing session can tell
+    /// whether newer directions took over.
+    @ObservationIgnored private var trackingGeneration = 0
 
     init(routes: any RouteProviding = MapKitRouteProvider()) {
         self.routes = routes
@@ -145,12 +148,12 @@ final class GuidanceSession: GuidanceControlling {
             destination: station.spokenName,
             state: .guiding(progress, docksOpen: docksOpen)
         )
-        if speak { prompter.say(opening) }
 
         if LocationService.shared.authorizationStatus != .authorizedAlways,
            UIApplication.shared.applicationState != .active {
             opening += " To hear each turn with your phone locked, open Dock Finder and allow location access all the time."
         }
+        if speak { prompter.say(opening) }
         return opening
     }
 
@@ -158,7 +161,20 @@ final class GuidanceSession: GuidanceControlling {
         guard progress != nil else { return }
         progress = nil
         await stopTracking()
-        await DockFinderLiveActivity.shared.end()
+        await Self.handActivityBack()
+    }
+
+    /// When directions end mid-ride, the Live Activity goes back to showing
+    /// the ride instead of disappearing.
+    private static func handActivityBack(showing finalState: GuidanceActivityAttributes.ContentState? = nil) async {
+        if let ride = RideTracker.shared.currentRide {
+            await DockFinderLiveActivity.shared.update(
+                .riding(to: ride.destination.name, remaining: RideTracker.shared.distanceRemaining),
+                force: true
+            )
+        } else {
+            await DockFinderLiveActivity.shared.end(showing: finalState, lingering: finalState == nil ? 0 : 2 * 60)
+        }
     }
 
     func dismissLastArrival() {
@@ -168,6 +184,7 @@ final class GuidanceSession: GuidanceControlling {
     // MARK: - Tracking
 
     private func beginTracking() {
+        trackingGeneration += 1
         serviceSession = CLServiceSession(authorization: .whenInUse)
         // With only While Using access, this keeps updates flowing once the
         // app leaves the screen. It can only start while the app is on
@@ -239,26 +256,34 @@ final class GuidanceSession: GuidanceControlling {
         // Keep running until the arrival has been spoken; stopping location
         // first would let iOS suspend the app mid-sentence.
         let backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Dock arrival")
+        let generation = trackingGeneration
         prompter.say(text)
-        await DockFinderLiveActivity.shared.end(showing: .arrived(at: station, docksOpen: docksOpen), lingering: 2 * 60)
+        await Self.handActivityBack(showing: .arrived(at: station, docksOpen: docksOpen))
         await prompter.waitUntilDone()
-        await stopTracking()
+        // New directions may have started while this was being spoken;
+        // don't stop their tracking.
+        if trackingGeneration == generation {
+            await stopTracking()
+        }
         UIApplication.shared.endBackgroundTask(backgroundTask)
     }
 
     /// Recomputes the route from where the rider is, to the same dock or
-    /// to `newStation`, and says the new first instruction.
-    private func reroute(from location: CLLocation, to newStation: DockStation? = nil, announcement: String = "Rerouting.") async {
-        guard let current = station else { return }
-        guard newStation != nil || Date.now.timeIntervalSince(lastReroute) >= Self.rerouteCooldown else { return }
+    /// to `newStation`, and says the new first instruction. Returns false
+    /// when no new route was set.
+    @discardableResult
+    private func reroute(from location: CLLocation, to newStation: DockStation? = nil, announcement: String = "Rerouting.") async -> Bool {
+        guard let current = station else { return false }
+        guard newStation != nil || Date.now.timeIntervalSince(lastReroute) >= Self.rerouteCooldown else { return false }
         lastReroute = .now
         guard let route = try? await routes.route(from: location, to: newStation ?? current),
               progress != nil
-        else { return }
+        else { return false }
         var fresh = GuidanceProgress(route: route)
         let next = fresh.opening()
         progress = fresh
         prompter.say("\(announcement) \(next)")
+        return true
     }
 
     /// Re-checks the dock every couple of minutes and once more near the
@@ -279,13 +304,17 @@ final class GuidanceSession: GuidanceControlling {
         case .fine(let docks):
             docksOpen = docks
         case .switchTo(let alternative, let problem):
-            docksOpen = alternative.availableDocks
-            checkedNearEnd = false
-            await reroute(
+            let switched = await reroute(
                 from: location,
                 to: alternative,
                 announcement: "\(Speech.sentence(target.spokenName)) \(problem.phrase) now. Heading to \(alternative.spokenName) instead, \(Speech.docksOpen(alternative.availableDocks))."
             )
+            if switched {
+                docksOpen = alternative.availableDocks
+                checkedNearEnd = false
+            } else {
+                docksOpen = network.station(id: target.id)?.openDocks
+            }
         case .noAlternative(let problem, let docks):
             docksOpen = docks
             prompter.say("\(Speech.sentence(target.spokenName)) \(problem.phrase) now, and nothing nearby has space.")

@@ -6,6 +6,7 @@
 //  that shows the next turn while guidance runs.
 //
 
+import CoreLocation
 import SwiftUI
 
 /// Starts spoken turn-by-turn guidance to `station`.
