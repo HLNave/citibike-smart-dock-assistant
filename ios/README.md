@@ -21,11 +21,13 @@ The destination reaches the app as plain text, so Siri can't turn it into a Maps
 
 More phrases:
 
-- "End my ride with Dock Finder"
-- "Check my school dock with Dock Finder" (your usual dock's status right now)
-- "Check a station with Dock Finder" → Siri asks which station
-- "Citi Bike status in Dock Finder" (citywide totals)
-- **"Ask Dock Finder"** → "What do you need?" → anything in your own words: "is Mercer and Bleecker full?", "how many bikes are out?", "my school dock is Court and State", "save this spot as gym". Requests it can't answer on the phone go to the n8n server if one is configured.
+- "End my ride with Dock Finder" (also "cancel my ride…")
+- "Check my school dock with Dock Finder" (your usual dock's status right now; works with any saved place's name)
+- "Check a station with Dock Finder" (also "is a station full in Dock Finder") → Siri asks which station
+- "Citi Bike status in Dock Finder" (also "check Citi Bike citywide with Dock Finder") for citywide totals
+- **"Ask Dock Finder"** (also "talk to Dock Finder") → "What do you need?" → anything in your own words: "is Mercer and Bleecker full?", "find a dock near Union Square", "how many bikes are out?", "start a ride to school", "end my ride", "my school dock is Court and State", "save this spot as gym". Requests it can't answer on the phone go to the n8n server if one is configured.
+
+The [root README](../README.md#what-to-say-to-siri) has the complete phrase list and everything "Ask Dock Finder" understands. Keep it in sync when phrases change.
 
 Only Find Dock has phrases starting with "find a dock". Siri matches phrases loosely, so a second "find a dock near …" phrase could win instead and ask a question, which turns the one-step request into a conversation.
 
@@ -45,7 +47,7 @@ Only Find Dock has phrases starting with "find a dock". Siri matches phrases loo
 | Arrival alert from a Shortcuts **Arrive** automation (older approach) | iPhone (*Find Dock Near Saved Place* → Speak Text) | none, automatic |
 | Dock near any address, landmark or neighborhood, right now | iPhone (Apple map search) | In the app (**Dock Near a Place**), or "Ask Dock Finder" → "find a dock near Union Square" |
 | Is a station full, and where to go instead | iPhone | "Check a station with Dock Finder", or "Ask Dock Finder" → "is Mercer and Bleecker full?" |
-| Citywide totals | iPhone | "Ask Dock Finder" → "how many bikes are out?" |
+| Citywide totals | iPhone | "Citi Bike status in Dock Finder", or "Ask Dock Finder" → "how many bikes are out?" |
 | Set a usual or backup dock, save a place | iPhone (in the app, the *Set Usual Dock* Shortcuts action, or by voice) | "Ask Dock Finder" → "my school dock is Mercer and Bleecker" / "save this spot as gym" |
 | Cycling directions | Apple Maps / Google Maps links in the app | none |
 | Anything else, in your own words | iPhone first (phrase rules, saved place and station names, then Apple Intelligence where available), **n8n backend** only when none of those understands the request or can find the place/station | "Ask Dock Finder", then say it |
@@ -170,7 +172,7 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 These can't be automated and **have not yet been verified on a device**. The Simulator runs have covered the in-app screens with live data:
 
 - [ ] Fresh install → Welcome screen → button shows the location prompt → Siri instructions screen.
-- [ ] "Dock Finder shortcuts" link opens Shortcuts and shows all six actions.
+- [ ] "Dock Finder shortcuts" link opens Shortcuts and shows the seven Dock Finder shortcuts.
 - [ ] "Hey Siri, start a ride with Dock Finder" asks "Where are you heading?" **without opening the app**, with the phone locked and headphones in. Answering "school", "Union Square" and "44 West 4th Street" each starts a ride; "home" (not saved) asks you to add it.
 - [ ] "Hey Siri, ask Dock Finder" asks "What do you need?" (confirmed reachable on an iPhone 12 Pro), and "is Mercer and Bleecker full?" / "how many bikes are out?" get the right answer.
 - [ ] Saying "Doc Finder" (or Siri showing "doc") still reaches the app.
@@ -201,4 +203,4 @@ The three supplied `.shortcut` files are signed Apple Encrypted Archives. They w
 
 - *App Detection* (presumably triggered when the Citi Bike app opens) writes the current ISO-8601 timestamp to `ride.txt`.
 - *School Automation* (presumably a location trigger) reads `ride.txt`. If more than 60 minutes have passed, it exits. Otherwise it geocodes "44 W 4th Street", POSTs `{place: "school", destLat, destLon}` to `…/webhook/citibike-arrival`, speaks the response, and resets `ride.txt` to `2000-01-01`.
-- The app's **Find Dock Near Saved Place** intent covers the same need on device (see [Arrival alerts](#arrival-alerts-replaces-the-n8n-arrival-webhook)). The ride-detection timestamp trick isn't reproduced; use a Time Range on the Arrive automation instead.
+- The app's **Find Dock Near Saved Place** intent covers the same need on device (see [Arrival alerts with a Shortcuts automation](#arrival-alerts-with-a-shortcuts-automation-older-approach)). The ride-detection timestamp trick isn't reproduced; use a Time Range on the Arrive automation instead.

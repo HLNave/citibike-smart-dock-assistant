@@ -1,95 +1,144 @@
 # Citi Bike Smart Dock Assistant
 
-A hands-free helper for Citi Bike riders in NYC. As you get close to where you're going, it tells you **through your headphones** which nearby dock actually has space, so you never have to pull out your phone while riding.
+A hands-free helper for Citi Bike riders in NYC. Tell Siri where you're riding, and as you get close it tells you **through your headphones** which nearby dock actually has space, so you never have to pull out your phone while riding.
 
-> "your usual dock is full. go to Washington and Greene, 8 docks, 100 meters from school."
+> "Hey Siri, start a ride with Dock Finder."
+> Siri: "Where are you heading?"
+> "School."
+> Siri: "Got it. I'll tell you where to dock when you're about 0.3 miles from school."
+> *…as you get close:* "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
 
-Built as a group capstone project with [n8n](https://n8n.io), iPhone Shortcuts + Siri, Citi Bike's public live feed, and OpenStreetMap.
+Built as a group capstone project. The main product is **Dock Finder**, a native iPhone app (SwiftUI, Siri, App Intents) that reads Citi Bike's public live feed directly. An [n8n](https://n8n.io) workflow answers the free-form questions the phone can't understand, and powers an older Shortcuts-only version for riders without the app.
 
 ## The problem
 
 Riding to class, we kept arriving to find the nearby docks already full. Then you have to stop, unlock your phone, open the Citi Bike app and hunt for another station, which is annoying and unsafe on a bike. We wanted something that checks live availability, remembers the docks you normally use, and reroutes you before you get there, entirely by voice.
 
-## Ways to use it
+## What to say to Siri
 
-| Mode | How you trigger it | What happens |
+These work with the phone locked once Dock Finder is installed. Nothing needs to be turned on first.
+
+### The two you need
+
+| Say | Siri asks | Then |
 |---|---|---|
-| **Arrival alert** | Automatic: an iPhone "Arrive" automation fires ~500 m from school, work or home | Speaks whether your usual dock has room, and if not, where to go instead |
-| **Dock Finder (Siri)** | "Hey Siri, run Dock Finder", then ask anything | "find me a dock near me", "is Mercer and Bleecker full?", "find me a dock near Union Square", "how many bikes are out?" |
-| **Action Button** | One press | Nearest dock with space to where you are right now |
-| **Chat** | n8n's built-in chat window | Fuller text answers with Google Maps cycling directions |
+| **"Hey Siri, start a ride with Dock Finder"** | "Where are you heading?" | Answer with a saved place ("school"), a landmark ("Union Square", "NYU Stern") or an address ("44 West 4th Street"). Ride; as you get close, you hear where to dock. |
+| **"Hey Siri, find a dock with Dock Finder"** | nothing | The nearest station to you with room, right now. |
 
-### What it says (real responses from live data)
+### All phrases
+
+| Phrase (say "Hey Siri, …") | What it does |
+|---|---|
+| **Start a ride with Dock Finder**<br>also: *Begin a ride with…*, *Start riding with…*, *New ride with Dock Finder* | Asks where you're heading, then alerts you near the destination with the best dock |
+| **End my ride with Dock Finder**<br>also: *Cancel my ride with Dock Finder* | Stops watching the current ride |
+| **Find a dock with Dock Finder**<br>also: *Find me a dock with…*, *Find a dock in…*, *Find an available dock with…*, *Find an open dock with…*, *Find the nearest dock with…*, *Find a dock near me with Dock Finder*, *Nearest dock in Dock Finder* | Nearest dock with room to where you are |
+| **Check my *school* dock with Dock Finder** (any saved place's name) | Your usual dock there; if it's full, your backup, then the nearest other station with room |
+| **Check a station with Dock Finder**<br>also: *Is a station full in Dock Finder* | Asks "Which station?", then says how many docks and bikes it has, and where to go if it's full |
+| **Citi Bike status in Dock Finder**<br>also: *Check Citi Bike citywide with Dock Finder* | Citywide bikes, open docks and full stations |
+| **Ask Dock Finder**<br>also: *Talk to Dock Finder* | Asks "What do you need?", then takes anything in your own words (below) |
+
+### What you can say to "Ask Dock Finder"
+
+| You want | Say, for example |
+|---|---|
+| A dock near you | "near me", "here", "nearest", "where can I park?" |
+| A dock near a place | "find a dock near Union Square", "close to NYU Stern", or just "school" |
+| Whether a station has room | "is Mercer and Bleecker full?", "does Court and State have room?", "check Lafayette and 8th", "how many docks at Mercer and Bleecker?", or just the station name |
+| Your usual dock | "is my school dock full?", "check my school dock" |
+| Citywide totals | "how many bikes are out?", "citywide", "system status" |
+| Start a ride | "start a ride to school", "I'm heading to Union Square", "take me to 44 West 4th Street" |
+| End a ride | "end my ride", "cancel trip", "I'm done riding" |
+| Set a usual dock | "my school dock is Mercer and Bleecker", "set my work dock to Court and State" |
+| Save where you're standing | "save this spot as gym", "remember here as office" |
+
+Anything else goes to the n8n server, if the app was built with one. Without a server, you get a short help message.
+
+### Tips
+
+- **Don't say "run Dock Finder" or "open Dock Finder"** if the app is installed. Siri treats a launch verb plus the app's name as "open the app", which needs the phone unlocked. (Riders using only the Shortcuts version, without the app, do say "run Dock Finder"; see [docs/onboarding.md](docs/onboarding.md).)
+- **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
+- **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
+- **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
+- **Ride alerts with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
+- **If Siri runs the wrong action** after installing a new build, delete the app and install it again; iOS caches which phrase runs which action.
+- **A shorter phrase:** in the Shortcuts app, make a shortcut with Dock Finder's **Start Ride** action and name it something like **Ride Check** (not "Dock Finder"). Then "Hey Siri, ride check" works the same way.
+
+## Using the app
+
+The first time it opens, tap **Enable Dock Finder with Siri** to allow location, then read the Siri cheat sheet. After that, the home screen has:
+
+- **Find Nearest Dock**: the answer, with Apple Maps and Google Maps directions.
+- **Ride card**: **Start a Ride** (pick a saved place or search an address). During a ride it shows the distance left and an **End Ride** button, and afterwards what was said on arrival.
+- **Saved Places**: **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.
+- **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask Dock Finder (type a question, or tap an example).
+- **How to Use with Siri**: the phrase cheat sheet again.
+
+**Recommended setup:** add School, Work and Home with a usual and backup dock for each, allow Always location, and from then on just say "Hey Siri, start a ride with Dock Finder" → "school".
+
+### What it says (examples)
 
 | Situation | Spoken answer |
 |---|---|
-| Usual dock OK | "your usual dock has 25 docks open." |
-| Usual dock full | "your usual dock is full. go to Washington and Greene, 8 docks, 100 meters from school." |
+| Ride started | "Got it. I'll tell you where to dock when you're about 0.3 miles from school." |
+| Usual dock OK | "Your usual dock has 25 docks open." |
+| Usual dock full | "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school." |
 | Near me | "West 15th and 6th has 53 docks open, right there." |
-| Station check | "Mercer and Bleecker has 29 docks open." |
-| Near a place | "East 17th and Broadway has 47 docks open, 150 meters from union square." |
+| Station check | "Mercer and Bleecker has 29 docks open and 4 bikes." |
+| Near a place | "East 17th and Broadway has 47 docks open, 500 feet from union square." |
 | Whole system | "35,393 bikes and 30,882 open docks citywide. 243 stations are full." |
 
-Station names are rewritten the way New Yorkers say them ("W 15 St & 6 Ave" becomes "West 15th and 6th"), so Siri doesn't read "St" as "Saint".
+Station names are rewritten the way New Yorkers say them ("W 15 St & 6 Ave" becomes "West 15th and 6th"), so Siri doesn't read "St" as "Saint". A station counts only if it's accepting returns, has **at least 2** open docks and reported in the last hour. Distances are straight-line.
 
 ## How it works
 
-The iPhone does the listening and the talking; one n8n workflow does the thinking. Every request ends in a single plain-text sentence that the phone reads aloud with its built-in voice.
-
 ```mermaid
 flowchart LR
-  A["Arrival automation / Action Button<br/>(coordinates + usual dock)"] --> W1["arrival webhook"]
-  S["Siri: run Dock Finder<br/>(your words + GPS)"] --> W2["siri webhook"]
-  C["n8n chat"] --> AI
-  W2 --> AI["chat model<br/>understands the request"]
-  AI --> R{"what kind of question?"}
-  R --> ST["check a station"]
-  R --> PL["dock near a place / near me"]
-  R --> NW["citywide totals"]
-  R --> RM["remember a usual dock"]
-  W1 --> PK["pick the best dock<br/>(no AI, fast)"]
-  ST & PL & NW & RM & PK --> SP["make it speakable"]
-  SP --> V["one sentence → phone speaks it"]
+  S["Siri phrase / app screen"] --> P{"understood on the iPhone?<br/>phrase rules → saved places & station names<br/>→ Apple Intelligence"}
+  P -- yes --> D["on-device features<br/>(nearest dock, dock near a place,<br/>station check, citywide, rides, saved places)"]
+  D --> F["Citi Bike live feed (GBFS)<br/>+ Apple map search"]
+  P -- no --> W2["n8n siri webhook<br/>chat model understands it"]
+  W2 --> F2["Citi Bike feed + OpenStreetMap"]
+  F & F2 --> V["one sentence → Siri speaks it"]
+  R["active ride<br/>(live location + geofence)"] -- "within alert distance" --> D
 ```
 
-- **Live data:** Citi Bike's public [GBFS feed](https://gbfs.lyft.com/gbfs/2.3/bkn/en/) (no API key). A station counts as available only if it's accepting returns and has **at least 2** open docks, within 1.2 km.
-- **Place lookup:** [OpenStreetMap Nominatim](https://nominatim.org/) turns "NYU Stern" or "270 Park Avenue" into coordinates. The AI rewrites landmarks into street addresses first, because the geocoder only matches addresses and official names.
-- **Understanding requests:** a small chat model classifies what you said into one of six intents (`station`, `place`, `gps`, `network`, `remember`, `help`) and extracts station names and places into a fixed JSON schema. **It never writes the answer**; plain JavaScript does, so every number comes straight from the live feed. We've run it on Claude Haiku 4.5 and GPT-6 Luna; any fast, non-reasoning model works.
-- **Arrival alerts skip the AI entirely.** Their inputs are fixed, so they answer in ~2–3 s. Siri questions take ~3–6 s.
-- **Memory:** the Siri conversation remembers aliases like "my school dock is Mercer and Bleecker". Arrival automations carry their usual dock in the request itself.
+- **On the iPhone first.** Every feature runs on the phone, reading Citi Bike's public [GBFS feed](https://gbfs.citibikenyc.com/gbfs/en/) (no API key) and Apple's map search. Saved places are stored only on the phone.
+- **Rides** track location in the background the way navigation apps do, plus a geofence around the destination that relaunches the app if iOS closed it. At the alert distance it speaks the answer (ducking music) and posts it as a notification, then the ride ends. Rides stop after 60 minutes if you never arrive.
+- **The n8n server is a fallback** for free-form questions the phone can't understand, or places and stations it can't find. A chat model classifies the request into a fixed JSON schema; **it never writes the answer**. Plain JavaScript does, so every number comes from the live feed. OpenStreetMap Nominatim looks up places, and the model rewrites nicknames ("that bagel place by Stern") into addresses when the lookup fails.
+- **Shortcuts-only version.** Before the app, riders used shared iPhone shortcuts ("Hey Siri, run Dock Finder", the Action Button, and an Arrive automation per place) that call the n8n webhooks. They still work; see [docs/onboarding.md](docs/onboarding.md) and [docs/shortcuts.md](docs/shortcuts.md).
 
 ## Repo layout
 
 ```
+ios/
+  biker-app.xcodeproj                            # the Dock Finder app; see ios/README.md
+  biker-app/                                     # app source
+  DockFinderTests/                               # unit tests
 n8n/
   citibike-smart-dock-assistant.workflow.json   # import this into n8n
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
-docs/
-  onboarding.md                                  # start here as a new rider
-  shortcuts.md                                   # how every shared shortcut works, step by step (auto-updated on each push)
-  iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
-  project-summary.pdf                            # one-page-per-topic project overview
 shortcuts/
   build_shortcuts.py                             # builds the signed, shareable .shortcut files (output in shortcuts/dist/, gitignored)
   generate_docs.py                               # regenerates docs/shortcuts.md (CI runs it on every push)
-ios/
-  biker-app.xcodeproj                            # native SwiftUI "Dock Finder" app: dock logic runs on the iPhone, n8n only for free-form questions; see ios/README.md
-  biker-app/                                     # app source
-  DockFinderTests/                               # unit tests
+docs/
+  onboarding.md                                  # new-rider guide (app and Shortcuts-only paths)
+  shortcuts.md                                   # how every shared shortcut works, step by step (auto-updated on each push)
+  iphone-setup-handoff.md                        # Shortcuts-only iPhone setup, written for an AI assistant to walk a rider through
+  project-summary.pdf                            # one-page-per-topic project overview
 ```
 
-The workflow JSON is the source of truth; `code-nodes/` holds copies of the six Code nodes so the logic is easy to read and review on GitHub.
-
-To try the native iOS app (developer preview) on your own iPhone, follow [Testing the developer preview on your own iPhone](ios/README.md#testing-the-developer-preview-on-your-own-iphone).
+The workflow JSON is the source of truth for the server; `code-nodes/` holds copies of its Code nodes so the logic is easy to read and review on GitHub.
 
 ## Set it up
 
-**New rider? Start with [docs/onboarding.md](docs/onboarding.md).** Riders add a few shortcut files a teammate sends them, answer two questions, and make one automation per place: no URLs or coordinates. Whoever shares the files builds them with `shortcuts/build_shortcuts.py`. The steps below set up the shared n8n backend, which Path B needs and the app uses for free-form questions.
+### 1. The app
 
-### 1. Backend (n8n)
+There's no TestFlight build yet, so each tester installs it from Xcode on a Mac (a free Apple ID is enough; iPhone on iOS 26.5 or newer). Follow [Testing the developer preview on your own iPhone](ios/README.md#testing-the-developer-preview-on-your-own-iphone). The app works fully without the server; set `DOCKFINDER_BACKEND_HOST` only if you want free-form questions answered by n8n.
+
+### 2. Backend (n8n, optional for the app)
 
 1. In n8n (Cloud or self-hosted), create a workflow, then **⋯ → Import from File** and pick `n8n/citibike-smart-dock-assistant.workflow.json`.
-2. Open the chat model node attached to **understand request** and pick your model and credential (OpenAI, Anthropic, etc.). If a model offers a reasoning-effort setting, use the lowest.
+2. Open the chat model nodes (attached to **understand request** and **ai address**) and pick your model and credential (OpenAI, Anthropic, etc.). If a model offers a reasoning-effort setting, use the lowest.
 3. **Save** and **Publish**.
 4. Copy the **Production URL** from the **siri webhook** and **arrival webhook** nodes (use `/webhook/`, not `/webhook-test/`).
 
@@ -99,34 +148,35 @@ Quick test from a terminal:
 curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-arrival" -H "Content-Type: application/json" -d '{"lat":40.738,"lon":-73.996}'
 ```
 
-### 2. iPhone
+### 3. Shortcuts-only riders (no app)
 
-See [docs/onboarding.md](docs/onboarding.md). For the Shortcuts-only path: open [`docs/iphone-setup-handoff.md`](docs/iphone-setup-handoff.md), replace `https://YOUR-N8N-HOST` with your n8n address, then attach it to ChatGPT or Claude and say "help me set this up on my iPhone". It covers the required iPhone settings, the arrival automations, the Dock Finder Siri shortcut, and a troubleshooting table of every mistake we hit. You need iOS 17 or newer and about 15 minutes.
+See [docs/onboarding.md](docs/onboarding.md). Riders add a few shortcut files a teammate sends them, answer two questions, and make one automation per place. Whoever shares the files builds them with `shortcuts/build_shortcuts.py --host YOUR-N8N-HOST`. For a guided setup, give [`docs/iphone-setup-handoff.md`](docs/iphone-setup-handoff.md) (with your n8n address filled in) to ChatGPT or Claude and say "help me set this up on my iPhone".
 
-**Webhook URLs have no authentication.** Anyone with them can query the assistant and spend your AI credits on Siri requests. Share filled-in copies only with people you trust.
+**Webhook URLs have no authentication.** Anyone with them can query the assistant and spend your AI credits. Share them, and app builds that contain them, only with people you trust.
 
 ## Decisions we made
 
-- **Trigger near saved places, not the Google Maps destination.** Google Maps doesn't expose your navigation destination or live position to other apps, so iPhone "Arrive" automations for commute destinations give a fully automatic trigger without building an App Store app.
-- **Siri + Shortcuts instead of a Telegram bot.** Our first voice prototype used Telegram, but voice notes need the phone unlocked and a button held, and replies don't auto-play. Siri is truly hands-free, and the phone does speech recognition and text-to-speech for free.
+- **A native app for rides.** Google Maps doesn't expose your navigation destination to other apps, so the first version could only alert you near pre-set places via "Arrive" automations. The app lets you start a ride to *any* destination by voice and alerts you there.
+- **Siri instead of a Telegram bot.** Our first voice prototype used Telegram, but voice notes need the phone unlocked and a button held, and replies don't auto-play. Siri is truly hands-free, and the phone does speech recognition and text-to-speech for free.
+- **One question, then the answer.** "Start a ride with Dock Finder" asks only "Where are you heading?"; the destination reaches the app as plain text, so Siri can't turn it into a Maps search (or a search for doctors).
 - **Spoken-first answers.** Anything spoken is one sentence: where to go, how many docks, how far.
-- **AI only where it helps.** Fixed-input paths (arrival, Action Button) are plain code; only free-form questions go through a model.
+- **AI only where it helps.** Fixed requests are plain code on the phone; only free-form questions go through a model, on device first.
 
 ## Costs
 
 | Piece | Cost |
 |---|---|
-| Citi Bike feed, OpenStreetMap lookups, iPhone speech | Free |
-| Chat model per Siri question | ≈ $0.002 or less (arrival alerts use none) |
+| Citi Bike feed, Apple map search, OpenStreetMap lookups, iPhone speech, on-device AI | Free |
+| Server chat model per free-form question the phone can't answer | ≈ $0.002 or less |
 | n8n hosting | n8n Cloud plan, or free/self-hosted |
 
 ## Limitations and next steps
 
-- Arrival alerts fire however you arrive (walking, subway). iOS can't tell you're biking, so a time window is the only filter.
+- **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch and background speech. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
 - Distances are straight-line, not riding distance.
 - The closest dock with ≥2 spaces wins, even if a much roomier one is only slightly farther. Next: prefer stations with a bigger buffer when they're nearly as close.
-- Siri conversation memory is in n8n's in-memory store and resets on restart.
-- Ideas: move the backend to a free serverless function that caches the station list for faster answers; keep each rider's saved places on the server so automations need one action; a native app that sets an arrival alert for *any* destination shared from Google Maps.
+- Server conversation memory is in n8n's in-memory store and resets on restart.
+- No TestFlight build yet; free-team installs expire after 7 days.
 
 ## Credits
 
