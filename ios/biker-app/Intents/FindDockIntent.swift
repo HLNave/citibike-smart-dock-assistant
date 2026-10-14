@@ -35,7 +35,7 @@ extension AppIntent {
     /// - When `answer` started a ride (it's not the ride from before), asks
     ///   whether to guide the rider to the dock on arrival.
     /// - When it names a dock, asks "Want me to direct you there?" and, on
-    ///   yes, starts turn-by-turn guidance and reads the first instruction.
+    ///   yes, confirms and starts turn-by-turn guidance in the app's voice.
     @MainActor
     func reply(
         with answer: DockAnswer,
@@ -70,8 +70,11 @@ extension AppIntent {
             // the question, so don't repeat it.
             return spokenResult(answer.text, dialog: "Okay.")
         }
-        let opening = try await guidance.start(to: station, speak: false)
-        return spokenResult(opening)
+        // Siri only confirms; the app's voice gives the directions once Siri
+        // has finished, so the two don't talk over each other.
+        let siriLine = guidance.siriConfirmation(for: station)
+        let reply = try await guidance.start(to: station, siriWillSay: siriLine)
+        return spokenResult(guidance.isActive ? siriLine : reply)
     }
 }
 

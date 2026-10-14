@@ -224,7 +224,8 @@ struct GuidanceRouterTests {
         let guidance = GuidanceSpy(offered: dock)
         let answer = try await router(guidance).answer("take me there")
         #expect(guidance.started.map(\.id) == ["dock"])
-        #expect(answer.text == "Head to Bleecker and Mercer.")
+        // Siri only confirms; the app's voice gives the directions.
+        #expect(answer.text == "Okay, directing you to Bleecker and Mercer.")
     }
 
     @Test func takeMeThereWithoutAnOfferGoesToTheNearestDock() async throws {

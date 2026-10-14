@@ -22,10 +22,16 @@ protocol GuidanceControlling: AnyObject {
     var isActive: Bool { get }
     /// The dock the rider was last offered directions to, if recently.
     func recentOffer(now: Date) -> DockStation?
-    /// Starts guiding and returns the opening sentence: "0.3 miles to West
-    /// 4th and Mercer. Head north on 6th Avenue." With `speak`, the app
-    /// also says it; Siri speaks it itself when it started guidance.
-    func start(to station: DockStation, speak: Bool) async throws -> String
+    /// Starts guiding. The app's voice gives every instruction, starting
+    /// with the opening ("0.3 miles to West 4th and Mercer. Head north on
+    /// 6th Avenue."), which is also returned. When Siri started it, pass
+    /// the line Siri is about to say as `siriWillSay`; the app holds its
+    /// own speech until Siri should be done, so the two never talk over
+    /// each other. If the rider is already at the dock, guidance doesn't
+    /// start and a short message comes back instead.
+    func start(to station: DockStation, siriWillSay siriLine: String?) async throws -> String
+    /// What Siri says when directions start: just a confirmation.
+    func siriConfirmation(for station: DockStation) -> String
     func stop() async
 }
 
@@ -124,7 +130,16 @@ final class GuidanceSession: GuidanceControlling {
 
     // MARK: - Starting and stopping
 
-    func start(to station: DockStation, speak: Bool) async throws -> String {
+    func siriConfirmation(for station: DockStation) -> String {
+        var line = "Okay, directing you to \(station.spokenName)."
+        if LocationService.shared.authorizationStatus != .authorizedAlways,
+           UIApplication.shared.applicationState != .active {
+            line += " To hear each turn with your phone locked, open Dock Finder and allow location access all the time."
+        }
+        return line
+    }
+
+    func start(to station: DockStation, siriWillSay siriLine: String?) async throws -> String {
         let here = try await LocationService.shared.currentLocation().location
         if here.distance(from: station.location) <= GuidanceProgress.arrivalRadius * 2 {
             return "\(Speech.sentence(station.spokenName)) is right here."
@@ -133,7 +148,7 @@ final class GuidanceSession: GuidanceControlling {
 
         await stopTracking()
         var progress = GuidanceProgress(route: route)
-        var opening = progress.opening()
+        let opening = progress.opening()
         self.progress = progress
         docksOpen = station.availableDocks
         lastArrival = nil
@@ -149,17 +164,17 @@ final class GuidanceSession: GuidanceControlling {
             state: .guiding(progress, docksOpen: docksOpen)
         )
 
-        if LocationService.shared.authorizationStatus != .authorizedAlways,
-           UIApplication.shared.applicationState != .active {
-            opening += " To hear each turn with your phone locked, open Dock Finder and allow location access all the time."
+        if let siriLine {
+            prompter.hold(for: VoicePrompter.speakingTime(of: siriLine))
         }
-        if speak { prompter.say(opening) }
+        prompter.say(opening)
         return opening
     }
 
     func stop() async {
         guard progress != nil else { return }
         progress = nil
+        prompter.dropHeld()
         await stopTracking()
         await Self.handActivityBack()
     }
@@ -334,7 +349,52 @@ final class VoicePrompter: NSObject {
         synthesizer.delegate = self
     }
 
+    private var heldUntil: ContinuousClock.Instant?
+    private var held: [String] = []
+
+    /// Roughly how long Siri takes to say `text`, including the moment
+    /// before it starts talking.
+    static func speakingTime(of text: String) -> Duration {
+        let words = text.split(whereSeparator: \.isWhitespace).count
+        return .seconds(1.5 + Double(words) * 0.4)
+    }
+
+    /// Queues everything said for `duration`, then speaks it in order.
+    /// Used while Siri is still talking.
+    func hold(for duration: Duration) {
+        let until = ContinuousClock.now + duration
+        heldUntil = until
+        Task { [weak self] in
+            try? await Task.sleep(until: until, clock: .continuous)
+            self?.release(heldUntil: until)
+        }
+    }
+
+    /// Forgets anything queued by `hold`, e.g. when directions stop.
+    func dropHeld() {
+        heldUntil = nil
+        held.removeAll()
+    }
+
+    private func release(heldUntil until: ContinuousClock.Instant) {
+        guard heldUntil == until else { return }
+        heldUntil = nil
+        let queued = held
+        held.removeAll()
+        for text in queued {
+            speak(text)
+        }
+    }
+
     func say(_ text: String) {
+        if heldUntil != nil {
+            held.append(text)
+        } else {
+            speak(text)
+        }
+    }
+
+    private func speak(_ text: String) {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])

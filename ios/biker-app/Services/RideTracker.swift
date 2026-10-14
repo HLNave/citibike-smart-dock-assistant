@@ -217,7 +217,7 @@ final class RideTracker: RideControlling {
         if let station = answer.station {
             GuidanceSession.shared.offer(station)
             if ride.guidesToDock {
-                let started = await Task { try await GuidanceSession.shared.start(to: station, speak: true) }.result
+                let started = await Task { try await GuidanceSession.shared.start(to: station, siriWillSay: nil) }.result
                 if case .failure(let error) = started {
                     let message = (error as? DockFinderError) ?? .routeUnavailable
                     await announcer.announce(String(localized: message.localizedStringResource), title: "Directions")

@@ -109,10 +109,14 @@ final class GuidanceSpy: GuidanceControlling {
 
     func recentOffer(now: Date) -> DockStation? { offered }
 
-    func start(to station: DockStation, speak: Bool) async throws -> String {
+    func start(to station: DockStation, siriWillSay siriLine: String?) async throws -> String {
         started.append(station)
         isActive = true
         return "Head to \(station.spokenName)."
+    }
+
+    func siriConfirmation(for station: DockStation) -> String {
+        "Okay, directing you to \(station.spokenName)."
     }
 
     func stop() async {

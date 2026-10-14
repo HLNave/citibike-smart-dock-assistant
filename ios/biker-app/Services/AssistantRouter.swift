@@ -117,7 +117,9 @@ struct AssistantRouter {
             } else {
                 station = try await service.findNearestDock().station
             }
-            return DockAnswer(text: try await guidance.start(to: station, speak: false))
+            let siriLine = guidance.siriConfirmation(for: station)
+            let reply = try await guidance.start(to: station, siriWillSay: siriLine)
+            return DockAnswer(text: guidance.isActive ? siriLine : reply)
 
         case .stopDirections:
             if guidance.isActive {

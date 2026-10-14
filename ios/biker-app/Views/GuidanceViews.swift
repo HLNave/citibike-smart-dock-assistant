@@ -63,7 +63,7 @@ struct DirectMeButton: View {
             _ = await LocationService.shared.requestWhenInUseAuthorization()
         }
         do {
-            _ = try await guidance.start(to: station, speak: true)
+            _ = try await guidance.start(to: station, siriWillSay: nil)
             error = nil
         } catch let failure as DockFinderError {
             error = failure
