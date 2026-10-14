@@ -12,7 +12,7 @@
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>When you start a ride, Dock Finder watches for you to get close to your destination so it can tell you where to dock, even with your phone locked.</string>
+	<string>Dock Finder tells you where to dock as you get close, and guides you there turn by turn, with your phone locked in your pocket.</string>
 	<key>DockFinderBackendHost</key>
 	<string>$(DOCKFINDER_BACKEND_HOST)</string>
 	<!-- "Dock" and "doc" sound the same, so Siri often transcribes the app's

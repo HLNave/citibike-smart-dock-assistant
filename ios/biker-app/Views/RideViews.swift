@@ -93,7 +93,6 @@ struct RideCard: View {
 
 /// Explains, and asks for, the Always access rides need with the phone locked.
 struct AlwaysLocationNotice: View {
-    private static let askedKey = "askedForAlwaysLocation"
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
@@ -119,7 +118,7 @@ struct AlwaysLocationNotice: View {
 
     /// iOS only shows the upgrade prompt once; after that, Settings is the only way.
     private var canPrompt: Bool {
-        status == .authorizedWhenInUse && !UserDefaults.standard.bool(forKey: Self.askedKey)
+        status == .authorizedWhenInUse && !UserDefaults.standard.bool(forKey: LocationService.alwaysPromptShownKey)
             || status == .notDetermined
     }
 
@@ -129,7 +128,6 @@ struct AlwaysLocationNotice: View {
 
     private func requestAccess() {
         if canPrompt {
-            UserDefaults.standard.set(true, forKey: Self.askedKey)
             Task {
                 if status == .notDetermined {
                     _ = await LocationService.shared.requestWhenInUseAuthorization()

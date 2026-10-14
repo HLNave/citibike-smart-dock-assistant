@@ -82,12 +82,12 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 
 ## Using the app
 
-The first time it opens, tap **Enable Dock Finder with Siri** to allow location, then read the Siri cheat sheet. After that, the home screen has:
+The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about location twice: choose **Allow While Using App**, then **Change to Always Allow** (iOS never offers "Always" in the first question), so rides and directions work with the phone locked. Then read the Siri cheat sheet. After that, the home screen has:
 
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
-- **Saved Places**: **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.
+- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask Dock Finder (type a question, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again.
 

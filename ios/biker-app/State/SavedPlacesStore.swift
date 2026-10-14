@@ -120,7 +120,7 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
 
 @Observable
 final class SavedPlacesStore {
-    static let shared = SavedPlacesStore()
+    static let shared = SavedPlacesStore(backup: KeychainPlacesBackup())
     nonisolated static let storageKey = "savedPlaces"
     /// Unreadable data is copied here instead of being overwritten, so a bad
     /// update can't silently erase the rider's places.
@@ -140,14 +140,28 @@ final class SavedPlacesStore {
     }
 
     private let defaults: UserDefaults
+    private let backup: (any PlacesBackup)?
     private let onChange: () -> Void
 
     private(set) var places: [SavedPlace]
 
-    init(defaults: UserDefaults = .standard, onChange: @escaping () -> Void = SavedPlacesStore.refreshSiriPhrases) {
+    init(
+        defaults: UserDefaults = .standard,
+        backup: (any PlacesBackup)? = nil,
+        onChange: @escaping () -> Void = SavedPlacesStore.refreshSiriPhrases
+    ) {
         self.defaults = defaults
+        self.backup = backup
         self.onChange = onChange
-        places = Self.load(from: defaults)
+        // A fresh install has nothing saved yet; bring back the places from
+        // before the app was deleted, if a backup survived.
+        if defaults.data(forKey: Self.storageKey) == nil, let saved = backup?.read() {
+            defaults.set(saved, forKey: Self.storageKey)
+            places = Self.load(from: defaults)
+            if !places.isEmpty { onChange() }
+        } else {
+            places = Self.load(from: defaults)
+        }
     }
 
     func place(id: UUID) -> SavedPlace? {
@@ -248,6 +262,7 @@ final class SavedPlacesStore {
     private func save() {
         if let data = try? JSONEncoder().encode(places) {
             defaults.set(data, forKey: Self.storageKey)
+            backup?.write(data)
         }
         onChange()
     }

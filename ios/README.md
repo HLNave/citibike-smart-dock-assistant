@@ -141,6 +141,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 - **Edit anything** (name, nicknames, location, alert distance), set a location with **Use My Current Location**, reorder or delete places, and get a warning if a place has no Citi Bike station within 1.2 km.
 - **By voice:** "my school dock is Mercer and Bleecker", "save this spot as gym".
 - **Storage is defensive:** places saved by older versions still load, one damaged entry doesn't wipe the list, and unreadable data is kept aside instead of being overwritten.
+- **They survive reinstalling.** A copy is kept in the iPhone's keychain (`State/PlacesBackup.swift`), which iOS keeps when an app is deleted, and is restored on a fresh install. It only works with the same bundle ID and signing team, and it's long-standing iOS behavior rather than a documented guarantee. Nothing leaves the phone; iCloud sync would need a paid developer account.
 
 ## Testing the developer preview on your own iPhone
 
@@ -169,7 +170,7 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 
 ### Things to know
 
-- **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
+- **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. Saved places come back even if you deleted the app; location permission has to be granted again. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
 - **Keep signing out of the project file.** Set your team and bundle ID in `Local.xcconfig`, not with the Team menu in Xcode. The menu writes them into `project.pbxproj`, which is shared. If that happens, run `git diff` before committing and leave those lines out.
 - **Siri needs a Development Team.** Without one, Find Dock appears in Shortcuts but fails with "Unable to run App Shortcut" (see Building above).
 - **If Siri runs the wrong action or keeps re-asking a question** after installing a new build, delete Dock Finder from the phone and install it again. iOS caches which phrase runs which action. For developers: never reorder or remove entries in `DockFinderShortcutsProvider` (append only), and bump `CURRENT_PROJECT_VERSION` in `Config/DockFinder.xcconfig` whenever the phrases change. `SiriPhraseTests` fails if the order changes.
@@ -179,7 +180,8 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 
 These can't be automated and **have not yet been verified on a device**. The Simulator runs have covered the in-app screens with live data:
 
-- [ ] Fresh install → Welcome screen → button shows the location prompt → Siri instructions screen.
+- [ ] Fresh install → Welcome screen → button shows the While Using location prompt, then straight away "Change to Always Allow" → Siri instructions screen.
+- [ ] Add a place, delete the app, reinstall from Xcode: the place (with its usual dock) is back.
 - [ ] On the "Use Dock Finder with Siri" screen, the Dock Finder shortcuts button (Apple's list of the app's Siri phrases) shows nine entries.
 - [ ] "Hey Siri, start a ride with Dock Finder" asks "Where are you heading?" **without opening the app**, with the phone locked and headphones in. Answering "school", "Union Square" and "44 West 4th Street" each starts a ride; "home" (not saved) asks you to add it.
 - [ ] "Hey Siri, ask Dock Finder" asks "What do you need?" (confirmed reachable on an iPhone 12 Pro), and "is Mercer and Bleecker full?" / "how many bikes are out?" get the right answer.

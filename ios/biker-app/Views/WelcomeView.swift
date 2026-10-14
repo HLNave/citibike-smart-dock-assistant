@@ -57,7 +57,7 @@ struct WelcomeView: View {
                 .controlSize(.large)
                 .disabled(isRequesting)
 
-                Text("Set up location access and learn how to use Dock Finder hands-free.")
+                Text("iOS asks twice about location. Choose Allow While Using App, then Change to Always Allow, so rides and directions keep working with your phone locked.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -78,7 +78,7 @@ struct WelcomeView: View {
         onboarding.markIntroCompleted()
         isRequesting = true
         Task {
-            let status = await LocationService.shared.requestWhenInUseAuthorization()
+            let status = await LocationService.shared.requestAlwaysAuthorizationFromStart()
             isRequesting = false
             switch status {
             case .denied, .restricted:

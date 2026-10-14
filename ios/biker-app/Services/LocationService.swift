@@ -8,6 +8,7 @@
 
 import CoreLocation
 import Foundation
+import UIKit
 
 nonisolated struct LocationFix: Sendable {
     let location: CLLocation
@@ -21,6 +22,9 @@ nonisolated protocol LocationProviding: Sendable {
 @MainActor
 final class LocationService: NSObject, LocationProviding {
     static let shared = LocationService()
+    /// Set once the "Change to Always Allow" prompt has been asked for.
+    /// iOS shows it only once; after that, Settings is the only way.
+    nonisolated static let alwaysPromptShownKey = "askedForAlwaysLocation"
 
     /// How long to wait for Core Location before giving up.
     private static let requestTimeout: Duration = .seconds(15)
@@ -60,7 +64,23 @@ final class LocationService: NSObject, LocationProviding {
     /// locked. iOS shows the prompt at most once; after that the rider has
     /// to change it in Settings.
     func requestAlwaysAuthorization() {
+        UserDefaults.standard.set(true, forKey: Self.alwaysPromptShownKey)
         manager.requestAlwaysAuthorization()
+    }
+
+    /// Asks for When In Use access, then straight away for Always. iOS
+    /// never offers Always in the first prompt; asking for it right after
+    /// When In Use is granted shows "Change to Always Allow?" immediately.
+    /// Returns the resulting status once the rider has answered.
+    func requestAlwaysAuthorizationFromStart() async -> CLAuthorizationStatus {
+        let status = await requestWhenInUseAuthorization()
+        guard status == .authorizedWhenInUse,
+              !UserDefaults.standard.bool(forKey: Self.alwaysPromptShownKey)
+        else { return status }
+        let prompt = PromptWatcher()
+        requestAlwaysAuthorization()
+        await prompt.waitForAnswer()
+        return manager.authorizationStatus
     }
 
     nonisolated func currentLocation() async throws -> LocationFix {
@@ -137,5 +157,45 @@ extension LocationService: CLLocationManagerDelegate {
                 : .locationUnavailable
             finishLocationRequest(.failure(mapped))
         }
+    }
+}
+
+/// Waits for a system permission prompt to be answered. Showing the prompt
+/// makes the app inactive, and answering it makes it active again. Keeping
+/// While Using doesn't change the authorization, so there may be no
+/// location callback to wait for. If the prompt never appears, it stops
+/// waiting after a couple of seconds.
+private final class PromptWatcher {
+    private var promptAppeared = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var observers: [NSObjectProtocol] = []
+
+    /// Starts listening right away, so call it before triggering the prompt.
+    init() {
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.promptAppeared = true }
+        })
+        observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            // Ignore a late "active" from the previous prompt closing.
+            MainActor.assumeIsolated { if self?.promptAppeared == true { self?.finish() } }
+        })
+    }
+
+    func waitForAnswer() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                if self?.promptAppeared == false { self?.finish() }
+            }
+        }
+    }
+
+    private func finish() {
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers.removeAll()
+        continuation?.resume()
+        continuation = nil
     }
 }
