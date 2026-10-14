@@ -29,6 +29,8 @@ struct HomeView: View {
 
                     DockLookupSection(buttonTitle: "Find Nearest Dock", prominent: true)
 
+                    GuidanceCard()
+
                     RideCard()
 
                     HomeCard(title: "Saved Places", trailing: savedPlaces.places.count > 1 ? .manage : nil) {

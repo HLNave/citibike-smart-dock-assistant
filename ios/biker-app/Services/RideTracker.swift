@@ -32,6 +32,8 @@ protocol RideControlling: AnyObject {
     var canTrackInBackground: Bool { get }
     func start(_ ride: Ride) async
     func end() async
+    /// Whether the arrival alert turns into turn-by-turn guidance to the dock.
+    func setGuidesToDock(_ guides: Bool)
 }
 
 @Observable
@@ -76,6 +78,10 @@ final class RideTracker: RideControlling {
         save()
         await Announcer.requestNotificationPermission()
         await beginTracking(ride)
+        await DockFinderLiveActivity.shared.show(
+            destination: ride.destination.name,
+            state: .riding(to: ride.destination.name, remaining: nil)
+        )
     }
 
     func end() async {
@@ -83,6 +89,15 @@ final class RideTracker: RideControlling {
         distanceRemaining = nil
         save()
         await stopTracking()
+        if !GuidanceSession.shared.isActive {
+            await DockFinderLiveActivity.shared.end()
+        }
+    }
+
+    func setGuidesToDock(_ guides: Bool) {
+        guard currentRide != nil else { return }
+        currentRide?.guidesToDock = guides
+        save()
     }
 
     /// Call at every launch, including the background relaunch iOS does for
@@ -143,7 +158,13 @@ final class RideTracker: RideControlling {
                         await self.end()
                         return
                     case .riding(let distance):
-                        if let distance { self.distanceRemaining = distance }
+                        if let distance {
+                            self.distanceRemaining = distance
+                            await DockFinderLiveActivity.shared.update(
+                                .riding(to: ride.destination.name, remaining: distance),
+                                minInterval: 15
+                            )
+                        }
                     }
                 }
             } catch {}
@@ -187,6 +208,23 @@ final class RideTracker: RideControlling {
         let answer = await Task { await Self.arrivalAnswer(for: ride) }.value
         lastArrival = RideArrival(destination: ride.destination.name, answer: answer, date: .now)
         await announcer.announce(answer.text, title: "Docking near \(ride.destination.name)")
+
+        // Guidance starts before this ride's tracking stops, so location
+        // keeps the app running throughout, and in its own task so stopping
+        // the ride's tasks can't cancel it.
+        if let station = answer.station {
+            GuidanceSession.shared.offer(station)
+            if ride.guidesToDock {
+                let started = await Task { try await GuidanceSession.shared.start(to: station, speak: true) }.result
+                if case .failure(let error) = started {
+                    let message = (error as? DockFinderError) ?? .routeUnavailable
+                    await announcer.announce(String(localized: message.localizedStringResource), title: "Directions")
+                }
+            }
+        }
+        if !GuidanceSession.shared.isActive {
+            await DockFinderLiveActivity.shared.end(showing: .answer(answer), lingering: 5 * 60)
+        }
 
         await stopTracking()
         UIApplication.shared.endBackgroundTask(backgroundTask)

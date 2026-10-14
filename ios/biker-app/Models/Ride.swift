@@ -21,19 +21,38 @@ nonisolated struct Ride: Codable, Sendable, Equatable {
     var alertDistance: CLLocationDistance
     var startedAt: Date
     var expiresAt: Date
+    /// After saying where to dock, guide the rider there turn by turn.
+    var guidesToDock: Bool
 
     init(
         destination: Destination,
         savedPlaceID: UUID? = nil,
         alertDistance: CLLocationDistance = SavedPlace.defaultAlertDistance,
         startedAt: Date = .now,
-        duration: TimeInterval = Ride.maxDuration
+        duration: TimeInterval = Ride.maxDuration,
+        guidesToDock: Bool = false
     ) {
         self.destination = destination
         self.savedPlaceID = savedPlaceID
         self.alertDistance = alertDistance
         self.startedAt = startedAt
         self.expiresAt = startedAt.addingTimeInterval(duration)
+        self.guidesToDock = guidesToDock
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case destination, savedPlaceID, alertDistance, startedAt, expiresAt, guidesToDock
+    }
+
+    /// Rides saved by an older version have no `guidesToDock`.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        destination = try container.decode(Destination.self, forKey: .destination)
+        savedPlaceID = try container.decodeIfPresent(UUID.self, forKey: .savedPlaceID)
+        alertDistance = try container.decode(CLLocationDistance.self, forKey: .alertDistance)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        expiresAt = try container.decode(Date.self, forKey: .expiresAt)
+        guidesToDock = try container.decodeIfPresent(Bool.self, forKey: .guidesToDock) ?? false
     }
 
     enum Progress: Equatable {

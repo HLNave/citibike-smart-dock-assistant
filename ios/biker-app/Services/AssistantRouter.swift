@@ -21,8 +21,10 @@ struct AssistantRouter {
     var backend: (any AssistantBackend)?
     var location: any LocationProviding
     var sessionID: String
+    var guidance: any GuidanceControlling = GuidanceSession.shared
 
     static let helpText = "You can ask whether a station has room, like is Mercer and Bleecker full, or how many bikes are out. To get docking directions on the way somewhere, say start a ride to school."
+    static let stoppedDirections = "Okay, I stopped the directions."
 
     /// Names riders use for their own places. If one isn't saved, a map
     /// search would find some business called "Home" or "Gym" instead.
@@ -98,10 +100,35 @@ struct AssistantRouter {
 
         case .endRide:
             guard let ride = rides.currentRide else {
+                if guidance.isActive {
+                    await guidance.stop()
+                    return DockAnswer(text: Self.stoppedDirections)
+                }
                 return DockAnswer(text: "You don't have a ride in progress.")
             }
             await rides.end()
+            await guidance.stop()
             return DockAnswer(text: "Okay, I stopped watching your ride to \(ride.destination.name).")
+
+        case .directions:
+            let station: DockStation
+            if let offered = guidance.recentOffer(now: .now) {
+                station = offered
+            } else {
+                station = try await service.findNearestDock().station
+            }
+            return DockAnswer(text: try await guidance.start(to: station, speak: false))
+
+        case .stopDirections:
+            if guidance.isActive {
+                await guidance.stop()
+                return DockAnswer(text: Self.stoppedDirections)
+            }
+            if let ride = rides.currentRide, ride.guidesToDock {
+                rides.setGuidesToDock(false)
+                return DockAnswer(text: "Okay. On this ride, I'll just tell you where to dock.")
+            }
+            return DockAnswer(text: "You're not getting directions right now.")
 
         case .setUsualDock(let placeName, let stationName):
             guard let saved = store.place(matching: placeName) else {

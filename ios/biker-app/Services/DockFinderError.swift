@@ -23,6 +23,7 @@ nonisolated enum DockFinderError: Error, Equatable, Sendable {
     case stationNotFound(String)
     case savedPlaceNotFound
     case backendUnavailable
+    case routeUnavailable
 }
 
 extension DockFinderError: CustomLocalizedStringResourceConvertible, LocalizedError {
@@ -58,6 +59,8 @@ extension DockFinderError: CustomLocalizedStringResourceConvertible, LocalizedEr
             "That saved place no longer exists. Open Dock Finder to add it again."
         case .backendUnavailable:
             "Dock Finder couldn't reach its server to answer that. Try asking for a dock near you or near a place."
+        case .routeUnavailable:
+            "Dock Finder couldn't work out a cycling route to that dock right now. Try again in a moment."
         }
     }
 

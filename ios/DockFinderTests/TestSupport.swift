@@ -89,4 +89,34 @@ final class RideSpy: RideControlling {
         endCount += 1
         currentRide = nil
     }
+
+    func setGuidesToDock(_ guides: Bool) {
+        currentRide?.guidesToDock = guides
+    }
+}
+
+@MainActor
+final class GuidanceSpy: GuidanceControlling {
+    var isActive: Bool
+    var offered: DockStation?
+    private(set) var started: [DockStation] = []
+    private(set) var stopCount = 0
+
+    init(isActive: Bool = false, offered: DockStation? = nil) {
+        self.isActive = isActive
+        self.offered = offered
+    }
+
+    func recentOffer(now: Date) -> DockStation? { offered }
+
+    func start(to station: DockStation, speak: Bool) async throws -> String {
+        started.append(station)
+        isActive = true
+        return "Head to \(station.spokenName)."
+    }
+
+    func stop() async {
+        stopCount += 1
+        isActive = false
+    }
 }

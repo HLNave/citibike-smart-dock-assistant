@@ -95,6 +95,26 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             shortTitle: "Citywide Status",
             systemImageName: "chart.bar"
         )
+        AppShortcut(
+            intent: StopDirectionsIntent(),
+            phrases: [
+                "Stop directions with \(.applicationName)",
+                "Cancel directions with \(.applicationName)",
+                "Stop guiding with \(.applicationName)",
+            ],
+            shortTitle: "Stop Directions",
+            systemImageName: "location.slash"
+        )
+        AppShortcut(
+            intent: DirectMeIntent(),
+            phrases: [
+                "Direct me with \(.applicationName)",
+                "Guide me to a dock with \(.applicationName)",
+                "Get directions with \(.applicationName)",
+            ],
+            shortTitle: "Direct Me",
+            systemImageName: "location.north.line"
+        )
     }
 
     static let shortcutTileColor: ShortcutTileColor = .teal

@@ -23,6 +23,7 @@ nonisolated struct DockStation: Sendable, Equatable, Identifiable {
     let observedAt: Date?
 
     var spokenName: String { Speech.stationName(name) }
+    var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
 }
 
 /// A place to find docks near: a saved place or a map search result.

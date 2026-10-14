@@ -28,6 +28,10 @@ nonisolated enum ParsedRequest: Sendable, Equatable {
     case setUsualDock(place: String, station: String)
     /// "Save this spot as gym".
     case savePlace(String)
+    /// "Take me there": turn-by-turn guidance to the dock just mentioned.
+    case directions
+    /// "Stop directions".
+    case stopDirections
 }
 
 nonisolated protocol RequestParsing: Sendable {
@@ -63,8 +67,13 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         let request = normalize(text)
         guard !request.isEmpty else { return nil }
 
-        // Rides and saved-place edits first, since "start a ride to the
-        // park near my office" would otherwise read as a place search.
+        // Directions first: "take me to the dock" isn't a ride to a place
+        // called "the dock". Then rides and saved-place edits, since "start
+        // a ride to the park near my office" would otherwise read as a
+        // place search.
+        if let guidance = parseGuidance(request) {
+            return guidance
+        }
         if let ride = parseRide(request) {
             return ride
         }
@@ -103,6 +112,26 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         // "Find me a dock", "where can I park" with no place named.
         if request.range(of: #"\b(dock|docks|park|return|drop off|parking)\b"#, options: .regularExpression) != nil {
             return .nearMe
+        }
+        return nil
+    }
+
+    private static let directionEndings: Set<String> = [
+        "stop directions", "stop the directions", "cancel directions", "cancel the directions", "end directions",
+        "stop guiding", "stop guiding me", "stop navigation", "stop the navigation", "stop navigating",
+    ]
+
+    private static let directionRequests = [
+        #"^(?:yes,? )?(?:direct|guide|take|navigate|bring|lead) me(?: there| to it| to that dock| to the dock| to that station| to the station)?$"#,
+        #"^(?:get |give me |start )?directions(?: there| to it| to that dock| to the dock)?$"#,
+    ]
+
+    private static func parseGuidance(_ request: String) -> ParsedRequest? {
+        if directionEndings.contains(request) {
+            return .stopDirections
+        }
+        if directionRequests.contains(where: { request.range(of: $0, options: .regularExpression) != nil }) {
+            return .directions
         }
         return nil
     }

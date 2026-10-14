@@ -206,7 +206,7 @@ def app_section():
         return out + ["App source not found.", ""]
     titles = {}
     for f in APP_INTENTS.glob("*.swift"):
-        for m in re.finditer(r"struct\s+(\w+)\s*:\s*AppIntent.*?static\s+(?:let|var)\s+title[^=]*=\s*\"([^\"]+)\"",
+        for m in re.finditer(r"struct\s+(\w+)\s*:\s*(?:AppIntent|LiveActivityIntent)\b.*?static\s+(?:let|var)\s+title[^=]*=\s*\"([^\"]+)\"",
                              f.read_text(), re.S):
             titles[m.group(1)] = m.group(2)
     src = APP_PROVIDER.read_text()

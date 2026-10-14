@@ -82,6 +82,44 @@ nonisolated enum Speech {
         }
     }
 
+    /// Makes an Apple Maps instruction sound right when spoken: "Turn left
+    /// onto W 4th St" → "Turn left onto West 4th Street", and "The
+    /// destination is on your left" → "The dock is on your left".
+    static func instruction(_ text: String) -> String {
+        var text = text.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
+            .replacingOccurrences(of: "&", with: " and ")
+        if text.range(of: #"^Arrive\b"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return "You'll reach the dock"
+        }
+        text = replace(#"\b([Tt])he destination\b"#, in: text) { groups in "\(groups[1])he dock" }
+        text = replace(#"\bE\b(?=\s+\d)"#, in: text) { _ in "East" }
+        text = replace(#"\bW\b(?=\s+\d)"#, in: text) { _ in "West" }
+        text = replace(#"\bN\b(?=\s+\d)"#, in: text) { _ in "North" }
+        text = replace(#"\bS\b(?=\s+\d)"#, in: text) { _ in "South" }
+        text = replace(#"\b(\d+)\s+St\b"#, in: text) { groups in Int(groups[1]).map { "\(ordinal($0)) Street" } ?? groups[0] }
+        text = replace(#"\b(\d+)\s+Ave\b"#, in: text) { groups in Int(groups[1]).map { "\(ordinal($0)) Avenue" } ?? groups[0] }
+        // "St Marks Pl" is Saint Marks Place; "Bleecker St" is Bleecker Street.
+        text = replace(#"\bSt\b\.?(?=\s+[A-Z][a-z])"#, in: text) { _ in "Saint" }
+        let words = ["St": "Street", "Ave": "Avenue", "Pl": "Place", "Blvd": "Boulevard", "Rd": "Road",
+                     "Dr": "Drive", "Pkwy": "Parkway", "Hwy": "Highway", "Sq": "Square", "Ln": "Lane"]
+        for (short, long) in words {
+            text = replace(#"\b\#(short)\b\.?"#, in: text) { _ in long }
+        }
+        return text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    /// "Turn left" → "turn left", for the middle of a sentence.
+    static func lowercasingFirst(_ text: String) -> String {
+        guard let first = text.first else { return text }
+        return first.lowercased() + text.dropFirst()
+    }
+
+    /// Ends a sentence with a period unless it already has punctuation.
+    static func period(_ text: String) -> String {
+        guard let last = text.last, !".!?".contains(last) else { return text }
+        return text + "."
+    }
+
     /// Uppercases the first letter so sentences that start with a
     /// lowercase place name ("school") still read as sentences on screen.
     static func sentence(_ text: String) -> String {

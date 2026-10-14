@@ -22,20 +22,35 @@ These work with the phone locked once Dock Finder is installed. Nothing needs to
 
 | Say | Siri asks | Then |
 |---|---|---|
-| **"Hey Siri, start a ride with Dock Finder"** | "Where are you heading?" | Answer with a saved place ("school"), a landmark ("Union Square", "NYU Stern") or an address ("44 West 4th Street"). Ride; as you get close, you hear where to dock. |
-| **"Hey Siri, find a dock with Dock Finder"** | nothing | The nearest station to you with room, right now. |
+| **"Hey Siri, start a ride with Dock Finder"** | "Where are you heading?" | Answer with a saved place ("school"), a landmark ("Union Square", "NYU Stern") or an address ("44 West 4th Street"). Siri then asks "Want me to guide you to the dock when you're close?" Ride; as you get close, you hear where to dock, and with "yes", each turn on the way there. |
+| **"Hey Siri, find a dock with Dock Finder"** | "Want me to direct you there?" | The nearest station to you with room, right now. Say "yes" to hear each turn on the way. |
+
+### Directions to the dock
+
+Whenever Siri tells you about a dock (Find Dock, Check Station, your saved place's dock, Ask Dock Finder), it ends with **"Want me to direct you there?"** Say **"yes"** and Dock Finder guides you there turn by turn through your headphones, with the phone locked:
+
+> "0.3 miles to West 4th and Mercer. Head north on 6th Avenue." … "In 500 feet, turn right onto Bleecker Street." … "Turn right onto Bleecker Street." … "You've arrived at West 4th and Mercer, 8 docks open."
+
+- If you leave the route, it says "Rerouting" and gives the new next turn.
+- It re-checks the dock every couple of minutes and once more as you get close. If the dock fills up: "West 4th and Mercer is full now. Heading to Mercer and Bleecker instead, 6 docks open."
+- The next turn, the distance to it and the dock's open docks also show on the **Lock Screen and in the Dynamic Island**.
+- **"Hey Siri, stop directions with Dock Finder"** (or "end my ride…") stops it. It also stops on its own at the dock, or after 45 minutes.
+- Said "no" by mistake? **"Hey Siri, direct me with Dock Finder"** guides you to the dock you were just told about (or the nearest one with room).
+- On a ride, say "yes" to "Want me to guide you to the dock when you're close?" and the arrival alert turns straight into directions.
 
 ### All phrases
 
 | Phrase (say "Hey Siri, …") | What it does |
 |---|---|
 | **Start a ride with Dock Finder**<br>also: *Begin a ride with…*, *Start riding with…*, *New ride with Dock Finder* | Asks where you're heading, then alerts you near the destination with the best dock |
-| **End my ride with Dock Finder**<br>also: *Cancel my ride with Dock Finder* | Stops watching the current ride |
+| **End my ride with Dock Finder**<br>also: *Cancel my ride with Dock Finder* | Stops watching the current ride, and any directions |
 | **Find a dock with Dock Finder**<br>also: *Find me a dock with…*, *Find a dock in…*, *Find an available dock with…*, *Find an open dock with…*, *Find the nearest dock with…*, *Find a dock near me with Dock Finder*, *Nearest dock in Dock Finder* | Nearest dock with room to where you are |
 | **Check my *school* dock with Dock Finder** (any saved place's name) | Your usual dock there; if it's full, your backup, then the nearest other station with room |
 | **Check a station with Dock Finder**<br>also: *Is a station full in Dock Finder* | Asks "Which station?", then says how many docks and bikes it has, and where to go if it's full |
 | **Citi Bike status in Dock Finder**<br>also: *Check Citi Bike citywide with Dock Finder* | Citywide bikes, open docks and full stations |
 | **Ask Dock Finder**<br>also: *Talk to Dock Finder* | Asks "What do you need?", then takes anything in your own words (below) |
+| **Direct me with Dock Finder**<br>also: *Guide me to a dock with…*, *Get directions with Dock Finder* | Turn-by-turn directions to the dock you were just told about, or the nearest dock with room |
+| **Stop directions with Dock Finder**<br>also: *Cancel directions with…*, *Stop guiding with Dock Finder* | Stops turn-by-turn directions (during a ride, before you arrive, it turns off guidance for that ride) |
 
 ### What you can say to "Ask Dock Finder"
 
@@ -48,6 +63,8 @@ These work with the phone locked once Dock Finder is installed. Nothing needs to
 | Citywide totals | "how many bikes are out?", "citywide", "system status" |
 | Start a ride | "start a ride to school", "I'm heading to Union Square", "take me to 44 West 4th Street" |
 | End a ride | "end my ride", "cancel trip", "I'm done riding" |
+| Directions to the dock just mentioned | "take me there", "direct me", "guide me to the dock", "directions" |
+| Stop directions | "stop directions", "cancel directions", "stop guiding" |
 | Set a usual dock | "my school dock is Mercer and Bleecker", "set my work dock to Court and State" |
 | Save where you're standing | "save this spot as gym", "remember here as office" |
 
@@ -59,7 +76,8 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 - **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
-- **Ride alerts with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
+- **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
+- **Shortcuts automations** that pipe a dock answer into Speak Text (like an Arrive automation) should turn off the action's **Offer Directions** option, so the automation doesn't stop to ask "Want me to direct you there?"
 - **If Siri runs the wrong action** after installing a new build, delete the app and install it again; iOS caches which phrase runs which action.
 - **A shorter phrase:** in the Shortcuts app, make a shortcut with Dock Finder's **Start Ride** action and name it something like **Ride Check** (not "Dock Finder"). Then "Hey Siri, ride check" works the same way.
 
@@ -67,8 +85,9 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 
 The first time it opens, tap **Enable Dock Finder with Siri** to allow location, then read the Siri cheat sheet. After that, the home screen has:
 
-- **Find Nearest Dock**: the answer, with Apple Maps and Google Maps directions.
-- **Ride card**: **Start a Ride** (pick a saved place or search an address). During a ride it shows the distance left and an **End Ride** button, and afterwards what was said on arrival.
+- **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions, plus Apple Maps and Google Maps links. Every dock answer in the app has **Direct Me**.
+- **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
+- **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
 - **Saved Places**: **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask Dock Finder (type a question, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again.
@@ -172,7 +191,8 @@ See [docs/onboarding.md](docs/onboarding.md). Riders add a few shortcut files a 
 
 ## Limitations and next steps
 
-- **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch and background speech. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
+- **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch, background speech, Siri's yes/no follow-ups, turn-by-turn directions and the Live Activity. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
+- Turn-by-turn directions use Apple's cycling routes and straight-line GPS matching; in Manhattan's tall-building canyons, GPS can be 10–20 m off, so a turn can be announced a little early or late.
 - Distances are straight-line, not riding distance.
 - The closest dock with ≥2 spaces wins, even if a much roomier one is only slightly farther. Next: prefer stations with a bigger buffer when they're nearly as close.
 - Server conversation memory is in n8n's in-memory store and resets on restart.

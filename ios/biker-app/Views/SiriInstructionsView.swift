@@ -37,7 +37,7 @@ struct SiriInstructionsView: View {
                     PhraseRow(text: "Siri asks: “Where are you heading?”", systemImage: "bubble.left.fill")
                         .foregroundStyle(.secondary)
                     PhraseRow(text: "Say a saved place (“school”), a landmark (“Union Square”), or an address.", systemImage: "mappin.and.ellipse")
-                    Text("As you get close, Dock Finder tells you where to dock, through your headphones, even with your phone locked.")
+                    Text("As you get close, Dock Finder tells you where to dock, through your headphones, even with your phone locked. Say “yes” when Siri asks “Want me to guide you to the dock when you're close?” to also hear each turn on the way there.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -52,7 +52,7 @@ struct SiriInstructionsView: View {
                         .foregroundStyle(.secondary)
                     PhraseRow(text: "“Hey Siri, find a dock with Dock Finder.”", systemImage: "mic.fill")
                         .font(.title3.weight(.semibold))
-                    Text("Siri answers straight away with the nearest station that has room.")
+                    Text("Siri tells you the nearest station that has room, then asks “Want me to direct you there?” Say “yes” to hear each turn through your headphones.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -109,6 +109,8 @@ struct SiriInstructionsView: View {
     }
 
     static let morePhrases = [
+        "“Hey Siri, stop directions with Dock Finder.”",
+        "“Hey Siri, direct me with Dock Finder.”",
         "“Hey Siri, end my ride with Dock Finder.”",
         "“Hey Siri, check my school dock with Dock Finder.”",
         "“Hey Siri, check a station with Dock Finder.”",

@@ -45,6 +45,11 @@ struct RideCard: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Toggle("Guide me to the dock", isOn: Binding(
+                get: { rides.currentRide?.guidesToDock ?? false },
+                set: { rides.setGuidesToDock($0) }
+            ))
+            .font(.subheadline)
             AlwaysLocationNotice()
             Button(role: .destructive) {
                 Task { await rides.end() }
@@ -146,6 +151,8 @@ struct StartRideView: View {
     @State private var results: [Destination] = []
     @State private var error: DockFinderError?
     @State private var outcome: AnswerModel = AnswerModel()
+    /// Remembered between rides.
+    @AppStorage("guideRidesToDock") private var guidesToDock = true
 
     var body: some View {
         NavigationStack {
@@ -202,6 +209,7 @@ struct StartRideView: View {
                     }
                 }
                 Section {
+                    Toggle("Guide me to the dock when I'm close", isOn: $guidesToDock)
                     AlwaysLocationNotice()
                 } footer: {
                     Text("Hands-free: “Hey Siri, start a ride with Dock Finder”, then say where you're heading.")
@@ -233,8 +241,12 @@ struct StartRideView: View {
         if LocationService.shared.authorizationStatus == .notDetermined {
             _ = await LocationService.shared.requestWhenInUseAuthorization()
         }
+        let rideBefore = RideTracker.shared.currentRide
         await outcome.run {
             try await AssistantRouter.live().handle(.startRide(destination))
+        }
+        if let ride = RideTracker.shared.currentRide, ride != rideBefore {
+            RideTracker.shared.setGuidesToDock(guidesToDock)
         }
         if case .answered = outcome.phase, RideTracker.shared.currentRide != nil {
             try? await Task.sleep(for: .seconds(1.5))

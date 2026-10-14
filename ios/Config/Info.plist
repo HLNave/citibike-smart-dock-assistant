@@ -8,6 +8,9 @@
 		<string>location</string>
 		<string>audio</string>
 	</array>
+	<!-- The Lock Screen / Dynamic Island view of a ride and of directions to a dock. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>When you start a ride, Dock Finder watches for you to get close to your destination so it can tell you where to dock, even with your phone locked.</string>
 	<key>DockFinderBackendHost</key>

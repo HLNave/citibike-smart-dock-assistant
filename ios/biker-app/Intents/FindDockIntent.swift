@@ -6,18 +6,78 @@
 //  speaks it, and Shortcuts gets it as text (e.g. for Speak Text in an
 //  arrival automation).
 //
+//  Answers that name a dock end with "Want me to direct you there?", and
+//  a new ride asks "Want me to guide you to the dock when you're close?".
+//  Siri is already in the conversation, so the rider can answer by voice
+//  with the phone locked. Intents that can start guidance or a ride are
+//  LiveActivityIntents, which lets them start the Lock Screen activity
+//  from the background.
+//
 
 import AppIntents
 
 typealias SpokenAnswerResult = IntentResult & ReturnsValue<String> & ProvidesDialog
 
+/// Every intent result goes through here, so all of an intent's return
+/// paths have the same type. `value` is what Shortcuts receives.
+func spokenResult(_ value: String, dialog: String? = nil) -> some SpokenAnswerResult {
+    .result(value: value, dialog: "\(dialog ?? value)")
+}
+
 extension DockAnswer {
     var intentResult: some SpokenAnswerResult {
-        .result(value: text, dialog: "\(text)")
+        spokenResult(text)
     }
 }
 
-struct FindDockIntent: AppIntent {
+extension AppIntent {
+    /// Speaks `answer`, then follows up:
+    /// - When `answer` started a ride (it's not the ride from before), asks
+    ///   whether to guide the rider to the dock on arrival.
+    /// - When it names a dock, asks "Want me to direct you there?" and, on
+    ///   yes, starts turn-by-turn guidance and reads the first instruction.
+    @MainActor
+    func reply(
+        with answer: DockAnswer,
+        offerDirections: Bool = true,
+        rideBefore: Ride? = nil,
+        checksForNewRide: Bool = false
+    ) async throws -> some SpokenAnswerResult {
+        let guidance = GuidanceSession.shared
+
+        if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
+            guard offerDirections else { return spokenResult(answer.text) }
+            do {
+                try await requestConfirmation(
+                    result: .result(dialog: "\(answer.text) \(GuidanceSession.rideQuestion)"),
+                    confirmationActionName: .go
+                )
+            } catch {
+                return spokenResult(answer.text, dialog: "Okay. I'll just tell you where to dock.")
+            }
+            RideTracker.shared.setGuidesToDock(true)
+            return spokenResult(answer.text, dialog: "Okay. When you're close, I'll guide you to the dock.")
+        }
+
+        guard let station = answer.station else { return spokenResult(answer.text) }
+        guidance.offer(station)
+        guard offerDirections, guidance.station?.id != station.id else { return spokenResult(answer.text) }
+        do {
+            try await requestConfirmation(
+                result: .result(dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"),
+                confirmationActionName: .go
+            )
+        } catch {
+            // "No", or Siri couldn't ask. The answer was already spoken with
+            // the question, so don't repeat it.
+            return spokenResult(answer.text, dialog: "Okay.")
+        }
+        let opening = try await guidance.start(to: station, speak: false)
+        return spokenResult(opening)
+    }
+}
+
+struct FindDockIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Find Dock"
     static let description = IntentDescription(
         "Finds the nearest Citi Bike station with room to return your bike."
@@ -28,15 +88,21 @@ struct FindDockIntent: AppIntent {
     /// while the intent is running.
     static let supportedModes: IntentModes = .background
 
+    /// Turn off in automations that pipe the answer into Speak Text, so
+    /// nothing waits for a yes or no.
+    @Parameter(title: "Offer Directions", default: true)
+    var offerDirections: Bool
+
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
         // Errors conform to CustomLocalizedStringResourceConvertible, so Siri
         // speaks their message when they propagate.
-        try await DockFinderService.live.findNearestDock().answer.intentResult
+        let answer = try await DockFinderService.live.findNearestDock().answer
+        return try await reply(with: answer, offerDirections: offerDirections)
     }
 }
 
-struct FindDockNearSavedPlaceIntent: AppIntent {
+struct FindDockNearSavedPlaceIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Find Dock Near Saved Place"
     static let description = IntentDescription(
         "Checks your usual dock at a saved place, or finds the nearest dock there with room. Use it in an Arrive automation for a heads-up before you get there."
@@ -49,21 +115,27 @@ struct FindDockNearSavedPlaceIntent: AppIntent {
     @Parameter(title: "Place")
     var place: SavedPlaceEntity?
 
+    /// Turn off in an Arrive automation that pipes the answer into Speak
+    /// Text, so the automation doesn't stop to ask a question.
+    @Parameter(title: "Offer Directions", default: true)
+    var offerDirections: Bool
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Find a dock near \(\.$place)")
+        Summary("Find a dock near \(\.$place)") {
+            \.$offerDirections
+        }
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
         guard let place else {
-            return DockAnswer(text: Self.whichPlaceHelp(SavedPlacesStore.shared.places)).intentResult
+            return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(SavedPlacesStore.shared.places)))
         }
         guard let saved = SavedPlacesStore.shared.place(id: place.id) else {
             throw DockFinderError.savedPlaceNotFound
         }
-        return try await DockFinderService.live
-            .findDock(for: saved)
-            .answer.intentResult
+        let answer = try await DockFinderService.live.findDock(for: saved).answer
+        return try await reply(with: answer, offerDirections: offerDirections)
     }
 }
 
@@ -77,7 +149,7 @@ extension FindDockNearSavedPlaceIntent {
     }
 }
 
-struct FindDockNearPlaceIntent: AppIntent {
+struct FindDockNearPlaceIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Find Dock Near a Place"
     static let description = IntentDescription(
         "Finds a dock with room near an address, landmark or neighborhood, like Union Square."
@@ -87,18 +159,23 @@ struct FindDockNearPlaceIntent: AppIntent {
     @Parameter(title: "Place", requestValueDialog: "Where are you headed?")
     var place: String
 
+    @Parameter(title: "Offer Directions", default: true)
+    var offerDirections: Bool
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Find a dock near \(\.$place)")
+        Summary("Find a dock near \(\.$place)") {
+            \.$offerDirections
+        }
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let router = AssistantRouter.live()
-        return try await router.handle(.place(place)).intentResult
+        let answer = try await AssistantRouter.live().handle(.place(place))
+        return try await reply(with: answer, offerDirections: offerDirections)
     }
 }
 
-struct CheckStationIntent: AppIntent {
+struct CheckStationIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Check Station"
     static let description = IntentDescription(
         "Says whether a Citi Bike station has open docks, and where to go instead if it doesn't."
@@ -111,15 +188,19 @@ struct CheckStationIntent: AppIntent {
     @Parameter(title: "Station", requestValueDialog: "Which station?")
     var station: String
 
+    @Parameter(title: "Offer Directions", default: true)
+    var offerDirections: Bool
+
     static var parameterSummary: some ParameterSummary {
-        Summary("Check \(\.$station)")
+        Summary("Check \(\.$station)") {
+            \.$offerDirections
+        }
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live()
-            .handle(.station(KeywordRequestParser.normalize(station)))
-            .intentResult
+        let answer = try await AssistantRouter.live().handle(.station(KeywordRequestParser.normalize(station)))
+        return try await reply(with: answer, offerDirections: offerDirections)
     }
 }
 
@@ -167,7 +248,7 @@ struct SetUsualDockIntent: AppIntent {
 /// are you heading?" → "school" / "Union Square". Siri only has to match
 /// that one phrase; the destination reaches the app as plain text, so Siri
 /// can't mistake it for a Maps search.
-struct StartRideIntent: AppIntent {
+struct StartRideIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Start Ride"
     static let description = IntentDescription(
         "Asks where you're heading, then tells you where to dock when you're close. The destination can be a saved place or anywhere Apple Maps finds. Works with your phone locked when Dock Finder has Always location access."
@@ -183,7 +264,9 @@ struct StartRideIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live().handle(.startRide(destination)).intentResult
+        let rideBefore = RideTracker.shared.currentRide
+        let answer = try await AssistantRouter.live().handle(.startRide(destination))
+        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
     }
 }
 
@@ -202,7 +285,7 @@ struct EndRideIntent: AppIntent {
 /// words: a station check, citywide totals, a usual-dock setting, or a
 /// question only the server can answer. Rides and the nearest dock have
 /// their own one-step phrases.
-struct AskDockFinderIntent: AppIntent {
+struct AskDockFinderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Ask Dock Finder"
     static let description = IntentDescription(
         "Ask anything in your own words, like whether a station is full or how many bikes are out. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
@@ -214,6 +297,35 @@ struct AskDockFinderIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live().answer(request).intentResult
+        let rideBefore = RideTracker.shared.currentRide
+        let answer = try await AssistantRouter.live().answer(request)
+        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
+    }
+}
+
+/// "Hey Siri, direct me with Dock Finder": turn-by-turn guidance to the
+/// dock Siri just mentioned, or to the nearest dock with room. Also the
+/// fallback if a yes/no follow-up ever doesn't get through.
+struct DirectMeIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Direct Me to a Dock"
+    static let description = IntentDescription(
+        "Guides you turn by turn, through your headphones, to the dock Dock Finder just told you about, or to the nearest dock with room."
+    )
+    static let supportedModes: IntentModes = .background
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        try await AssistantRouter.live().handle(.directions).intentResult
+    }
+}
+
+struct StopDirectionsIntent: AppIntent {
+    static let title: LocalizedStringResource = "Stop Directions"
+    static let description = IntentDescription("Stops turn-by-turn guidance to a dock.")
+    static let supportedModes: IntentModes = .background
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        try await AssistantRouter.live().handle(.stopDirections).intentResult
     }
 }

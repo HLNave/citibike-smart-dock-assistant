@@ -337,6 +337,8 @@ Not needed for the shared shortcuts above. Listed so everyone knows which phrase
 | Find Dock Near Saved Place | “Check my <place> dock with Dock Finder” |
 | Check Station | “Check a station with Dock Finder”; “Is a station full in Dock Finder” |
 | Citywide Status | “Citi Bike status in Dock Finder”; “Check Citi Bike citywide with Dock Finder” |
+| Stop Directions | “Stop directions with Dock Finder”; “Cancel directions with Dock Finder”; “Stop guiding with Dock Finder” |
+| Direct Me to a Dock | “Direct me with Dock Finder”; “Guide me to a dock with Dock Finder”; “Get directions with Dock Finder” |
 
 <!-- generated:end -->
 
