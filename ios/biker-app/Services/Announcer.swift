@@ -46,7 +46,7 @@ final class Announcer: NSObject {
         let id = utteranceID
         await withCheckedContinuation { continuation in
             speechFinished = continuation
-            synthesizer.speak(AVSpeechUtterance(string: text))
+            synthesizer.speak(SpokenVoice.utterance(text))
             Task { [weak self] in
                 try? await Task.sleep(for: Self.speechTimeout)
                 if self?.utteranceID == id { self?.finishSpeaking() }
@@ -83,6 +83,51 @@ extension Announcer: AVSpeechSynthesizerDelegate {
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in self.finishSpeaking() }
+    }
+}
+
+/// How Dock Finder sounds when it speaks on its own (ride alerts and
+/// directions). Siri's replies use Siri's voice; for the app's own speech,
+/// iOS doesn't hand out Siri's voice directly, so this picks the closest
+/// one available: a Siri voice if the system lists one, otherwise the
+/// best-quality male voice for the phone's language. Downloading an
+/// "Enhanced" or "Premium" male voice in Settings › Accessibility ›
+/// Spoken Content › Voices makes it sound better.
+enum SpokenVoice {
+    /// The default rate (0.5) sounds rushed for directions on a bike.
+    static let rate: Float = AVSpeechUtteranceDefaultSpeechRate * 0.88
+
+    static let voice: AVSpeechSynthesisVoice? = pickVoice(
+        from: AVSpeechSynthesisVoice.speechVoices(),
+        language: AVSpeechSynthesisVoice.currentLanguageCode()
+    )
+
+    static func utterance(_ text: String) -> AVSpeechUtterance {
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        utterance.rate = rate
+        utterance.postUtteranceDelay = 0.2
+        return utterance
+    }
+
+    /// Prefers, in order: male, a Siri voice, then Premium over Enhanced
+    /// over the basic quality. Novelty voices never win.
+    static func pickVoice(from voices: [AVSpeechSynthesisVoice], language: String) -> AVSpeechSynthesisVoice? {
+        let exact = voices.filter { $0.language == language }
+        let candidates = exact.isEmpty ? voices.filter { $0.language.hasPrefix(String(language.prefix(2))) } : exact
+        func score(_ voice: AVSpeechSynthesisVoice) -> Int {
+            var score = 0
+            if voice.gender == .male { score += 100 }
+            if voice.identifier.lowercased().contains("siri") { score += 50 }
+            switch voice.quality {
+            case .premium: score += 20
+            case .enhanced: score += 10
+            default: break
+            }
+            if voice.voiceTraits.contains(.isNoveltyVoice) { score -= 1_000 }
+            return score
+        }
+        return candidates.max { score($0) < score($1) }
     }
 }
 

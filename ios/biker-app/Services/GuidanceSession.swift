@@ -342,7 +342,7 @@ final class VoicePrompter: NSObject {
         } catch {
             return
         }
-        synthesizer.speak(AVSpeechUtterance(string: text))
+        synthesizer.speak(SpokenVoice.utterance(text))
     }
 
     /// Returns once everything queued has been spoken, or after `timeout`.

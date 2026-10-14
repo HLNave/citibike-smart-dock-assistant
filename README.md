@@ -77,7 +77,8 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
-- **Shortcuts automations** that pipe a dock answer into Speak Text (like an Arrive automation) should turn off the action's **Offer Directions** option, so the automation doesn't stop to ask "Want me to direct you there?"
+- **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
+- **Only if you built your own automation** (most riders haven't): an *automation* is something you set up in Apple's Shortcuts app to run by itself, e.g. "when I arrive near school, run Dock Finder's *Find Dock Near Saved Place* and read the answer out loud" (that's an **Arrive** automation; see the [iOS README](ios/README.md#arrival-alerts-with-a-shortcuts-automation-older-approach)). Nobody is talking to Siri when an automation runs, so nobody can answer "Want me to direct you there?" In that automation, tap the Dock Finder action and switch **Offer Directions** off. Talking to Siri yourself is unaffected.
 - **If Siri runs the wrong action** after installing a new build, delete the app and install it again; iOS caches which phrase runs which action.
 - **A shorter phrase:** in the Shortcuts app, make a shortcut with Dock Finder's **Start Ride** action and name it something like **Ride Check** (not "Dock Finder"). Then "Hey Siri, ride check" works the same way.
 
@@ -85,7 +86,7 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 
 The first time it opens, tap **Enable Dock Finder with Siri** to allow location, then read the Siri cheat sheet. After that, the home screen has:
 
-- **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions, plus Apple Maps and Google Maps links. Every dock answer in the app has **Direct Me**.
+- **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
 - **Saved Places**: **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.

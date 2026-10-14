@@ -86,7 +86,6 @@ struct AnswerCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 DirectMeButton(station: station)
-                DirectionsLinks(station: station)
             }
 
             if answer.source != .onDevice {
@@ -104,49 +103,6 @@ struct AnswerCard: View {
         answer.source == .server
             ? "Answered by the Dock Finder server"
             : "Understood by Apple Intelligence on your iPhone"
-    }
-}
-
-/// Cycling directions to a station.
-struct DirectionsLinks: View {
-    let station: DockStation
-
-    var body: some View {
-        HStack(spacing: 20) {
-            if let appleMaps {
-                Link(destination: appleMaps) {
-                    Label("Apple Maps", systemImage: "map")
-                }
-            }
-            if let googleMaps {
-                Link(destination: googleMaps) {
-                    Label("Google Maps", systemImage: "bicycle")
-                }
-            }
-        }
-        .font(.subheadline.weight(.semibold))
-    }
-
-    private var coordinate: String { "\(station.latitude),\(station.longitude)" }
-
-    private var appleMaps: URL? {
-        var components = URLComponents(string: "https://maps.apple.com/")
-        components?.queryItems = [
-            URLQueryItem(name: "daddr", value: coordinate),
-            URLQueryItem(name: "q", value: station.name),
-        ]
-        return components?.url
-    }
-
-    /// Google Maps supports a cycling mode in its universal link.
-    private var googleMaps: URL? {
-        var components = URLComponents(string: "https://www.google.com/maps/dir/")
-        components?.queryItems = [
-            URLQueryItem(name: "api", value: "1"),
-            URLQueryItem(name: "destination", value: coordinate),
-            URLQueryItem(name: "travelmode", value: "bicycling"),
-        ]
-        return components?.url
     }
 }
 

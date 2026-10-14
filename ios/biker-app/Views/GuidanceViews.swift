@@ -18,28 +18,42 @@ struct DirectMeButton: View {
     @State private var error: DockFinderError?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(spacing: 8) {
             if guidance.station?.id == station.id {
                 Label("Directing you there", systemImage: "location.north.line.fill")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.tint)
+                    .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 Button {
                     Task { await start() }
                 } label: {
-                    Label(isStarting ? "Finding a route…" : "Direct Me", systemImage: "location.north.line.fill")
-                        .frame(maxWidth: .infinity)
+                    // Built by hand rather than with Label, so the icon and
+                    // title stay centered together in List rows too.
+                    HStack(spacing: 8) {
+                        if isStarting {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "location.north.line.fill")
+                        }
+                        Text(isStarting ? "Finding a route…" : "Direct Me")
+                    }
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .disabled(isStarting)
             }
             if let error {
                 Text(error.localizedStringResource)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func start() async {
@@ -57,78 +71,117 @@ struct DirectMeButton: View {
     }
 }
 
-/// The next turn, the dock and a Stop button while guiding; the arrival
-/// message afterwards.
+/// The next turn while guiding; the arrival message afterwards.
 struct GuidanceCard: View {
     private let guidance = GuidanceSession.shared
 
     var body: some View {
         if let progress = guidance.progress {
-            let state = GuidanceActivityAttributes.ContentState.guiding(progress, docksOpen: guidance.docksOpen)
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: state.symbol)
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.tint)
-                        .frame(width: 44)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(state.headline)
-                            .font(.headline)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(state.detail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Label {
-                    Text(dockLine(progress.route.station))
-                } icon: {
-                    Image(systemName: "bicycle")
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-                if LocationService.shared.authorizationStatus != .authorizedAlways {
-                    Text("Keep Dock Finder open, or allow location access all the time, to hear each turn with your phone locked.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Button(role: .destructive) {
-                    Task { await guidance.stop() }
-                } label: {
-                    Label("Stop Directions", systemImage: "xmark.circle")
-                }
-                .font(.subheadline.weight(.semibold))
+            ActiveDirectionsCard(progress: progress, docksOpen: guidance.docksOpen) {
+                Task { await guidance.stop() }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 16))
         } else if let arrival = guidance.lastArrival {
-            HStack(alignment: .top) {
-                Label(arrival, systemImage: "mappin.circle.fill")
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text(arrival)
                     .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer()
                 Button {
                     guidance.dismissLastArrival()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
                         .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Dismiss")
             }
             .padding()
             .background(.background.secondary, in: .rect(cornerRadius: 16))
         }
     }
+}
 
-    private func dockLine(_ station: DockStation) -> String {
-        var line = "To \(station.spokenName)"
-        if let docks = guidance.docksOpen { line += ", \(Speech.docksOpen(docks))" }
-        if let progress = guidance.progress { line += " · \(Speech.length(progress.remaining)) to go" }
-        return line
+/// Laid out like a navigation banner: the turn and its distance up top,
+/// the dock and how far it is underneath, then Stop.
+private struct ActiveDirectionsCard: View {
+    let progress: GuidanceProgress
+    let docksOpen: Int?
+    let onStop: () -> Void
+
+    var body: some View {
+        let instruction = progress.nextManeuver.map { Speech.instruction($0.instruction) } ?? "Head to the dock"
+        let symbol = GuidanceActivityAttributes.ContentState.maneuverSymbol(for: instruction)
+
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Directions", systemImage: "location.north.line.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tint)
+
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 56, height: 56)
+                    .background(Color.accentColor, in: .rect(cornerRadius: 14))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    if let distance = progress.distanceToNextManeuver {
+                        Text(Speech.length(distance))
+                            .font(.title2.bold())
+                            .monospacedDigit()
+                    }
+                    Text(instruction)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            Divider()
+
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(progress.route.station.spokenName)
+                        .font(.subheadline.weight(.semibold))
+                    Text("\(Speech.length(progress.remaining)) to go")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let docksOpen {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text("\(docksOpen)")
+                            .font(.title3.bold())
+                            .monospacedDigit()
+                        Text(docksOpen == 1 ? "dock open" : "docks open")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if LocationService.shared.authorizationStatus != .authorizedAlways {
+                Text("Keep Dock Finder open, or allow location access all the time, to hear each turn with your phone locked.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button(role: .destructive, action: onStop) {
+                Text("Stop Directions")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background.secondary, in: .rect(cornerRadius: 16))
     }
 }

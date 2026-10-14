@@ -54,7 +54,6 @@ Only Find Dock has phrases starting with "find a dock". Siri matches phrases loo
 | Citywide totals | iPhone | "Citi Bike status in Dock Finder", or "Ask Dock Finder" → "how many bikes are out?" |
 | Set a usual or backup dock, save a place | iPhone (in the app, the *Set Usual Dock* Shortcuts action, or by voice) | "Ask Dock Finder" → "my school dock is Mercer and Bleecker" / "save this spot as gym" |
 | **Turn-by-turn directions to a dock**, spoken with the phone locked, with a Lock Screen / Dynamic Island Live Activity | iPhone (Apple cycling routes, background location, speech) | "yes" to "Want me to direct you there?", or "Direct me with Dock Finder" |
-| Directions in another app | Apple Maps / Google Maps links in the app | none |
 | Anything else, in your own words | iPhone first (phrase rules, saved place and station names, then Apple Intelligence where available), **n8n backend** only when none of those understands the request or can find the place/station | "Ask Dock Finder", then say it |
 
 Dock rules match the n8n workflow: a station counts only if it's installed, accepting returns, has **at least 2** open docks, and reported in the last hour. Destination searches stay within **1.2 km**. Station names are spoken the way New Yorkers say them ("W 15 St & 6 Ave" → "West 15th and 6th").
