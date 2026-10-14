@@ -122,9 +122,11 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 
 ## Directions to the dock
 
-> "Hey Siri, find a dock with Dock Finder" → *"West 15th and 6th has 8 docks open, 300 feet away. Want me to direct you there?"* → "Yes" → *"0.1 miles to West 15th and 6th. Head north on 6th Avenue."* → … → *"In 200 feet, turn left onto West 15th Street."* → *"Turn left onto West 15th Street."* → *"You've arrived at West 15th and 6th, 8 docks open."*
+> "Hey Siri, find a dock with Dock Finder" → *"West 15th and 6th has 8 docks open, 300 feet away. Want me to direct you there?"* → "Yes" → Siri: *"Okay, directing you to West 15th and 6th."* → Dock Finder's voice: *"0.1 miles to West 15th and 6th. Head north on 6th Avenue."* → … → *"In 200 feet, turn left onto West 15th Street."* → *"Turn left onto West 15th Street."* → *"You've arrived at West 15th and 6th, 8 docks open."*
 
 - **Where it starts:** "yes" to Siri's follow-up after any dock answer (Find Dock, Check Station, Find Dock Near Saved Place / Near a Place, Ask Dock Finder); "Direct me with Dock Finder" or "take me there" in Ask (the dock offered in the last 10 minutes, else the nearest with room); **Direct Me** under any dock answer in the app; or a ride's arrival when the rider asked to be guided.
+- **Two voices, never at once:** Siri only confirms ("Okay, directing you to …"). Dock Finder's own voice gives every instruction, holding anything it would say until Siri should have finished (estimated from the length of Siri's sentence).
+- **Starting direction:** Apple's first step is often just "Start on West 14th Street", or empty. The opening adds which way to go from the route's first 25 m: "Head east on West 14th Street", or "Head east, then in 300 feet, turn left onto 7th Avenue". North/south/east/west only, which matches Manhattan's grid (avenues north–south, streets east–west).
 - **Route:** Apple's cycling directions (`MKDirections`, `.cycling`). Apple Maps instructions are rewritten to be spoken ("W 4th St" → "West 4th Street", "The destination is on your left" → "The dock is on your left").
 - **When it speaks:** each turn about 150 m ahead ("In 500 feet, turn right onto Bleecker Street") and again about 35 m ahead ("Turn right onto Bleecker Street"); arrival within 30 m of the dock. Fixes worse than 65 m accuracy are ignored.
 - **Off route:** two fixes in a row more than 45 m from the route → "Rerouting." and the new next turn (at most every 20 s).
@@ -170,7 +172,8 @@ Optional: Window → Devices and Simulators → select your phone → **Connect 
 
 ### Things to know
 
-- **Free-team installs expire after 7 days.** Run the app from Xcode again to reinstall. Saved places come back even if you deleted the app; location permission has to be granted again. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
+- **Installing a new build: don't delete the app first.** Press ⌘R and it installs over the old one. iOS forgets the "Trust" from step 7 once no apps from your team are left on the phone, so deleting means trusting again (and granting location again).
+- **Free-team installs expire after 7 days.** Press ⌘R before then to refresh it. Saved places come back even if you deleted the app; location permission has to be granted again. A paid Apple Developer Program membership lifts this and is needed for TestFlight.
 - **Keep signing out of the project file.** Set your team and bundle ID in `Local.xcconfig`, not with the Team menu in Xcode. The menu writes them into `project.pbxproj`, which is shared. If that happens, run `git diff` before committing and leave those lines out.
 - **Siri needs a Development Team.** Without one, Find Dock appears in Shortcuts but fails with "Unable to run App Shortcut" (see Building above).
 - **If Siri runs the wrong action or keeps re-asking a question** after installing a new build, delete Dock Finder from the phone and install it again. iOS caches which phrase runs which action. For developers: never reorder or remove entries in `DockFinderShortcutsProvider` (append only), and bump `CURRENT_PROJECT_VERSION` in `Config/DockFinder.xcconfig` whenever the phrases change. `SiriPhraseTests` fails if the order changes.
@@ -188,7 +191,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Saying "Doc Finder" (or Siri showing "doc") still reaches the app.
 - [ ] A question it can't understand is answered by the server (if `DOCKFINDER_BACKEND_HOST` is set).
 - [ ] "Hey Siri, find a dock with Dock Finder" (and "find me a dock…", "find the nearest dock…") answers with the nearest dock **without asking anything first**, then asks "Want me to direct you there?"
-- [ ] With the phone locked and headphones in, "yes" to that question starts directions **without unlocking**, and Siri reads the first instruction. "No" just ends with "Okay."
+- [ ] With the phone locked and headphones in, "yes" to that question starts directions **without unlocking**: Siri says "Okay, directing you to …", then Dock Finder's voice gives the first instruction (with a direction, e.g. "Head east on…") without the two overlapping. "No" just ends with "Okay."
 - [ ] Riding with directions, phone locked: each turn is announced ahead and at the corner, music ducks, and arrival is announced at the dock. Taking a wrong turn gives "Rerouting." within a few seconds.
 - [ ] The Lock Screen and Dynamic Island show the next turn, the distance and the dock's open docks, and update as you ride; the activity ends a couple of minutes after arrival.
 - [ ] "Hey Siri, stop directions with Dock Finder" stops directions and removes the Live Activity. "Hey Siri, direct me with Dock Finder" after saying "no" starts directions to the same dock.

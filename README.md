@@ -27,10 +27,11 @@ These work with the phone locked once Dock Finder is installed. Nothing needs to
 
 ### Directions to the dock
 
-Whenever Siri tells you about a dock (Find Dock, Check Station, your saved place's dock, Ask Dock Finder), it ends with **"Want me to direct you there?"** Say **"yes"** and Dock Finder guides you there turn by turn through your headphones, with the phone locked:
+Whenever Siri tells you about a dock (Find Dock, Check Station, your saved place's dock, Ask Dock Finder), it ends with **"Want me to direct you there?"** Say **"yes"**: Siri confirms ("Okay, directing you to West 4th and Mercer."), then Dock Finder's own voice guides you there turn by turn through your headphones, with the phone locked. It waits for Siri to finish, so the two never talk at once:
 
-> "0.3 miles to West 4th and Mercer. Head north on 6th Avenue." … "In 500 feet, turn right onto Bleecker Street." … "Turn right onto Bleecker Street." … "You've arrived at West 4th and Mercer, 8 docks open."
+> "0.3 miles to West 4th and Mercer. Head east on West 14th Street." … "In 500 feet, turn right onto Bleecker Street." … "Turn right onto Bleecker Street." … "You've arrived at West 4th and Mercer, 8 docks open."
 
+- It always says which way to set off ("Head east on…"), even when Apple's route data only says "Start on West 14th Street".
 - If you leave the route, it says "Rerouting" and gives the new next turn.
 - It re-checks the dock every couple of minutes and once more as you get close. If the dock fills up: "West 4th and Mercer is full now. Heading to Mercer and Bleecker instead, 6 docks open."
 - The next turn, the distance to it and the dock's open docks also show on the **Lock Screen and in the Dynamic Island**.
@@ -78,7 +79,8 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
 - **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
-- **If Siri runs the wrong action** after installing a new build, delete the app and install it again; iOS caches which phrase runs which action.
+- **Installing a new build:** just press ⌘R in Xcode over the installed app. Deleting it first means trusting the developer again on the phone (iOS forgets that trust when none of your apps are left) and granting location again.
+- **If Siri runs the wrong action** after installing a new build, then delete the app and install it again; iOS caches which phrase runs which action.
 
 ## Using the app
 
