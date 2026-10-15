@@ -342,12 +342,13 @@ final class GuidanceSession: GuidanceControlling {
 /// Speaks guidance prompts without blocking, one after another, lowering
 /// music or other audio while it talks (the way Maps does).
 final class VoicePrompter: NSObject {
-    private let synthesizer = AVSpeechSynthesizer()
-
-    override init() {
-        super.init()
+    /// Created on first use: setting one up loads the speech engine, which
+    /// is slow and would otherwise hold up the first screen at launch.
+    private lazy var synthesizer: AVSpeechSynthesizer = {
+        let synthesizer = AVSpeechSynthesizer()
         synthesizer.delegate = self
-    }
+        return synthesizer
+    }()
 
     private var heldUntil: ContinuousClock.Instant?
     private var held: [String] = []

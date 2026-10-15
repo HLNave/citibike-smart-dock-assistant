@@ -16,15 +16,16 @@ final class Announcer: NSObject {
     /// Longest a spoken answer is waited for, in case speech never reports finishing.
     private static let speechTimeout: Duration = .seconds(30)
 
-    private let synthesizer = AVSpeechSynthesizer()
+    /// Created on first use: setting one up loads the speech engine, which
+    /// is slow and would otherwise hold up the first screen at launch.
+    private lazy var synthesizer: AVSpeechSynthesizer = {
+        let synthesizer = AVSpeechSynthesizer()
+        synthesizer.delegate = self
+        return synthesizer
+    }()
     private var speechFinished: CheckedContinuation<Void, Never>?
     /// Identifies the current utterance, so a stale timeout can't end a newer one.
     private var utteranceID = 0
-
-    override init() {
-        super.init()
-        synthesizer.delegate = self
-    }
 
     /// Returns once the answer has been spoken (or speech failed), so the
     /// caller can keep the app awake until then.
