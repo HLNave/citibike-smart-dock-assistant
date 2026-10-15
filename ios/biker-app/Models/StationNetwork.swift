@@ -135,9 +135,9 @@ nonisolated struct StationNetwork: Sendable {
             .filter({ $0.isInstalled && location.distance(from: $0.location) <= Self.nearbyRadius })
             .min(by: { location.distance(from: $0.location) < location.distance(from: $1.location) }),
             nearest.id != chosenID,
-            let problem = problem(with: nearest)
+            let issue = problem(with: nearest)
         else { return nil }
-        return AvoidedDock(nearest, problem: problem)
+        return AvoidedDock(nearest, problem: issue)
     }
 
     func station(id: String) -> StationSnapshot? {
