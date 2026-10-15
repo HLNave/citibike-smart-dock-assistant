@@ -13,7 +13,6 @@ DOCKFINDER_BUNDLE_ID = com.yourname.dockfinder
 // The webhook has no password, so don't post it anywhere public.
 DOCKFINDER_BACKEND_HOST = YOUR-N8N-HOST
 
-// Optional: the team's usage-data Google Sheet web app, WITHOUT "https://"
-// (xcconfig treats "//" as a comment), e.g.
-// script.google.com/macros/s/AKfy…/exec. Ask a teammate, or see metrics/README.md.
-DOCKFINDER_METRICS_URL =
+// Usage data already goes to the team's sheet (set in DockFinder.xcconfig).
+// Uncomment to send nowhere, or to point at your own sheet (without "https://").
+// DOCKFINDER_METRICS_URL =

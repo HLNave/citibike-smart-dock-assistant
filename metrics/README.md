@@ -11,13 +11,13 @@ When a rider agrees to share usage data (asked once in the app; changeable under
    - Who has access: **Anyone**
    - **Deploy**, and approve the permissions it asks for (it only touches this sheet).
 4. Copy the **Web app URL** (ends in `/exec`).
-5. In `ios/Config/Local.xcconfig`, add it **without** `https://` (xcconfig files treat `//` as a comment):
+5. Set `DOCKFINDER_METRICS_URL` in `ios/Config/DockFinder.xcconfig` to it, **without** `https://` (xcconfig files treat `//` as a comment):
    ```
    DOCKFINDER_METRICS_URL = script.google.com/macros/s/AKfy…/exec
    ```
 6. Build and run. Rows appear in an **Events** tab as people use the app.
 
-Everyone building the app should use the same URL. Like the n8n host, it has no password: anyone with it can add rows, so share it only with the team. If you change the script later, use **Deploy → Manage deployments → Edit → New version**, so the URL stays the same.
+**The team's sheet is already set up** and its URL is committed in `ios/Config/DockFinder.xcconfig`, so every build reports there with no setup. Only the sheet's owner ever signs in to Google (once, when deploying); riders never do. The repo is public, so anyone who finds the URL could add junk rows, but they can't read anything: the script only appends. To build without sending anywhere, add `DOCKFINDER_METRICS_URL =` to your `Local.xcconfig`. If you change the script later, use **Deploy → Manage deployments → Edit → New version**, so the URL stays the same.
 
 ## What a row contains
 

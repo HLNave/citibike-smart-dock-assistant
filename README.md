@@ -194,7 +194,7 @@ curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-siri" -H "Content-Type: app
 
 ### 3. Usage data sheet (optional)
 
-To collect usage data from riders who agree to share it, set up a Google Sheet with the included Apps Script (about 2 minutes) and put its URL in `DOCKFINDER_METRICS_URL`. Steps: [metrics/README.md](metrics/README.md). Without it, nothing is ever sent.
+Already set up: the team's Google Sheet URL is in `ios/Config/DockFinder.xcconfig`, so builds send usage data (from riders who agree) there with no extra setup, and riders never sign in to anything. To use a different sheet or send nothing, see [metrics/README.md](metrics/README.md).
 
 ## Decisions we made
 

@@ -98,7 +98,7 @@ Every answer is one sentence. Siri speaks it and the app shows it.
   Then fill in:
   - `DEVELOPMENT_TEAM`: your team ID (Xcode → Settings → Accounts → your Apple ID → the team shows its ID).
   - `DOCKFINDER_BUNDLE_ID`: something unique to you, e.g. `com.yourname.dockfinder`.
-  - `DOCKFINDER_METRICS_URL` (optional): the team's usage-data Google Sheet web app, **without** `https://` (e.g. `script.google.com/macros/s/…/exec`). See `metrics/README.md`. Leave it empty and usage data is never sent, whatever riders choose.
+  - `DOCKFINDER_METRICS_URL`: already set to the team's usage-data sheet in `DockFinder.xcconfig`, so you don't need to add it. Set it to empty here (`DOCKFINDER_METRICS_URL =`) to build an app that never sends usage data. See `metrics/README.md`.
   - `DOCKFINDER_BACKEND_HOST` (optional): the group's n8n host, e.g. `yourname.app.n8n.cloud`. Ask a teammate. Leave it empty and the app never contacts a server; anything it can't answer on device gets a short help message instead.
 - **A Development Team is required, even in the Simulator.** Without a Team ID, iOS's App Intents daemon (`linkd`) rejects the app with "Unable to get teamId … Rejecting invalid client due to requiresValidBundle". The intents still *appear* in Shortcuts but fail with "Unable to run App Shortcut".
 
