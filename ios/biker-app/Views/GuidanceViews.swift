@@ -12,6 +12,9 @@ import SwiftUI
 /// Starts spoken turn-by-turn guidance to `station`.
 struct DirectMeButton: View {
     let station: DockStation
+    /// The full dock this answer steered away from, if any; counted as
+    /// saved once the rider asks for directions.
+    var avoided: AvoidedDock? = nil
 
     private let guidance = GuidanceSession.shared
     @State private var isStarting = false
@@ -65,6 +68,11 @@ struct DirectMeButton: View {
         do {
             _ = try await guidance.start(to: station, siriWillSay: nil)
             error = nil
+            SavingsStore.shared.record(
+                DockAnswer(text: "", station: station, avoided: avoided),
+                from: LocationService.shared.lastKnownLocation,
+                context: "app"
+            )
         } catch let failure as DockFinderError {
             error = failure
         } catch {}

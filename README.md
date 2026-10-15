@@ -95,14 +95,28 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 
 ## Using the app
 
-The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about location twice: choose **Allow While Using App**, then **Change to Always Allow** (iOS never offers "Always" in the first question), so rides and directions work with the phone locked. Then read the Siri cheat sheet. After that, the home screen has:
+The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about location twice: choose **Allow While Using App**, then **Change to Always Allow** (iOS never offers "Always" in the first question), so rides and directions work with the phone locked. Then it asks whether to **share usage data** with the Dock Finder team (see [Privacy and usage data](#privacy-and-usage-data)), and shows the Siri cheat sheet. After that, the home screen has:
 
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
 - **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out you're alerted (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
+- **Savings**: how much time and money Dock Finder has saved you this month (see [Savings](#savings)). Tap it for all-time totals, recent full docks avoided, and how it's calculated.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask Dock Finder (type a question, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again.
+- **Privacy**: turn usage sharing on or off, and see exactly what's shared.
+
+### Savings
+
+Every time Dock Finder steers you away from a full or closed dock (your usual dock, the one nearest your destination or you, or a dock that fills up while you're getting directions), it estimates the time that saved: riding to that dock, finding it full and riding on, versus riding straight to one with room. That's the extra distance on city streets at about 15 km/h, plus 1.5 minutes for finding it full, capped at 15 minutes per dock. Money is that time at Citi Bike's member **e-bike** rate, **$0.27 a minute** (everyone is assumed to ride e-bikes). The same redirect shown twice within half an hour counts once.
+
+Until you have your own numbers, the card shows a typical commuter: about 50 rides a month, 10% ending at a full dock, 5 minutes lost each, so about **25 minutes and $6.75 a month**. The rate and every assumption are constants at the top of `ios/biker-app/Models/Savings.swift`.
+
+### Privacy and usage data
+
+Dock Finder asks once (at onboarding, or on the first launch after updating) whether to share usage data with the team; **Privacy** on the home screen changes it any time. If the rider agrees, each event (rides, arrival alerts, directions, Siri and in-app answers, full docks avoided and the savings credited) is sent to the team's Google Sheet with **the rider's location at the time and the docks involved**, tied to a random ID made on that iPhone, never a name or Apple ID. Turning sharing off deletes anything not yet sent. The savings dashboard works either way; its history stays on the phone.
+
+The app's privacy manifest (`ios/biker-app/PrivacyInfo.xcprivacy`) declares this: precise location, product interaction and a device ID, collected for analytics, not linked to the rider's identity, not used for tracking. Use the same answers in App Store Connect's privacy questions if the app is ever submitted. Setting up the sheet: [metrics/README.md](metrics/README.md).
 
 **Recommended setup:** add School, Work and Home with a usual and backup dock for each, allow Always location and Motion & Fitness. From then on, biking up to any of them tells you where to dock automatically; to also get turn-by-turn directions, say "Hey Siri, start a ride with Dock Finder" → "school" before you set off.
 
@@ -144,6 +158,8 @@ ios/
   biker-app.xcodeproj                            # the Dock Finder app; see ios/README.md
   biker-app/                                     # app source
   DockFinderTests/                               # unit tests
+metrics/
+  google-apps-script.js                          # receives usage data into a Google Sheet; setup in metrics/README.md
 n8n/
   citibike-smart-dock-assistant.workflow.json   # import this into n8n
   code-nodes/                                    # readable copies of the workflow's JavaScript nodes
@@ -175,6 +191,10 @@ curl -X POST "https://YOUR-N8N-HOST/webhook/citibike-siri" -H "Content-Type: app
 ```
 
 **The webhook has no authentication.** Anyone with its URL can query the assistant and spend your AI credits. Share the host, and app builds that contain it, only with people you trust.
+
+### 3. Usage data sheet (optional)
+
+To collect usage data from riders who agree to share it, set up a Google Sheet with the included Apps Script (about 2 minutes) and put its URL in `DOCKFINDER_METRICS_URL`. Steps: [metrics/README.md](metrics/README.md). Without it, nothing is ever sent.
 
 ## Decisions we made
 

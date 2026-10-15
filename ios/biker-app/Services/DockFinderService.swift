@@ -39,7 +39,11 @@ nonisolated struct DockFinderService: Sendable {
         let fix = try await location.currentLocation()
         let network = try await loadNetwork()
         let station = try Self.nearestStation(to: fix.location, in: network)
-        return DockSearchResult(station: station, locationIsApproximate: fix.isApproximate)
+        return DockSearchResult(
+            station: station,
+            locationIsApproximate: fix.isApproximate,
+            avoided: network.skippedNearest(to: fix.location, chosenID: station.id)
+        )
     }
 
     /// Finds a dock near a destination. If the rider has a usual dock there,
@@ -138,7 +142,13 @@ nonisolated struct DockFinderService: Sendable {
         let excluded: Set<String> = Set([usual?.id, backupStationID].compactMap { $0 })
         let selected = network.returnableStations(around: destination.location, within: StationNetwork.nearbyRadius)
             .first { !excluded.contains($0.id) }
-        return DestinationDockResult(destination: destination, usualDock: usual, usualDockProblem: usualProblem, selected: selected)
+        return DestinationDockResult(
+            destination: destination,
+            usualDock: usual,
+            usualDockProblem: usualProblem,
+            selected: selected,
+            skippedNearest: usual == nil ? network.skippedNearest(to: destination.location, chosenID: selected?.id) : nil
+        )
     }
 
     static func check(_ station: StationSnapshot, in network: StationNetwork) -> StationCheckResult {

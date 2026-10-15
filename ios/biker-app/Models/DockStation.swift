@@ -52,6 +52,9 @@ nonisolated struct DockAnswer: Sendable, Equatable {
     /// The station the answer recommends, for directions. `nil` for
     /// answers that aren't about one station (citywide totals, server replies).
     var station: DockStation? = nil
+    /// The full (or closed) dock the rider would otherwise have gone to,
+    /// when the answer steers them away from one. Counts toward savings.
+    var avoided: AvoidedDock? = nil
     var source: Source = .onDevice
 }
 
@@ -62,6 +65,8 @@ nonisolated struct DockSearchResult: Sendable, Equatable {
     /// True when the user granted only approximate location, so the
     /// "nearest" station may not actually be the closest one.
     let locationIsApproximate: Bool
+    /// The nearest station, when it's full and this answer skips it.
+    var avoided: AvoidedDock? = nil
 
     /// "West 15th and 6th has 53 docks open, right there."
     var summary: String {
@@ -72,7 +77,7 @@ nonisolated struct DockSearchResult: Sendable, Equatable {
         return sentence
     }
 
-    var answer: DockAnswer { DockAnswer(text: summary, station: station) }
+    var answer: DockAnswer { DockAnswer(text: summary, station: station, avoided: avoided) }
 }
 
 // MARK: - Dock near a destination
@@ -87,8 +92,21 @@ nonisolated struct DestinationDockResult: Sendable, Equatable {
     let selected: DockStation?
     /// True when `selected` is the rider's backup dock for this place.
     var selectedIsBackup = false
+    /// With no usual dock: the station nearest the destination, when it's
+    /// full and `selected` skips it.
+    var skippedNearest: AvoidedDock? = nil
 
     var usesUsualDock: Bool { usualDock != nil && usualDockProblem == nil }
+
+    /// The dock the rider would have gone to without Dock Finder: their
+    /// usual one, or the nearest one, when it couldn't take a bike.
+    var avoided: AvoidedDock? {
+        guard selected != nil else { return nil }
+        if let usualDock, let usualDockProblem {
+            return AvoidedDock(usualDock, problem: usualDockProblem)
+        }
+        return skippedNearest
+    }
 
     var summary: String {
         let lead = usualDockProblem.map { "Your usual dock \($0.phrase). " } ?? ""
@@ -108,7 +126,7 @@ nonisolated struct DestinationDockResult: Sendable, Equatable {
         return "\(selected.spokenName) has \(Speech.docksOpen(selected.availableDocks)), \(distance)."
     }
 
-    var answer: DockAnswer { DockAnswer(text: summary, station: selected) }
+    var answer: DockAnswer { DockAnswer(text: summary, station: selected, avoided: avoided) }
 }
 
 // MARK: - One station's status
@@ -131,11 +149,17 @@ nonisolated struct StationCheckResult: Sendable, Equatable {
         return "\(name) \(problem.phrase). Go to \(alternative.spokenName), \(alternative.availableDocks) docks, \(Speech.distance(alternative.straightLineDistance))."
     }
 
+    /// The checked station, when it can't take a bike and there's an alternative.
+    var avoided: AvoidedDock? {
+        guard let problem, alternative != nil else { return nil }
+        return AvoidedDock(station, problem: problem)
+    }
+
     var answer: DockAnswer {
         let target = problem == nil
             ? DockStation(snapshot: station, distance: 0)
             : alternative
-        return DockAnswer(text: summary, station: target)
+        return DockAnswer(text: summary, station: target, avoided: avoided)
     }
 }
 

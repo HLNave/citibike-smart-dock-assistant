@@ -79,6 +79,8 @@ Every answer is one sentence. Siri speaks it and the app shows it.
 | `Shared/` | Code compiled into both the app and the widget extension (the Live Activity's data) |
 | `DockFinderWidgets/` | Widget extension that draws the Live Activity on the Lock Screen and in the Dynamic Island |
 | `biker-app/Models/PlaceArrival.swift`, `biker-app/Services/PlaceArrivalMonitor.swift` | Saved-place arrival alerts without a ride: geofences per place, the "only when biking" check, and the alert |
+| `biker-app/Models/Savings.swift`, `biker-app/State/SavingsStore.swift`, `biker-app/Views/SavingsViews.swift` | Savings: the time/money model, the on-phone history of full docks avoided, and the dashboard |
+| `biker-app/Services/Metrics.swift`, `biker-app/Views/PrivacyViews.swift`, `biker-app/PrivacyInfo.xcprivacy` | Usage data: the consent question, the queue that sends events to the team's Google Sheet (see `metrics/README.md`), the Privacy screen, and Apple's privacy manifest |
 | `biker-app/State/` | Saved places (`UserDefaults`, on this device only) and onboarding state. The active ride is saved too, so tracking survives a relaunch |
 | `Config/` | Build settings; your personal `Local.xcconfig` lives here (gitignored) |
 | `Tools/make_app_icon.py` | Draws the app icon (light, dark and tinted) into `Assets.xcassets/AppIcon.appiconset`; rerun after changing it (needs Pillow) |
@@ -96,6 +98,7 @@ Every answer is one sentence. Siri speaks it and the app shows it.
   Then fill in:
   - `DEVELOPMENT_TEAM`: your team ID (Xcode → Settings → Accounts → your Apple ID → the team shows its ID).
   - `DOCKFINDER_BUNDLE_ID`: something unique to you, e.g. `com.yourname.dockfinder`.
+  - `DOCKFINDER_METRICS_URL` (optional): the team's usage-data Google Sheet web app, **without** `https://` (e.g. `script.google.com/macros/s/…/exec`). See `metrics/README.md`. Leave it empty and usage data is never sent, whatever riders choose.
   - `DOCKFINDER_BACKEND_HOST` (optional): the group's n8n host, e.g. `yourname.app.n8n.cloud`. Ask a teammate. Leave it empty and the app never contacts a server; anything it can't answer on device gets a short help message instead.
 - **A Development Team is required, even in the Simulator.** Without a Team ID, iOS's App Intents daemon (`linkd`) rejects the app with "Unable to get teamId … Rejecting invalid client due to requiresValidBundle". The intents still *appear* in Shortcuts but fail with "Unable to run App Shortcut".
 
@@ -188,7 +191,9 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 
 - [ ] Fresh install → Welcome screen → button shows the While Using location prompt, then straight away "Change to Always Allow" → Siri instructions screen.
 - [ ] Add a place, delete the app, reinstall from Xcode: the place (with its usual dock) is back.
-- [ ] Onboarding asks for Motion & Fitness after the two location prompts.
+- [ ] Onboarding asks for Motion & Fitness after the two location prompts, then asks whether to share usage data. An existing install is asked once on the home screen instead.
+- [ ] With sharing on and `DOCKFINDER_METRICS_URL` set, rows appear in the sheet's Events tab within a few seconds of using the app (`app_launch`, `siri_answer`, …). With sharing off, nothing new appears; turning it back on under **Privacy** resumes.
+- [ ] Getting steered away from a full dock (e.g. "Your usual dock is full. Go to…") adds a `full_dock_avoided` row and moves the home screen's **Savings** card off the "typical commuter" estimate.
 - [ ] Without starting a ride, bike toward a saved place with the phone locked: about the alert distance out, the dock answer is spoken and shows as a notification. "Hey Siri, direct me with Dock Finder" then starts directions to that dock.
 - [ ] Walking (or arriving by subway) into the same place doesn't alert. A second arrival within the hour doesn't alert. Turning **Alert Me When I Arrive** off stops it.
 - [ ] With the app swiped away, biking up to a saved place still alerts (iOS relaunches it for the geofence).

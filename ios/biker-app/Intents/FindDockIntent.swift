@@ -43,6 +43,15 @@ extension AppIntent {
         checksForNewRide: Bool = false
     ) async throws -> some SpokenAnswerResult {
         let guidance = GuidanceSession.shared
+        let here = LocationService.shared.lastKnownLocation
+        Metrics.shared.log(
+            "siri_answer",
+            station: answer.station?.name,
+            avoidedStation: answer.avoided?.name,
+            location: here,
+            details: ["intent": String(describing: Self.self), "answer": answer.text]
+        )
+        SavingsStore.shared.record(answer, from: here, context: "siri")
 
         if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
             do {

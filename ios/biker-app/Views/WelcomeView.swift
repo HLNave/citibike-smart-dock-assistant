@@ -6,16 +6,21 @@
 import CoreLocation
 import SwiftUI
 
-/// First-launch flow: Welcome → Siri instructions.
+/// First-launch flow: Welcome → usage sharing question → Siri instructions.
 struct OnboardingFlowView: View {
     @Environment(OnboardingState.self) private var onboarding
+    @State private var showsSharingQuestion = false
     @State private var showsSiriInstructions = false
 
     var body: some View {
         NavigationStack {
-            WelcomeView(onContinue: { showsSiriInstructions = true })
-                .navigationDestination(isPresented: $showsSiriInstructions) {
-                    SiriInstructionsView(onDone: onboarding.finishOnboarding)
+            WelcomeView(onContinue: { showsSharingQuestion = true })
+                .navigationDestination(isPresented: $showsSharingQuestion) {
+                    UsageSharingPrompt { showsSiriInstructions = true }
+                        .navigationBarBackButtonHidden()
+                        .navigationDestination(isPresented: $showsSiriInstructions) {
+                            SiriInstructionsView(onDone: onboarding.finishOnboarding)
+                        }
                 }
         }
     }

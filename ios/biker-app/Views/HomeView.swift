@@ -9,6 +9,9 @@ struct HomeView: View {
     @Environment(SavedPlacesStore.self) private var savedPlaces
     @State private var showsSiriInstructions = false
     @State private var showsAddPlace = false
+    /// Riders who finished onboarding before usage sharing existed are
+    /// asked once here.
+    @State private var asksAboutSharing = UsageSharing.current() == nil
 
     var body: some View {
         NavigationStack {
@@ -32,6 +35,11 @@ struct HomeView: View {
                     GuidanceCard()
 
                     RideCard()
+
+                    NavigationLink(value: HomeRoute.savings) {
+                        SavingsCard()
+                    }
+                    .buttonStyle(.plain)
 
                     HomeCard(title: "Saved Places", trailing: savedPlaces.places.count > 1 ? .manage : nil) {
                         if savedPlaces.places.isEmpty {
@@ -79,6 +87,11 @@ struct HomeView: View {
                         Label("How to Use with Siri", systemImage: "mic")
                     }
                     .controlSize(.large)
+
+                    NavigationLink(value: HomeRoute.privacy) {
+                        Label("Privacy", systemImage: "hand.raised")
+                            .font(.subheadline)
+                    }
                 }
                 .padding(24)
                 .frame(maxWidth: 500)
@@ -92,6 +105,8 @@ struct HomeView: View {
                 case .stationSearch: StationSearchView()
                 case .citywide: CitywideView()
                 case .ask: AskView()
+                case .savings: SavingsView()
+                case .privacy: PrivacyView()
                 }
             }
         }
@@ -102,6 +117,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showsAddPlace) {
             AddPlaceView()
+        }
+        .sheet(isPresented: $asksAboutSharing) {
+            UsageSharingPrompt { asksAboutSharing = false }
         }
         .task {
             // For riders who finished onboarding before arrival alerts
@@ -118,6 +136,8 @@ enum HomeRoute: Hashable {
     case stationSearch
     case citywide
     case ask
+    case savings
+    case privacy
 }
 
 private struct HomeCard<Content: View>: View {

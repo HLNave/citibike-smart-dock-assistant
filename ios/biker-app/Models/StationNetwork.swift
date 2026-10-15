@@ -127,6 +127,19 @@ nonisolated struct StationNetwork: Sendable {
             }
     }
 
+    /// The station a rider would naturally head for (the nearest installed
+    /// one within `nearbyRadius`), when it can't take a bike and isn't
+    /// `chosenID`.
+    func skippedNearest(to location: CLLocation, chosenID: String?) -> AvoidedDock? {
+        guard let nearest = stations
+            .filter({ $0.isInstalled && location.distance(from: $0.location) <= Self.nearbyRadius })
+            .min(by: { location.distance(from: $0.location) < location.distance(from: $1.location) }),
+            nearest.id != chosenID,
+            let problem = problem(with: nearest)
+        else { return nil }
+        return AvoidedDock(nearest, problem: problem)
+    }
+
     func station(id: String) -> StationSnapshot? {
         stations.first { $0.id == id }
     }

@@ -34,7 +34,14 @@ final class AnswerModel {
         }
 
         do {
-            phase = .answered(try await operation())
+            let answer = try await operation()
+            phase = .answered(answer)
+            Metrics.shared.log(
+                "app_answer",
+                station: answer.station?.name,
+                avoidedStation: answer.avoided?.name,
+                details: ["answer": answer.text]
+            )
         } catch let error as DockFinderError {
             phase = .failed(error)
         } catch is CancellationError {

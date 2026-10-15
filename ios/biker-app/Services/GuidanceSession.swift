@@ -168,11 +168,18 @@ final class GuidanceSession: GuidanceControlling {
             prompter.hold(for: VoicePrompter.speakingTime(of: siriLine))
         }
         prompter.say(opening)
+        Metrics.shared.log(
+            "directions_started",
+            station: station.name,
+            location: here,
+            details: ["via": siriLine == nil ? "app" : "siri", "route_meters": String(Int(route.length))]
+        )
         return opening
     }
 
     func stop() async {
         guard progress != nil else { return }
+        Metrics.shared.log("directions_stopped", station: station?.name)
         progress = nil
         prompter.dropHeld()
         await stopTracking()
@@ -265,6 +272,7 @@ final class GuidanceSession: GuidanceControlling {
         var text = "You've arrived at \(station.spokenName)"
         if let docksOpen { text += ", \(Speech.docksOpen(docksOpen))" }
         text += "."
+        Metrics.shared.log("directions_arrived", station: station.name)
         progress = nil
         lastArrival = text
 
@@ -298,6 +306,9 @@ final class GuidanceSession: GuidanceControlling {
         let next = fresh.opening()
         progress = fresh
         prompter.say("\(announcement) \(next)")
+        if newStation == nil {
+            Metrics.shared.log("directions_rerouted", station: current.name, location: location)
+        }
         return true
     }
 
@@ -327,6 +338,12 @@ final class GuidanceSession: GuidanceControlling {
             if switched {
                 docksOpen = alternative.availableDocks
                 checkedNearEnd = false
+                // The dock filled up on the way: a full dock avoided.
+                SavingsStore.shared.record(
+                    DockAnswer(text: "", station: alternative, avoided: AvoidedDock(target, problem: problem)),
+                    from: location,
+                    context: "directions"
+                )
             } else {
                 docksOpen = network.station(id: target.id)?.openDocks
             }

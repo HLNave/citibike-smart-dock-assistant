@@ -12,3 +12,8 @@ DOCKFINDER_BUNDLE_ID = com.yourname.dockfinder
 // Optional: the group's n8n host, without https://. Ask a teammate for it.
 // The webhook has no password, so don't post it anywhere public.
 DOCKFINDER_BACKEND_HOST = YOUR-N8N-HOST
+
+// Optional: the team's usage-data Google Sheet web app, WITHOUT "https://"
+// (xcconfig treats "//" as a comment), e.g.
+// script.google.com/macros/s/AKfy…/exec. Ask a teammate, or see metrics/README.md.
+DOCKFINDER_METRICS_URL =

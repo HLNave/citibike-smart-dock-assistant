@@ -18,4 +18,9 @@ DOCKFINDER_BUNDLE_ID = spork.biker-app
 // get a help message instead.
 DOCKFINDER_BACKEND_HOST =
 
+// The team's usage-data Google Sheet (an Apps Script web app URL, without
+// "https://", since "//" starts a comment here). Empty means usage data is
+// never sent anywhere. See metrics/README.md.
+DOCKFINDER_METRICS_URL =
+
 #include? "Local.xcconfig"

@@ -14,9 +14,11 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Dock Finder checks whether you're biking, so it only tells you where to dock when you ride up to a saved place, not when you walk or take the subway.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Dock Finder tells you where to dock as you get close, and guides you there turn by turn, with your phone locked in your pocket.</string>
+	<string>Dock Finder tells you where to dock as you get close, and guides you there turn by turn, with your phone locked in your pocket. If you choose to share usage data, where you were is included.</string>
 	<key>DockFinderBackendHost</key>
 	<string>$(DOCKFINDER_BACKEND_HOST)</string>
+	<key>DockFinderMetricsURL</key>
+	<string>$(DOCKFINDER_METRICS_URL)</string>
 	<!-- "Dock" and "doc" sound the same, so Siri often transcribes the app's
 	     name as "Doc Finder". These names let Siri match it anyway. -->
 	<key>INAlternativeAppNames</key>

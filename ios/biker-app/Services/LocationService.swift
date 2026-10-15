@@ -46,6 +46,11 @@ final class LocationService: NSObject, LocationProviding {
         manager.authorizationStatus
     }
 
+    /// The latest location iOS already has, without asking for a new one.
+    var lastKnownLocation: CLLocation? {
+        manager.location
+    }
+
     /// Requests When In Use permission if the user hasn't decided yet, and
     /// returns the resulting status. Call only from a user interaction.
     func requestWhenInUseAuthorization() async -> CLAuthorizationStatus {

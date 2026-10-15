@@ -85,7 +85,7 @@ struct AnswerCard: View {
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                DirectMeButton(station: station)
+                DirectMeButton(station: station, avoided: answer.avoided)
             }
 
             if answer.source != .onDevice {

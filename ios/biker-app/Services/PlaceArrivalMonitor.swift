@@ -105,6 +105,15 @@ final class PlaceArrivalMonitor {
         do {
             let answer = try await DockFinderService.live.findDock(for: place).answer
             text = answer.text
+            let here = LocationService.shared.lastKnownLocation
+            Metrics.shared.log(
+                "place_arrival_alert",
+                station: answer.station?.name,
+                avoidedStation: answer.avoided?.name,
+                location: here,
+                details: ["place": place.name, "answer": answer.text]
+            )
+            SavingsStore.shared.record(answer, from: here, context: "place_arrival")
             if let station = answer.station {
                 GuidanceSession.shared.offer(station)
                 text += " For directions, say: Hey Siri, direct me with Dock Finder."

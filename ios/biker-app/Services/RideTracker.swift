@@ -82,9 +82,18 @@ final class RideTracker: RideControlling {
             destination: ride.destination.name,
             state: .riding(to: ride.destination.name, remaining: nil)
         )
+        Metrics.shared.log("ride_started", details: [
+            "destination": ride.destination.name,
+            "destination_latitude": String(ride.destination.latitude),
+            "destination_longitude": String(ride.destination.longitude),
+            "saved_place": ride.savedPlaceID == nil ? "no" : "yes",
+        ])
     }
 
     func end() async {
+        if let ride = currentRide {
+            Metrics.shared.log("ride_ended_early", details: ["destination": ride.destination.name])
+        }
         currentRide = nil
         distanceRemaining = nil
         save()
@@ -209,6 +218,15 @@ final class RideTracker: RideControlling {
         // A separate task, so cancelling the tracking tasks can't cancel it.
         let answer = await Task { await Self.arrivalAnswer(for: ride) }.value
         lastArrival = RideArrival(destination: ride.destination.name, answer: answer, date: .now)
+        let here = LocationService.shared.lastKnownLocation
+        Metrics.shared.log(
+            "ride_arrival_alert",
+            station: answer.station?.name,
+            avoidedStation: answer.avoided?.name,
+            location: here,
+            details: ["destination": ride.destination.name, "answer": answer.text]
+        )
+        SavingsStore.shared.record(answer, from: here, context: "ride_arrival")
         await announcer.announce(answer.text, title: "Docking near \(ride.destination.name)")
 
         // Guidance starts before this ride's tracking stops, so location
