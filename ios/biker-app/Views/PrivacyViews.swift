@@ -16,7 +16,7 @@ struct UsageSharingExplanation: View {
             Text("While Dock Finder is being tested, it can send the Dock Finder team a record of how you use it, so we can measure what it saves riders and fix what doesn't work:")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 8) {
-                Label("When you use it: rides, arrival alerts, directions and answers, including the words of questions you ask with the Ask Dock Finder button", systemImage: "list.bullet")
+                Label("When you use it: rides, arrival alerts, directions and Siri answers", systemImage: "list.bullet")
                 Label("Where you were at the time (your location) and the docks involved", systemImage: "location")
                 Label("The time and money we estimate it saved you", systemImage: "clock.arrow.circlepath")
             }

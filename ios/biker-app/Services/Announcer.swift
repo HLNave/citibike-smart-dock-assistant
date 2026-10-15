@@ -34,8 +34,7 @@ final class Announcer: NSObject {
         await speak(text)
     }
 
-    /// Speaks without posting a notification; returns once it's been said.
-    func speak(_ text: String) async {
+    private func speak(_ text: String) async {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])

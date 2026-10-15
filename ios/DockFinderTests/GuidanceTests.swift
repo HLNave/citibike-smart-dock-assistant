@@ -302,27 +302,3 @@ struct RideGuidanceTests {
         #expect(!decoded.guidesToDock)
     }
 }
-
-struct VoiceReplyTests {
-    @Test(arguments: [
-        ("Yes", VoiceReply.yes),
-        ("yeah sure", .yes),
-        ("Okay.", .yes),
-        ("yes please", .yes),
-        ("take me there", .yes),
-        ("No", .no),
-        ("no thanks", .no),
-        ("nope", .no),
-        ("don't bother", .no),
-        ("not now", .no),
-        ("what", .unclear),
-        ("", .unclear),
-    ])
-    func repliesAreUnderstood(text: String, expected: VoiceReply) {
-        #expect(VoiceReply.parse(text) == expected)
-    }
-
-    @Test func nothingHeardIsUnclear() {
-        #expect(VoiceReply.parse(nil) == .unclear)
-    }
-}

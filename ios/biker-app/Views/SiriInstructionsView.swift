@@ -77,8 +77,6 @@ struct SiriInstructionsView: View {
                 .padding()
                 .background(.background.secondary, in: .rect(cornerRadius: 16))
 
-                AskButtonSetupCard()
-
                 SiriTipView(intent: StartRideIntent())
 
                 if locationIsUnavailable {
@@ -160,64 +158,5 @@ private struct LocationRequiredNotice: View {
 #Preview {
     NavigationStack {
         SiriInstructionsView(onDone: {})
-    }
-}
-
-/// Setting up the Ask Dock Finder control: the steps iOS only lets the
-/// rider do, and the microphone and speech permissions it needs (which
-/// can only be asked for while the app is open).
-private struct AskButtonSetupCard: View {
-    @Environment(\.openURL) private var openURL
-    @State private var hasPermissions = VoiceAsk.hasPermissions
-    @State private var isRequesting = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Ask with one press")
-                .font(.headline)
-            Text("Put **Ask Dock Finder** on the Action Button, Lock Screen or Control Center. Press it and Dock Finder asks “What do you need?” and answers out loud, even with your phone locked, no “Hey Siri” needed.")
-                .font(.subheadline)
-                .fixedSize(horizontal: false, vertical: true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                PhraseRow(text: "Action Button: Settings › Action Button › Controls › Ask Dock Finder", systemImage: "button.vertical.right.press")
-                PhraseRow(text: "Lock Screen: touch and hold the Lock Screen › Customize › tap a bottom button › Ask Dock Finder", systemImage: "lock")
-                PhraseRow(text: "Control Center: swipe down from the top right › + › Add a Control › Ask Dock Finder", systemImage: "switch.2")
-            }
-            .font(.footnote)
-
-            if hasPermissions {
-                Label("Microphone and speech recognition are on", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
-            } else {
-                Button {
-                    Task { await allow() }
-                } label: {
-                    Text("Allow Microphone & Speech")
-                        .font(.body.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isRequesting)
-                Text("Needed once, so the button can listen. Your voice is turned into text on your iPhone.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.background.secondary, in: .rect(cornerRadius: 16))
-    }
-
-    private func allow() async {
-        isRequesting = true
-        defer { isRequesting = false }
-        hasPermissions = await VoiceAsk.requestPermissions()
-        // Denied earlier: iOS won't ask again, so open Settings instead.
-        if !hasPermissions, let url = URL(string: UIApplication.openSettingsURLString) {
-            openURL(url)
-        }
     }
 }

@@ -25,19 +25,6 @@ These work with the phone locked once Dock Finder is installed. Nothing needs to
 | **"Hey Siri, start a ride with Dock Finder"** | "Where are you heading?" | Answer with a saved place ("school"), a landmark ("Union Square", "NYU Stern") or an address ("44 West 4th Street"). Siri then asks "Want me to guide you to the dock when you're close?" Ride; as you get close, you hear where to dock, and with "yes", each turn on the way there. |
 | **"Hey Siri, find a dock with Dock Finder"** | "Want me to direct you there?" | The nearest station to you with room, right now. Say "yes" to hear each turn on the way. |
 
-### The Ask Dock Finder button (no "Hey Siri" needed)
-
-Put **Ask Dock Finder** on the **Action Button** (iPhone 15 Pro and later), the **Lock Screen** or **Control Center**. Press it and Dock Finder itself asks "What do you need?", listens until you pause, and answers out loud, with the phone locked. It's the same as "Ask Dock Finder" through Siri (including "Want me to direct you there?", answered by voice), but Siri never has to recognize a phrase, so it works every time.
-
-One-time setup:
-1. In Dock Finder, open **How to Use with Siri** and tap **Allow Microphone & Speech**. iOS can only ask while the app is open.
-2. Choose where it goes:
-   - **Action Button:** Settings → Action Button → **Controls** → Ask Dock Finder.
-   - **Lock Screen:** touch and hold the Lock Screen → Customize → tap a bottom button → Ask Dock Finder.
-   - **Control Center:** swipe down from the top right → **+** → Add a Control → Ask Dock Finder.
-
-Speech is turned into text on the iPhone. If you share usage data, the words of the question are included.
-
 ### Arriving at a saved place, no ride needed
 
 Bike up to a saved place (school, work, home) and Dock Finder tells you where to dock as you get close, through your headphones and as a notification, even if you never started a ride:
@@ -101,7 +88,8 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 - **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" and "Dog Finder" work as the app name.
-- **If "Ask Dock Finder" doesn't reach the app** (Siri searches the web or answers by itself), say the longer **"Ask Dock Finder a question"**. Siri treats a bare "Ask …" as a general question and sometimes keeps it. Or use the [Ask Dock Finder button](#the-ask-dock-finder-button-no-hey-siri-needed), which skips Siri entirely.
+- **If "Ask Dock Finder" doesn't reach the app** (Siri searches the web or answers by itself), say the longer **"Ask Dock Finder a question"**. Siri treats a bare "Ask …" as a general question and sometimes keeps it.
+- **Without "Hey Siri":** hold the side button (or long-press an AirPods stem) and say the phrase. It works with the phone locked. The Action Button can't start a Siri conversation: a Dock Finder action assigned to it asks "What do you need?" with a text box, because iOS only asks out loud when Siri runs the action.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
 - **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
 - **Installing a new build:** just press ⌘R in Xcode over the installed app. Deleting it first means trusting the developer again on the phone (iOS forgets that trust when none of your apps are left) and granting location again.
