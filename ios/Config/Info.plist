@@ -24,18 +24,13 @@
 	<key>DockFinderMetricsURL</key>
 	<string>$(DOCKFINDER_METRICS_URL)</string>
 	<!-- "Dock" and "doc" sound the same, so Siri often transcribes the app's
-	     name as "Doc Finder". These names let Siri match it anyway. -->
+	     name as "Doc Finder". These names let Siri match it anyway.
+	     iOS refuses to install an app with more than 3 of them. -->
 	<key>INAlternativeAppNames</key>
 	<array>
 		<dict>
 			<key>INAlternativeAppName</key>
 			<string>Doc Finder</string>
-			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>dock finder</string>
-		</dict>
-		<dict>
-			<key>INAlternativeAppName</key>
-			<string>Dockfinder</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
 			<string>dock finder</string>
 		</dict>
