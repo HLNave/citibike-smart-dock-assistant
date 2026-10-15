@@ -31,6 +31,9 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
     var backupStationID: String?
     var backupStationName: String?
     var alertDistance: CLLocationDistance
+    /// Say where to dock when the rider bikes up to this place, even
+    /// without a ride (see PlaceArrivalMonitor).
+    var arrivalAlerts: Bool
 
     init(
         id: UUID = UUID(),
@@ -43,7 +46,8 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         usualStationName: String? = nil,
         backupStationID: String? = nil,
         backupStationName: String? = nil,
-        alertDistance: CLLocationDistance = SavedPlace.defaultAlertDistance
+        alertDistance: CLLocationDistance = SavedPlace.defaultAlertDistance,
+        arrivalAlerts: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -56,11 +60,12 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         self.backupStationID = backupStationID
         self.backupStationName = backupStationName
         self.alertDistance = alertDistance
+        self.arrivalAlerts = arrivalAlerts
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, aliases, latitude, longitude, address
-        case usualStationID, usualStationName, backupStationID, backupStationName, alertDistance
+        case usualStationID, usualStationName, backupStationID, backupStationName, alertDistance, arrivalAlerts
     }
 
     /// Only the name and coordinates are required, so places saved by an
@@ -79,6 +84,7 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         backupStationName = try container.decodeIfPresent(String.self, forKey: .backupStationName)
         let distance = try container.decodeIfPresent(Double.self, forKey: .alertDistance) ?? Self.defaultAlertDistance
         alertDistance = distance > 0 ? distance : Self.defaultAlertDistance
+        arrivalAlerts = try container.decodeIfPresent(Bool.self, forKey: .arrivalAlerts) ?? true
     }
 
     var destination: Destination {
@@ -120,7 +126,11 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
 
 @Observable
 final class SavedPlacesStore {
-    static let shared = SavedPlacesStore(backup: KeychainPlacesBackup())
+    static let shared = SavedPlacesStore(backup: KeychainPlacesBackup()) {
+        SavedPlacesStore.refreshSiriPhrases()
+        // Watch the new or changed places for arrivals.
+        Task { await PlaceArrivalMonitor.shared.sync() }
+    }
     nonisolated static let storageKey = "savedPlaces"
     /// Unreadable data is copied here instead of being overwritten, so a bad
     /// update can't silently erase the rider's places.

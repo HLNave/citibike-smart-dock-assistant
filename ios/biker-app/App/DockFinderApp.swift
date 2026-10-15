@@ -17,6 +17,8 @@ struct DockFinderApp: App {
         // Also runs when iOS relaunches the app in the background for a
         // ride's geofence, so tracking resumes and the arrival is handled.
         Task { await RideTracker.shared.resume() }
+        // Same for arriving at a saved place without a ride.
+        Task { await PlaceArrivalMonitor.shared.sync() }
     }
 
     var body: some Scene {

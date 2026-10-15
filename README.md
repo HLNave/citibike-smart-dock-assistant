@@ -25,6 +25,17 @@ These work with the phone locked once Dock Finder is installed. Nothing needs to
 | **"Hey Siri, start a ride with Dock Finder"** | "Where are you heading?" | Answer with a saved place ("school"), a landmark ("Union Square", "NYU Stern") or an address ("44 West 4th Street"). Siri then asks "Want me to guide you to the dock when you're close?" Ride; as you get close, you hear where to dock, and with "yes", each turn on the way there. |
 | **"Hey Siri, find a dock with Dock Finder"** | "Want me to direct you there?" | The nearest station to you with room, right now. Say "yes" to hear each turn on the way. |
 
+### Arriving at a saved place, no ride needed
+
+Bike up to a saved place (school, work, home) and Dock Finder tells you where to dock as you get close, through your headphones and as a notification, even if you never started a ride:
+
+> "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school. For directions, say: Hey Siri, direct me with Dock Finder."
+
+- It only speaks up when you're **biking**, using the iPhone's motion sensor (allow **Motion & Fitness** when asked). Walking, driving or the subway don't trigger it. Without that permission it can't tell, so every arrival alerts.
+- At most once an hour per place, and not while a ride or directions are already running.
+- Uses each place's alert distance, and needs location access set to **Always**.
+- Turn it off per place with **Alert Me When I Arrive** on the place's screen.
+
 ### Directions to the dock
 
 Whenever Siri tells you about a dock (Find Dock, Check Station, your saved place's dock, Ask Dock Finder), it ends with **"Want me to direct you there?"** Say **"yes"**: Siri confirms ("Okay, directing you to West 4th and Mercer."), then Dock Finder's own voice guides you there turn by turn through your headphones, with the phone locked. It waits for Siri to finish, so the two never talk at once:
@@ -89,11 +100,11 @@ The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about lo
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
-- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out a ride alerts you (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, start a ride there, edit or delete it.
+- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out you're alerted (0.2 to 0.7 miles). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask Dock Finder (type a question, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again.
 
-**Recommended setup:** add School, Work and Home with a usual and backup dock for each, allow Always location, and from then on just say "Hey Siri, start a ride with Dock Finder" → "school".
+**Recommended setup:** add School, Work and Home with a usual and backup dock for each, allow Always location and Motion & Fitness. From then on, biking up to any of them tells you where to dock automatically; to also get turn-by-turn directions, say "Hey Siri, start a ride with Dock Finder" → "school" before you set off.
 
 ### What it says (examples)
 

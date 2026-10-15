@@ -42,6 +42,7 @@ Only Find Dock has phrases starting with "find a dock". Siri matches phrases loo
 | Feature | Runs on | Siri phrase |
 | --- | --- | --- |
 | **Ride alert**: start a ride to a saved place or anywhere, hear the best dock when you're ~500 m out, with the phone locked | iPhone (background location + speech) | "Start a ride with Dock Finder" → "school" |
+| **Saved-place arrival alert**: bike up to a saved place without starting a ride, hear the best dock at its alert distance | iPhone (geofences + motion activity + speech) | none, automatic |
 | Nearest dock to you, right now | iPhone | "Find a dock with Dock Finder" |
 | Your usual dock at a saved place, rerouting if it's full | iPhone | "Check my school dock with Dock Finder" |
 | Dock near any address, landmark or neighborhood, right now | iPhone (Apple map search) | In the app (**Dock Near a Place**), or "Ask Dock Finder" → "find a dock near Union Square" |
@@ -77,6 +78,7 @@ Every answer is one sentence. Siri speaks it and the app shows it.
 | `biker-app/Services/DockFinderLiveActivity.swift` | Starts, updates and ends the ride / directions Live Activity |
 | `Shared/` | Code compiled into both the app and the widget extension (the Live Activity's data) |
 | `DockFinderWidgets/` | Widget extension that draws the Live Activity on the Lock Screen and in the Dynamic Island |
+| `biker-app/Models/PlaceArrival.swift`, `biker-app/Services/PlaceArrivalMonitor.swift` | Saved-place arrival alerts without a ride: geofences per place, the "only when biking" check, and the alert |
 | `biker-app/State/` | Saved places (`UserDefaults`, on this device only) and onboarding state. The active ride is saved too, so tracking survives a relaunch |
 | `Config/` | Build settings; your personal `Local.xcconfig` lives here (gitignored) |
 | `Tools/make_app_icon.py` | Draws the app icon (light, dark and tinted) into `Assets.xcassets/AppIcon.appiconset`; rerun after changing it (needs Pillow) |
@@ -143,6 +145,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 - **Edit anything** (name, nicknames, location, alert distance), set a location with **Use My Current Location**, reorder or delete places, and get a warning if a place has no Citi Bike station within 1.2 km.
 - **By voice:** "my school dock is Mercer and Bleecker", "save this spot as gym".
 - **Storage is defensive:** places saved by older versions still load, one damaged entry doesn't wipe the list, and unreadable data is kept aside instead of being overwritten.
+- **Arrival alerts without a ride** (on by default, **Alert Me When I Arrive** per place). iOS watches a geofence around each saved place at its alert distance (`CLMonitor`, so it costs almost no battery and relaunches the app if needed). On entering one, Dock Finder checks the motion coprocessor (`CMMotionActivityManager`): it alerts only if the latest confident activity in the last hour is cycling, or cycling started in the last 5 minutes. Then it speaks the dock answer and posts it as a notification, and offers "Hey Siri, direct me with Dock Finder". At most once an hour per place, never during a ride or directions. Needs Always location; without Motion & Fitness access, arrivals aren't filtered.
 - **They survive reinstalling.** A copy is kept in the iPhone's keychain (`State/PlacesBackup.swift`), which iOS keeps when an app is deleted, and is restored on a fresh install. It only works with the same bundle ID and signing team, and it's long-standing iOS behavior rather than a documented guarantee. Nothing leaves the phone; iCloud sync would need a paid developer account.
 
 ## Testing the developer preview on your own iPhone
@@ -185,6 +188,10 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 
 - [ ] Fresh install → Welcome screen → button shows the While Using location prompt, then straight away "Change to Always Allow" → Siri instructions screen.
 - [ ] Add a place, delete the app, reinstall from Xcode: the place (with its usual dock) is back.
+- [ ] Onboarding asks for Motion & Fitness after the two location prompts.
+- [ ] Without starting a ride, bike toward a saved place with the phone locked: about the alert distance out, the dock answer is spoken and shows as a notification. "Hey Siri, direct me with Dock Finder" then starts directions to that dock.
+- [ ] Walking (or arriving by subway) into the same place doesn't alert. A second arrival within the hour doesn't alert. Turning **Alert Me When I Arrive** off stops it.
+- [ ] With the app swiped away, biking up to a saved place still alerts (iOS relaunches it for the geofence).
 - [ ] On the "Use Dock Finder with Siri" screen, the Dock Finder shortcuts button (Apple's list of the app's Siri phrases) shows nine entries.
 - [ ] "Hey Siri, start a ride with Dock Finder" asks "Where are you heading?" **without opening the app**, with the phone locked and headphones in. Answering "school", "Union Square" and "44 West 4th Street" each starts a ride; "home" (not saved) asks you to add it.
 - [ ] "Hey Siri, ask Dock Finder" asks "What do you need?" (confirmed reachable on an iPhone 12 Pro), and "is Mercer and Bleecker full?" / "how many bikes are out?" get the right answer.

@@ -70,6 +70,19 @@ struct SavedPlaceView: View {
                 }
 
                 Section {
+                    Toggle("Alert Me When I Arrive", isOn: Binding(
+                        get: { place.arrivalAlerts },
+                        set: { enabled in
+                            var updated = place
+                            updated.arrivalAlerts = enabled
+                            savedPlaces.update(updated)
+                        }
+                    ))
+                } footer: {
+                    Text("When you bike within \(Speech.length(place.alertDistance)) of \(place.name), Dock Finder tells you where to dock, even if you didn't start a ride. Needs location access set to Always; walking and the subway are skipped when Motion & Fitness is allowed.")
+                }
+
+                Section {
                     Button {
                         Task {
                             await rideModel.run(needsLocation: true) {
