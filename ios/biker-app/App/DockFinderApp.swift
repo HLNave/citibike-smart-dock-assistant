@@ -17,6 +17,10 @@ struct DockFinderApp: App {
         // Also runs when iOS relaunches the app in the background for a
         // ride's geofence, so tracking resumes and the arrival is handled.
         Task { await RideTracker.shared.resume() }
+        // Tell Siri the saved place names for "Check my school dock". iOS can
+        // forget them after an update or reinstall, and places restored from
+        // the keychain don't count as a change.
+        SavedPlacesStore.refreshSiriPhrases()
         // Same for arriving at a saved place without a ride.
         Task { await PlaceArrivalMonitor.shared.sync() }
         // Usage events (only if the rider agreed to share), and anything

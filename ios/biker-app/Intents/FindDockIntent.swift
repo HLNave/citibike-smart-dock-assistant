@@ -126,17 +126,36 @@ struct FindDockNearSavedPlaceIntent: LiveActivityIntent {
     @Parameter(title: "Place")
     var place: SavedPlaceEntity?
 
+    /// Asked for, once, when Siri ran the phrase without catching which
+    /// place was meant. Plain text, matched by the app, so whatever the
+    /// rider says is accepted and nothing is re-asked.
+    @Parameter(title: "Place Name")
+    var placeName: String?
+
     static var parameterSummary: some ParameterSummary {
         Summary("Find a dock near \(\.$place)")
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        guard let place else {
-            return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(SavedPlacesStore.shared.places)))
-        }
-        guard let saved = SavedPlacesStore.shared.place(id: place.id) else {
-            throw DockFinderError.savedPlaceNotFound
+        let store = SavedPlacesStore.shared
+        let saved: SavedPlace
+        if let place {
+            guard let match = store.place(id: place.id) else {
+                throw DockFinderError.savedPlaceNotFound
+            }
+            saved = match
+        } else if store.places.count == 1, let only = store.places.first {
+            saved = only
+        } else if !store.places.isEmpty {
+            let names = store.places.map(\.name).formatted(.list(type: .or))
+            let spoken: String? = try await $placeName.requestValue("Which place: \(names)?")
+            guard let match = spoken.flatMap(store.place(matching:)) else {
+                return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)))
+            }
+            saved = match
+        } else {
+            return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)))
         }
         let answer = try await DockFinderService.live.findDock(for: saved).answer
         return try await reply(with: answer)
