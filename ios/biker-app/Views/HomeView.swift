@@ -12,6 +12,8 @@ struct HomeView: View {
     /// Riders who finished onboarding before usage sharing existed are
     /// asked once here.
     @State private var asksAboutSharing = UsageSharing.current() == nil
+    /// Riders who agreed to share before names existed are asked for one here.
+    @State private var asksForName = UsageNameCard.shouldShow
 
     var body: some View {
         NavigationStack {
@@ -29,6 +31,10 @@ struct HomeView: View {
                             .multilineTextAlignment(.center)
                     }
                     .padding(.top, 16)
+
+                    if asksForName {
+                        UsageNameCard { withAnimation { asksForName = false } }
+                    }
 
                     DockLookupSection(buttonTitle: "Find Nearest Dock", prominent: true)
 
@@ -108,6 +114,10 @@ struct HomeView: View {
                 case .savings: SavingsView()
                 case .privacy: PrivacyView()
                 }
+            }
+            .onAppear {
+                // Back from Privacy, where they may have added a name or stopped sharing.
+                asksForName = UsageNameCard.shouldShow
             }
         }
         .sheet(isPresented: $showsSiriInstructions) {

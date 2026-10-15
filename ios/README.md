@@ -192,6 +192,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Add a place, delete the app, reinstall from Xcode: the place (with its usual dock) is back.
 - [ ] Onboarding asks for Motion & Fitness after the two location prompts, then asks whether to share usage data. An existing install is asked once on the home screen instead.
 - [ ] With sharing on and `DOCKFINDER_METRICS_URL` set, rows appear in the sheet's Events tab within a few seconds of using the app (`app_opened`, `siri_answer`, …). With sharing off, nothing new appears; turning it back on under **Privacy** resumes.
+- [ ] With sharing on from an older build and no name, the home screen shows **Add your name** once; **Save** or **Not Now** hides it for good, and it never shows after answering the sharing question with the name field.
 - [ ] The sheet's **Users** tab has a row for this iPhone. A name typed under **Privacy** shows in its `name` column after leaving the screen; reopening the app updates `last_opened` (and `app_opens`, if 10+ minutes since the last open).
 - [ ] Getting steered away from a full dock (e.g. "Your usual dock is full. Go to…") adds a `full_dock_avoided` row and moves the home screen's **Savings** card off the "typical commuter" estimate.
 - [ ] A Siri dock answer adds a `hands_free_check` row and one to "times you didn't take out your phone"; saying "yes" to directions right after doesn't add a second one.

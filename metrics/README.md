@@ -43,7 +43,7 @@ One row per install, newest activity first, rewritten after every batch of event
 
 | Column | Meaning |
 |---|---|
-| `name` | What the rider typed in when asked to share usage data, or later under **Privacy**. Blank if they didn't give one |
+| `name` | What the rider typed in when asked to share usage data, on the one-time **Add your name** home-screen card (for riders who agreed before names existed), or under **Privacy**. Blank if they didn't give one |
 | `install_id` | Same as in Events. Deleting and reinstalling the app makes a new one (a new row); ⌘R over the installed app keeps it |
 | `last_opened` | The last time they opened the app (brought it on screen), overwritten each time |
 | `last_active` | The last event of any kind, including Siri requests and ride alerts with the app closed |
