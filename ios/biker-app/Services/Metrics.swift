@@ -5,8 +5,8 @@
 //  Usage events sent to the Dock Finder team's Google Sheet, so the team
 //  can measure how riders use the app and what it saves them. Only sent
 //  when the rider chose to share (UsageSharing). Each event carries a
-//  random per-install ID (never a name or Apple ID), the rider's location
-//  at the time, and the docks involved.
+//  random per-install ID (not an Apple ID), the name the rider chose to
+//  give, if any, the rider's location at the time, and the docks involved.
 //
 //  The sheet's address comes from `DOCKFINDER_METRICS_URL` in the
 //  gitignored Local.xcconfig (see metrics/README.md). Without it, nothing
@@ -31,6 +31,24 @@ nonisolated enum UsageSharing: String, Sendable {
     static func set(_ choice: UsageSharing, in defaults: UserDefaults = .standard) {
         defaults.set(choice.rawValue, forKey: key)
     }
+
+    static let nameKey = "usageName"
+
+    /// What the rider asked to be called in the team's sheet, so testers can
+    /// be told apart. Optional; `nil` when blank.
+    static func name(in defaults: UserDefaults = .standard) -> String? {
+        let name = defaults.string(forKey: nameKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    static func setName(_ name: String, in defaults: UserDefaults = .standard) {
+        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        if trimmed.isEmpty {
+            defaults.removeObject(forKey: nameKey)
+        } else {
+            defaults.set(trimmed, forKey: nameKey)
+        }
+    }
 }
 
 /// One row in the team's sheet.
@@ -47,6 +65,9 @@ nonisolated struct MetricsEvent: Codable, Sendable, Equatable {
     let minutesSaved: Double?
     let dollarsSaved: Double?
     let details: [String: String]
+    /// The rider's chosen name; `nil` if they didn't give one (and in
+    /// events queued by builds before names existed).
+    var userName: String? = nil
 }
 
 final class Metrics {
@@ -78,6 +99,22 @@ final class Metrics {
 
     var queuedCount: Int { queue.count }
 
+    /// Opening the app counts toward the team's Users tab (last opened,
+    /// how often). Coming back within this long is the same visit.
+    static let sameVisit: TimeInterval = 10 * 60
+    private static let lastOpenedKey = "metricsLastOpened"
+
+    /// Called whenever the app comes to the foreground; not for background
+    /// relaunches (rides, arrival alerts), which aren't the rider opening it.
+    func logOpened(now: Date = .now) {
+        if let last = defaults.object(forKey: Self.lastOpenedKey) as? Date,
+           now.timeIntervalSince(last) < Self.sameVisit, now >= last {
+            return
+        }
+        defaults.set(now, forKey: Self.lastOpenedKey)
+        log("app_opened", location: nil)
+    }
+
     /// Records an event, if the rider agreed to share, and sends it soon.
     /// Without a `location`, the latest one iOS has is used.
     func log(
@@ -104,7 +141,8 @@ final class Metrics {
             avoidedStation: avoidedStation,
             minutesSaved: minutesSaved.map { ($0 * 10).rounded() / 10 },
             dollarsSaved: minutesSaved.map { (SavingsModel.dollars(forMinutes: $0) * 100).rounded() / 100 },
-            details: details
+            details: details,
+            userName: UsageSharing.name(in: defaults)
         )
         queue.append(event)
         if queue.count > Self.maxQueued { queue.removeFirst(queue.count - Self.maxQueued) }

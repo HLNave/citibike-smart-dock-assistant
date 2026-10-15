@@ -203,6 +203,26 @@ struct UsageSharingTests {
         #expect(online.queuedCount == 0)
     }
 
+    @Test func aNameIsOptionalAndTidied() {
+        let defaults = defaults()
+        #expect(UsageSharing.name(in: defaults) == nil)
+        UsageSharing.setName("  Dustin ", in: defaults)
+        #expect(UsageSharing.name(in: defaults) == "Dustin")
+        UsageSharing.setName("   ", in: defaults)
+        #expect(UsageSharing.name(in: defaults) == nil)
+    }
+
+    @Test func openingAgainSoonIsTheSameVisit() {
+        let defaults = defaults()
+        UsageSharing.set(.granted, in: defaults)
+        let metrics = Metrics(defaults: defaults, endpoint: nil)
+        metrics.logOpened(now: referenceNow)
+        metrics.logOpened(now: referenceNow.addingTimeInterval(60))
+        #expect(metrics.queuedCount == 1)
+        metrics.logOpened(now: referenceNow.addingTimeInterval(Metrics.sameVisit + 1))
+        #expect(metrics.queuedCount == 2)
+    }
+
     @Test(arguments: [
         ("script.google.com/macros/s/abc/exec", "https://script.google.com/macros/s/abc/exec"),
         ("https://script.google.com/macros/s/abc/exec", "https://script.google.com/macros/s/abc/exec"),

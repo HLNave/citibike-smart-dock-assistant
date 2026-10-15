@@ -11,6 +11,7 @@ struct DockFinderApp: App {
     @State private var onboarding = OnboardingState()
     @State private var savedPlaces = SavedPlacesStore.shared
     @State private var rides = RideTracker.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
@@ -23,12 +24,9 @@ struct DockFinderApp: App {
         SavedPlacesStore.refreshSiriPhrases()
         // Same for arriving at a saved place without a ride.
         Task { await PlaceArrivalMonitor.shared.sync() }
-        // Usage events (only if the rider agreed to share), and anything
-        // that couldn't be sent last time.
-        Task {
-            Metrics.shared.log("app_launch")
-            await Metrics.shared.flush()
-        }
+        // Usage events that couldn't be sent last time. (Opening the app
+        // is logged when it comes to the foreground, below.)
+        Task { await Metrics.shared.flush() }
     }
 
     var body: some Scene {
@@ -43,6 +41,12 @@ struct DockFinderApp: App {
             .environment(onboarding)
             .environment(savedPlaces)
             .environment(rides)
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            // For the team's Users tab: last opened, and how often riders come back.
+            if phase == .active {
+                Metrics.shared.logOpened()
+            }
         }
     }
 }

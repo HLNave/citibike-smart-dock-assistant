@@ -4,7 +4,8 @@
   Apple's privacy manifest: what Dock Finder collects and why. It matches
   the usage-sharing question riders answer at onboarding (Views/PrivacyViews.swift).
   Collected only when the rider chooses to share; tied to a random install
-  ID, not to their identity; never used for tracking or ads.
+  ID, and to a name only if the rider types one in (so that is "linked");
+  never used for tracking or ads.
 -->
 <plist version="1.0">
 <dict>
@@ -14,6 +15,18 @@
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
