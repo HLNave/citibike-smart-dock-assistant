@@ -103,6 +103,11 @@ struct HomeView: View {
         .sheet(isPresented: $showsAddPlace) {
             AddPlaceView()
         }
+        .task {
+            // For riders who finished onboarding before arrival alerts
+            // existed. iOS only ever shows this once.
+            await MotionCheck.requestPermission()
+        }
     }
 }
 
