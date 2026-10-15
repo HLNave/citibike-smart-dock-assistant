@@ -60,7 +60,7 @@ Whenever Siri tells you about a dock (Find Dock, Check Station, your saved place
 | **Check my *school* dock with Dock Finder** (any saved place's name) | Your usual dock there; if it's full, your backup, then the nearest other station with room |
 | **Check a station with Dock Finder**<br>also: *Is a station full in Dock Finder* | Asks "Which station?", then says how many docks and bikes it has, and where to go if it's full |
 | **Citi Bike status in Dock Finder**<br>also: *Check Citi Bike citywide with Dock Finder* | Citywide bikes, open docks and full stations |
-| **Ask Dock Finder**<br>also: *Talk to Dock Finder* | Asks "What do you need?", then takes anything in your own words (below) |
+| **Ask Dock Finder**<br>also: *Talk to Dock Finder*, *Ask Dock Finder a question*, *Ask Dock Finder something*, *I have a question for Dock Finder* | Asks "What do you need?", then takes anything in your own words (below) |
 | **Direct me with Dock Finder**<br>also: *Guide me to a dock with…*, *Get directions with Dock Finder* | Turn-by-turn directions to the dock you were just told about, or the nearest dock with room |
 | **Stop directions with Dock Finder**<br>also: *Cancel directions with…*, *Stop guiding with Dock Finder* | Stops turn-by-turn directions (during a ride, before you arrive, it turns off guidance for that ride) |
 
@@ -87,7 +87,8 @@ Anything else goes to the n8n server, if the app was built with one. Without a s
 - **Don't say "run Dock Finder" or "open Dock Finder"** if the app is installed. Siri treats a launch verb plus the app's name as "open the app", which needs the phone unlocked.
 - **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
-- **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" works as the app name.
+- **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder" and "Dog Finder" work as the app name.
+- **If "Ask Dock Finder" doesn't reach the app** (Siri searches the web or answers by itself), say the longer **"Ask Dock Finder a question"**. Siri treats a bare "Ask …" as a general question and sometimes keeps it.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
 - **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
 - **Installing a new build:** just press ⌘R in Xcode over the installed app. Deleting it first means trusting the developer again on the phone (iOS forgets that trust when none of your apps are left) and granting location again.

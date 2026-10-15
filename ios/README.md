@@ -29,7 +29,7 @@ More phrases:
 - "Check my school dock with Dock Finder" (your usual dock's status right now; works with any saved place's name)
 - "Check a station with Dock Finder" (also "is a station full in Dock Finder") → Siri asks which station
 - "Citi Bike status in Dock Finder" (also "check Citi Bike citywide with Dock Finder") for citywide totals
-- **"Ask Dock Finder"** (also "talk to Dock Finder") → "What do you need?" → anything in your own words: "is Mercer and Bleecker full?", "find a dock near Union Square", "how many bikes are out?", "start a ride to school", "end my ride", "my school dock is Court and State", "save this spot as gym". Requests it can't answer on the phone go to the n8n server if one is configured.
+- **"Ask Dock Finder"** (also "talk to Dock Finder", "ask Dock Finder a question", "ask Dock Finder something", "I have a question for Dock Finder"; the longer ones are more reliable, since Siri sometimes claims a bare "Ask …" as a general question) → "What do you need?" → anything in your own words: "is Mercer and Bleecker full?", "find a dock near Union Square", "how many bikes are out?", "start a ride to school", "end my ride", "my school dock is Court and State", "save this spot as gym". Requests it can't answer on the phone go to the n8n server if one is configured.
 
 The [root README](../README.md#what-to-say-to-siri) has the complete phrase list and everything "Ask Dock Finder" understands. Keep it in sync when phrases change.
 

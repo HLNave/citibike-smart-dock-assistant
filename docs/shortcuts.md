@@ -330,7 +330,7 @@ Not needed for the shared shortcuts above. Listed so everyone knows which phrase
 
 | Shortcuts action | Siri phrases |
 |---|---|
-| Ask Dock Finder | “Ask Dock Finder”; “Talk to Dock Finder” |
+| Ask Dock Finder | “Ask Dock Finder”; “Talk to Dock Finder”; “Ask Dock Finder a question”; “Ask Dock Finder something”; “I have a question for Dock Finder” |
 | Start Ride | “Start a ride with Dock Finder”; “Begin a ride with Dock Finder”; “Start riding with Dock Finder”; “New ride with Dock Finder” |
 | End Ride | “End my ride with Dock Finder”; “Cancel my ride with Dock Finder” |
 | Find Dock | “Find a dock with Dock Finder”; “Find me a dock with Dock Finder”; “Find a dock in Dock Finder”; “Find an available dock with Dock Finder”; “Find an open dock with Dock Finder”; “Find the nearest dock with Dock Finder”; “Find a dock near me with Dock Finder”; “Nearest dock in Dock Finder” |

@@ -41,6 +41,12 @@
 			<key>INAlternativeAppNamePronunciationHint</key>
 			<string>docks finder</string>
 		</dict>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Dog Finder</string>
+			<key>INAlternativeAppNamePronunciationHint</key>
+			<string>dock finder</string>
+		</dict>
 	</array>
 </dict>
 </plist>

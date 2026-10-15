@@ -25,9 +25,15 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: AskDockFinderIntent(),
+            // "Ask <app>" alone is short and generic, and Siri often claims
+            // "Ask …" as a general question before checking apps. The longer
+            // variants give it more to match on.
             phrases: [
                 "Ask \(.applicationName)",
                 "Talk to \(.applicationName)",
+                "Ask \(.applicationName) a question",
+                "Ask \(.applicationName) something",
+                "I have a question for \(.applicationName)",
             ],
             shortTitle: "Ask Dock Finder",
             systemImageName: "bubble.left"
