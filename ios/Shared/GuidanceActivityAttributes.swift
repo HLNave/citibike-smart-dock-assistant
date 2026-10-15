@@ -19,6 +19,8 @@ nonisolated struct GuidanceActivityAttributes: ActivityAttributes {
             case guiding
             /// At the dock, or the ride's arrival answer when not guiding.
             case arrived
+            /// Ask Dock Finder by Voice is listening for a question.
+            case listening
         }
 
         var phase: Phase

@@ -29,6 +29,11 @@ final class DockFinderLiveActivity {
         activity = Activity<GuidanceActivityAttributes>.activities.first { $0.activityState == .active }
     }
 
+    /// True while a ride, directions or voice question activity is showing.
+    var isShowing: Bool {
+        activity?.activityState == .active
+    }
+
     /// Shows `state`, starting an activity if none is running. Fails
     /// quietly when Live Activities are off or can't be started right now.
     func show(destination: String, state: State) async {
@@ -99,6 +104,18 @@ extension GuidanceActivityAttributes.ContentState {
             dockName: progress.route.station.spokenName,
             docksOpen: docksOpen,
             symbol: maneuverSymbol(for: instruction)
+        )
+    }
+
+    /// While Ask Dock Finder by Voice is listening for a question.
+    nonisolated static func listening(_ prompt: String) -> Self {
+        Self(
+            phase: .listening,
+            headline: "Listening…",
+            detail: prompt,
+            dockName: nil,
+            docksOpen: nil,
+            symbol: "waveform"
         )
     }
 

@@ -85,6 +85,8 @@ struct GuidanceLiveActivity: Widget {
             return "Riding"
         case .arrived:
             return state.docksOpen.map { "\($0) docks" } ?? "Dock"
+        case .listening:
+            return "Listening"
         }
     }
 }

@@ -73,6 +73,7 @@ Every answer is one sentence. Siri speaks it and the app shows it.
 | `biker-app/Services/AssistantBackend.swift` | n8n Siri webhook client |
 | `biker-app/Models/Ride.swift`, `biker-app/Services/RideTracker.swift` | Rides: the arrival rules, and background tracking (live location + a geofence) |
 | `biker-app/Services/Announcer.swift` | Speaks the arrival answer (ducking other audio) and posts it as a notification |
+| `Shared/AskByVoiceIntent.swift`, `DockFinderWidgets/AskDockFinderControl.swift`, `biker-app/Services/VoiceAsk.swift` | The Ask Dock Finder control (Action Button, Lock Screen, Control Center): an `AudioRecordingIntent` that asks "What do you need?", listens with on-device speech recognition until the rider pauses, answers out loud, and listens for yes or no to directions. The intent is compiled into the widget extension too (the control needs the type there; `WIDGET_EXTENSION` skips the app-only call) but runs in the app |
 | `biker-app/Models/Guidance.swift` | Directions rules: the route, where the rider is along it, what to say when, and mid-ride dock checks |
 | `biker-app/Services/GuidanceSession.swift` | Runs directions: Apple cycling routes, background location, spoken turns, re-routing, dock re-checks |
 | `biker-app/Services/DockFinderLiveActivity.swift` | Starts, updates and ends the ride / directions Live Activity |
@@ -192,6 +193,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Fresh install → Welcome screen → button shows the While Using location prompt, then straight away "Change to Always Allow" → Siri instructions screen.
 - [ ] Add a place, delete the app, reinstall from Xcode: the place (with its usual dock) is back.
 - [ ] Onboarding asks for Motion & Fitness after the two location prompts, then asks whether to share usage data. An existing install is asked once on the home screen instead.
+- [ ] **Ask Dock Finder button:** after **Allow Microphone & Speech** on the Siri screen, Ask Dock Finder appears under Settings → Action Button → Controls, in Control Center's control gallery, and as a Lock Screen button. Pressing it with the phone locked shows "Listening…" on the Lock Screen, asks "What do you need?", and answers "is Mercer and Bleecker full?" out loud; for a dock, "yes" to "Want me to direct you there?" starts directions and "no" ends with "Okay." Saying nothing gives "Sorry, I didn't catch that." With music playing, it ducks and resumes. Without the permissions, it says to open Dock Finder.
 - [ ] With sharing on and `DOCKFINDER_METRICS_URL` set, rows appear in the sheet's Events tab within a few seconds of using the app (`app_launch`, `siri_answer`, …). With sharing off, nothing new appears; turning it back on under **Privacy** resumes.
 - [ ] Getting steered away from a full dock (e.g. "Your usual dock is full. Go to…") adds a `full_dock_avoided` row and moves the home screen's **Savings** card off the "typical commuter" estimate.
 - [ ] A Siri dock answer adds a `hands_free_check` row and one to "times you didn't take out your phone"; saying "yes" to directions right after doesn't add a second one.

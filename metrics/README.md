@@ -34,7 +34,7 @@ When a rider agrees to share usage data (asked once in the app; changeable under
 | `details` | Extra fields as JSON: the spoken answer, Siri intent, destination, etc. |
 | `event_id` | Unique per event, for spotting duplicates if a send was retried |
 
-Events: `app_launch`, `sharing_turned_on`, `siri_answer`, `app_answer`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
+Events: `app_launch`, `sharing_turned_on`, `siri_answer`, `app_answer`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`, `voice_question` (the words asked with the Ask Dock Finder button), `voice_answer`.
 
 ## Savings numbers
 

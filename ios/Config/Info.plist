@@ -11,6 +11,10 @@
 	<!-- The Lock Screen / Dynamic Island view of a ride and of directions to a dock. -->
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>When you press the Ask Dock Finder button (on the Action Button, Lock Screen or Control Center), Dock Finder listens for your question.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dock Finder turns your spoken question into text on your iPhone to answer it.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Dock Finder checks whether you're biking, so it only tells you where to dock when you ride up to a saved place, not when you walk or take the subway.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
