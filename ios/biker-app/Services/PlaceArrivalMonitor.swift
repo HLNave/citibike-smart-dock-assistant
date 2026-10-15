@@ -117,7 +117,7 @@ final class PlaceArrivalMonitor {
             SavingsStore.shared.recordHandsFree(context: "place_arrival")
             if let station = answer.station {
                 GuidanceSession.shared.offer(station)
-                text += " For directions, say: Hey Siri, direct me with Dock Finder."
+                text += " For directions, say: Hey Siri, ask Dock Finder to direct me."
             }
         } catch let error as DockFinderError {
             text = String(localized: error.localizedStringResource)

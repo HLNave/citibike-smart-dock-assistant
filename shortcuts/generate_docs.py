@@ -215,7 +215,7 @@ def app_section():
         return out + ["Couldn't read the phrases from the app source.", ""]
     out += ["| Shortcuts action | Siri phrases |", "|---|---|"]
     for intent, phrases in blocks:
-        said = [p.replace("\\(.applicationName)", "Dock Finder").replace("\\(\\.$place)", "<place>")
+        said = [p.replace("\\(.applicationName)", "Dock Finder").replace("\\(\\.$place)", "<place>").replace("\\(\\.$station)", "<station>")
                 for p in re.findall(r'"((?:[^"\\]|\\.)*)"', phrases)]
         out.append(f"| {titles.get(intent, intent)} | {cell('; '.join(f'“{s}”' for s in said))} |")
     return out + [""]

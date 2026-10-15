@@ -184,7 +184,7 @@ struct RideRouterTests {
     @Test func savingWhereYouAreByVoice() async throws {
         let store = testStore()
         let answer = try await router(store: store, rides: RideSpy()).answer("save this spot as gym")
-        #expect(answer.text == "Saved this spot as gym. Next time, say start a ride to gym.")
+        #expect(answer.text == "Saved this spot as gym. Next time, ask Dock Finder to start a ride to gym.")
         #expect(store.places.first?.name == "Gym")
         #expect(store.places.first?.latitude == farFromEverything.coordinate.latitude)
 
@@ -327,7 +327,7 @@ struct SavedPlaceRobustnessTests {
     }
 }
 
-// MARK: - "Start a ride with Dock Finder" → "Where are you heading?"
+// MARK: - "Ask Dock Finder to start a ride" → "Where are you heading?"
 
 struct HeadingAnswerTests {
     @Test(arguments: [

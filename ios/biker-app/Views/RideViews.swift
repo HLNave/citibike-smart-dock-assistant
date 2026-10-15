@@ -210,7 +210,7 @@ struct StartRideView: View {
                     Toggle("Guide me to the dock when I'm close", isOn: $guidesToDock)
                     AlwaysLocationNotice()
                 } footer: {
-                    Text("Hands-free: “Hey Siri, start a ride with Dock Finder”, then say where you're heading.")
+                    Text("Hands-free: “Hey Siri, ask Dock Finder to start a ride to school” (any saved place), or “…to start a ride” and then say where you're heading.")
                 }
             }
             .navigationTitle("Start a Ride")

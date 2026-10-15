@@ -168,7 +168,7 @@ extension FindDockNearSavedPlaceIntent {
             return "You don't have any saved places yet. Add one in Dock Finder."
         }
         let names = places.map(\.name).formatted(.list(type: .and))
-        return "Your saved places are \(names). Say, for example, check my \(first.name.lowercased()) dock with Dock Finder."
+        return "Your saved places are \(names). Say, for example, ask Dock Finder to check my \(first.name.lowercased()) dock."
     }
 }
 
@@ -200,21 +200,49 @@ struct CheckStationIntent: LiveActivityIntent {
     )
     static let supportedModes: IntentModes = .background
 
-    /// Plain text rather than a station entity, so Siri accepts whatever
-    /// the rider says once and the app does the fuzzy matching. An entity
-    /// parameter makes Siri re-ask when it can't resolve the answer.
-    @Parameter(title: "Station", requestValueDialog: "Which station?")
-    var station: String
+    /// Filled straight from the phrase ("…check Mercer and Bleecker") for
+    /// the stations Siri knows about (see `StationQuery.suggestedEntities`).
+    /// Optional, so Siri never re-asks when it can't match a station.
+    @Parameter(title: "Station")
+    var station: StationEntity?
+
+    /// Asked for when the phrase didn't name a station Siri knows. Plain
+    /// text, so Siri accepts whatever the rider says once and the app does
+    /// the fuzzy matching.
+    @Parameter(title: "Station Name")
+    var stationName: String?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Check \(\.$station)")
+        Summary("Check \(\.$station)") {
+            \.$stationName
+        }
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let answer = try await AssistantRouter.live().handle(.station(KeywordRequestParser.normalize(station)))
+        let spoken: String
+        if let station {
+            spoken = station.name
+        } else if let stationName, !stationName.isEmpty {
+            spoken = stationName
+        } else {
+            spoken = try await $stationName.requestValue("Which station?") ?? ""
+        }
+        guard !spoken.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return try await reply(with: DockAnswer(text: Self.whichStationHelp))
+        }
+        let answer = try await AssistantRouter.live().handle(.station(KeywordRequestParser.normalize(spoken)))
+        // A full station's answer names the alternative; the one asked about is `avoided`.
+        if let id = answer.avoided?.id ?? answer.station?.id,
+           let name = answer.avoided?.name ?? answer.station?.name {
+            RecentStations.shared.add(id: id, name: name)
+        }
         return try await reply(with: answer)
     }
+}
+
+extension CheckStationIntent {
+    static let whichStationHelp = "Say which station, for example, ask Dock Finder to check Mercer and Bleecker."
 }
 
 struct CitywideStatusIntent: AppIntent {
@@ -257,28 +285,44 @@ struct SetUsualDockIntent: AppIntent {
     }
 }
 
-/// The main Siri flow: "Hey Siri, start a ride with Dock Finder" → "Where
-/// are you heading?" → "school" / "Union Square". Siri only has to match
-/// that one phrase; the destination reaches the app as plain text, so Siri
-/// can't mistake it for a Maps search.
+/// The main Siri flow: "Hey Siri, ask Dock Finder to start a ride to
+/// school", in one go for a saved place. "…to start a ride" on its own asks
+/// "Where are you heading?", and the answer (a saved place, landmark or
+/// address) reaches the app as plain text, so Siri can't mistake it for a
+/// Maps search.
 struct StartRideIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Start Ride"
     static let description = IntentDescription(
-        "Asks where you're heading, then tells you where to dock when you're close. The destination can be a saved place or anywhere Apple Maps finds. Works with your phone locked when Dock Finder has Always location access."
+        "Tells you where to dock when you're close to where you're heading. The destination can be a saved place or anywhere Apple Maps finds. Works with your phone locked when Dock Finder has Always location access."
     )
     static let supportedModes: IntentModes = .background
 
-    @Parameter(title: "Destination", requestValueDialog: "Where are you heading?")
-    var destination: String
+    /// Filled straight from the phrase ("…start a ride to school"). Optional,
+    /// so Siri never re-asks when it can't match a saved place.
+    @Parameter(title: "Saved Place")
+    var place: SavedPlaceEntity?
+
+    @Parameter(title: "Destination")
+    var destination: String?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Start a ride to \(\.$destination)")
+        Summary("Start a ride to \(\.$destination)") {
+            \.$place
+        }
     }
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
         let rideBefore = RideTracker.shared.currentRide
-        let answer = try await AssistantRouter.live().handle(.startRide(destination))
+        let spoken: String
+        if let place {
+            spoken = place.name
+        } else if let destination, !destination.isEmpty {
+            spoken = destination
+        } else {
+            spoken = try await $destination.requestValue("Where are you heading?") ?? ""
+        }
+        let answer = try await AssistantRouter.live().handle(.startRide(spoken))
         return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
     }
 }
@@ -294,29 +338,7 @@ struct EndRideIntent: AppIntent {
     }
 }
 
-/// "Hey Siri, ask Dock Finder" → "What do you need?" → anything in your own
-/// words: a station check, citywide totals, a usual-dock setting, or a
-/// question only the server can answer. Rides and the nearest dock have
-/// their own one-step phrases.
-struct AskDockFinderIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Ask Dock Finder"
-    static let description = IntentDescription(
-        "Ask anything in your own words, like whether a station is full or how many bikes are out. Dock Finder answers on your iPhone when it can, and asks the Dock Finder server otherwise."
-    )
-    static let supportedModes: IntentModes = .background
-
-    @Parameter(title: "Request", requestValueDialog: "What do you need?")
-    var request: String
-
-    @MainActor
-    func perform() async throws -> some SpokenAnswerResult {
-        let rideBefore = RideTracker.shared.currentRide
-        let answer = try await AssistantRouter.live().answer(request)
-        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
-    }
-}
-
-/// "Hey Siri, direct me with Dock Finder": turn-by-turn guidance to the
+/// "Hey Siri, ask Dock Finder to direct me": turn-by-turn guidance to the
 /// dock Siri just mentioned, or to the nearest dock with room. Also the
 /// fallback if a yes/no follow-up ever doesn't get through.
 struct DirectMeIntent: LiveActivityIntent {

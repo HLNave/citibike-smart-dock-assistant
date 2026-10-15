@@ -330,15 +330,15 @@ Not needed for the shared shortcuts above. Listed so everyone knows which phrase
 
 | Shortcuts action | Siri phrases |
 |---|---|
-| Ask Dock Finder | “Ask Dock Finder”; “Talk to Dock Finder”; “Ask Dock Finder a question”; “Ask Dock Finder something”; “I have a question for Dock Finder” |
-| Start Ride | “Start a ride with Dock Finder”; “Begin a ride with Dock Finder”; “Start riding with Dock Finder”; “New ride with Dock Finder” |
-| End Ride | “End my ride with Dock Finder”; “Cancel my ride with Dock Finder” |
-| Find Dock | “Find a dock with Dock Finder”; “Find me a dock with Dock Finder”; “Find a dock in Dock Finder”; “Find an available dock with Dock Finder”; “Find an open dock with Dock Finder”; “Find the nearest dock with Dock Finder”; “Find a dock near me with Dock Finder”; “Nearest dock in Dock Finder” |
-| Find Dock Near Saved Place | “Check my <place> dock with Dock Finder” |
-| Check Station | “Check a station with Dock Finder”; “Is a station full in Dock Finder” |
-| Citywide Status | “Citi Bike status in Dock Finder”; “Check Citi Bike citywide with Dock Finder” |
-| Stop Directions | “Stop directions with Dock Finder”; “Cancel directions with Dock Finder”; “Stop guiding with Dock Finder” |
-| Direct Me to a Dock | “Direct me with Dock Finder”; “Guide me to a dock with Dock Finder”; “Get directions with Dock Finder” |
+| Start Ride | “Ask Dock Finder to start a ride to <place>”; “Ask Dock Finder to start riding to <place>”; “Ask Dock Finder to begin a ride to <place>”; “Ask Dock Finder to start a ride”; “Ask Dock Finder to begin a ride”; “Ask Dock Finder to start riding” |
+| End Ride | “Ask Dock Finder to end my ride”; “Ask Dock Finder to cancel my ride”; “Ask Dock Finder to stop my ride” |
+| Find Dock | “Ask Dock Finder to find a dock”; “Ask Dock Finder to find me a dock”; “Ask Dock Finder to find a dock near me”; “Ask Dock Finder to find an open dock”; “Ask Dock Finder to find the nearest dock”; “Ask Dock Finder for a dock”; “Ask Dock Finder for the nearest dock” |
+| Find Dock Near Saved Place | “Ask Dock Finder to check my <place> dock”; “Ask Dock Finder to find a dock near <place>”; “Ask Dock Finder to find a dock at <place>”; “Ask Dock Finder for a dock near <place>” |
+| Find Dock Near a Place | “Ask Dock Finder to find a dock somewhere else”; “Ask Dock Finder for a dock somewhere else” |
+| Check Station | “Ask Dock Finder to check <station>”; “Ask Dock Finder if <station> is full”; “Ask Dock Finder about <station>”; “Ask Dock Finder to check a station”; “Ask Dock Finder if a station is full” |
+| Citywide Status | “Ask Dock Finder for Citi Bike status”; “Ask Dock Finder how many bikes are out”; “Ask Dock Finder to check Citi Bike citywide” |
+| Direct Me to a Dock | “Ask Dock Finder to direct me”; “Ask Dock Finder to direct me there”; “Ask Dock Finder to take me there”; “Ask Dock Finder to guide me to a dock”; “Ask Dock Finder for directions” |
+| Stop Directions | “Ask Dock Finder to stop directions”; “Ask Dock Finder to cancel directions”; “Ask Dock Finder to stop guiding me” |
 
 <!-- generated:end -->
 

@@ -2,10 +2,10 @@
 //  SiriPhraseTests.swift
 //  DockFinderTests
 //
-//  Guards the Siri phrase list. iOS remembers which phrase belongs to which
-//  position in DockFinderShortcutsProvider and doesn't always re-read it on
-//  update; reordering once made "start a ride" run Find Dock and "find a
-//  dock" ask "Which place?" forever.
+//  Guards the Siri phrase list: every phrase is "Ask Dock Finder …", and
+//  iOS remembers which phrase belongs to which position in
+//  DockFinderShortcutsProvider and doesn't always re-read it on update;
+//  reordering once made "start a ride" run Find Dock.
 //
 
 import Foundation
@@ -15,15 +15,15 @@ import Testing
 struct SiriPhraseTests {
     /// The order phones already know. Append new shortcuts after these.
     static let knownOrder = [
-        "AskDockFinderIntent",
         "StartRideIntent",
         "EndRideIntent",
         "FindDockIntent",
         "FindDockNearSavedPlaceIntent",
+        "FindDockNearPlaceIntent",
         "CheckStationIntent",
         "CitywideStatusIntent",
-        "StopDirectionsIntent",
         "DirectMeIntent",
+        "StopDirectionsIntent",
     ]
 
     /// The App Shortcuts metadata Xcode extracts into the app bundle.
@@ -48,19 +48,21 @@ struct SiriPhraseTests {
         )
     }
 
-    @Test func onlyFindDockStartsWithFindADock() throws {
-        let owners = try shortcuts()
-            .filter { $0.phrases.contains { $0.lowercased().hasPrefix("find a dock") } }
-            .map(\.intent)
-        #expect(owners == ["FindDockIntent"], "Another \"find a dock…\" phrase can steal \"Find a dock with Dock Finder\".")
+    @Test func everyPhraseIsAskDockFinderAndARequest() throws {
+        let phrases = try shortcuts().flatMap(\.phrases)
+        #expect(!phrases.isEmpty)
+        for phrase in phrases {
+            #expect(phrase.hasPrefix("Ask ${applicationName} "), "\(phrase) should start with \"Ask Dock Finder\"")
+        }
+        // A bare "Ask Dock Finder" could win on the shared opening and drop the request.
+        #expect(!phrases.contains("Ask ${applicationName}"))
     }
 
-    @Test func noPhraseIsJustALaunchVerb() throws {
-        // "Run/open/start/launch Dock Finder" opens the app instead of running an action.
-        let launchOnly = try shortcuts().flatMap(\.phrases).filter { phrase in
-            ["run", "open", "start", "launch"].contains { phrase == "\($0.capitalized) ${applicationName}" }
-        }
-        #expect(launchOnly.isEmpty)
+    @Test func onlyFindDockFindsADockWithoutAPlace() throws {
+        let owners = try shortcuts()
+            .filter { $0.phrases.contains { $0.lowercased().hasSuffix(" to find a dock") } }
+            .map(\.intent)
+        #expect(owners == ["FindDockIntent"], "Another plain \"find a dock\" phrase can steal Find Dock's requests.")
     }
 }
 
@@ -72,6 +74,28 @@ struct SavedPlaceShortcutTests {
             SavedPlace(name: "School", latitude: 0, longitude: 0),
             SavedPlace(name: "Work", latitude: 0, longitude: 0),
         ]
-        #expect(FindDockNearSavedPlaceIntent.whichPlaceHelp(places) == "Your saved places are School and Work. Say, for example, check my school dock with Dock Finder.")
+        #expect(FindDockNearSavedPlaceIntent.whichPlaceHelp(places) == "Your saved places are School and Work. Say, for example, ask Dock Finder to check my school dock.")
+    }
+}
+
+@MainActor
+struct RecentStationsTests {
+    @Test func newestFirstWithoutRepeatsAndKept() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let recent = RecentStations(defaults: defaults)
+        recent.add(id: "a", name: "Mercer St & Bleecker St")
+        recent.add(id: "b", name: "Court St & State St")
+        recent.add(id: "a", name: "Mercer St & Bleecker St")
+        #expect(recent.stations.map(\.id) == ["a", "b"])
+        #expect(RecentStations(defaults: defaults).stations.map(\.id) == ["a", "b"])
+    }
+
+    @Test func onlyTheLatestAreKept() {
+        let recent = RecentStations(defaults: UserDefaults(suiteName: "test-\(UUID())")!)
+        for index in 0..<(RecentStations.limit + 5) {
+            recent.add(id: "\(index)", name: "Station \(index)")
+        }
+        #expect(recent.stations.count == RecentStations.limit)
+        #expect(recent.stations.first?.id == "\(RecentStations.limit + 4)")
     }
 }

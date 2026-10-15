@@ -4,47 +4,38 @@
 //
 //  App Shortcuts are registered with the system automatically at install
 //  time; nothing in the app needs to "enable" them. Phrases that mention a
-//  saved place are refreshed whenever saved places change.
+//  saved place or a station are refreshed whenever those lists change.
 //
 
 import AppIntents
 
 struct DockFinderShortcutsProvider: AppShortcutsProvider {
+    /// Every phrase is "Ask Dock Finder to/for/if/how …" and says the whole
+    /// request in one go. There's deliberately no bare "Ask Dock Finder":
+    /// Siri could match it on the shared opening and drop the rest.
+    ///
     /// **Never reorder or remove these; only append.** iOS remembers which
     /// phrase belongs to which position in this list and doesn't always
-    /// re-read it when the app is updated, so reordering made "start a ride"
-    /// run Find Dock and "find a dock" run the saved-place shortcut. If the
-    /// list ever has to change shape, also bump `CURRENT_PROJECT_VERSION` in
-    /// `Config/DockFinder.xcconfig`, which makes iOS re-read it.
+    /// re-read it when the app is updated, so reordering once made "start a
+    /// ride" run Find Dock. If the list ever has to change shape, also bump
+    /// `CURRENT_PROJECT_VERSION` in `Config/DockFinder.xcconfig`, which makes
+    /// iOS re-read it.
     ///
-    /// Only Find Dock may use phrases that start with "find a dock". Siri
-    /// matches phrases loosely, so any other "find a dock near/at …" phrase
-    /// can win instead and ask a follow-up question. ("Run/start Dock
-    /// Finder" can't be used at all: Siri treats a launch verb plus the
-    /// app's name as "open the app", which needs an unlock.)
+    /// Siri matches phrases loosely, so keep each action's wording clearly
+    /// different from the others' (only Find Dock may say "find a dock"
+    /// without a saved place after it). Siri can only fill a blank from a
+    /// list the app gives it (saved places, stations); free text such as an
+    /// address can't be part of a phrase, so those actions ask for it.
     static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: AskDockFinderIntent(),
-            // "Ask <app>" alone is short and generic, and Siri often claims
-            // "Ask …" as a general question before checking apps. The longer
-            // variants give it more to match on.
-            phrases: [
-                "Ask \(.applicationName)",
-                "Talk to \(.applicationName)",
-                "Ask \(.applicationName) a question",
-                "Ask \(.applicationName) something",
-                "I have a question for \(.applicationName)",
-            ],
-            shortTitle: "Ask Dock Finder",
-            systemImageName: "bubble.left"
-        )
         AppShortcut(
             intent: StartRideIntent(),
             phrases: [
-                "Start a ride with \(.applicationName)",
-                "Begin a ride with \(.applicationName)",
-                "Start riding with \(.applicationName)",
-                "New ride with \(.applicationName)",
+                "Ask \(.applicationName) to start a ride to \(\.$place)",
+                "Ask \(.applicationName) to start riding to \(\.$place)",
+                "Ask \(.applicationName) to begin a ride to \(\.$place)",
+                "Ask \(.applicationName) to start a ride",
+                "Ask \(.applicationName) to begin a ride",
+                "Ask \(.applicationName) to start riding",
             ],
             shortTitle: "Start Ride",
             systemImageName: "figure.outdoor.cycle"
@@ -52,8 +43,9 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: EndRideIntent(),
             phrases: [
-                "End my ride with \(.applicationName)",
-                "Cancel my ride with \(.applicationName)",
+                "Ask \(.applicationName) to end my ride",
+                "Ask \(.applicationName) to cancel my ride",
+                "Ask \(.applicationName) to stop my ride",
             ],
             shortTitle: "End Ride",
             systemImageName: "flag.checkered"
@@ -61,33 +53,45 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: FindDockIntent(),
             phrases: [
-                "Find a dock with \(.applicationName)",
-                "Find me a dock with \(.applicationName)",
-                "Find a dock in \(.applicationName)",
-                "Find an available dock with \(.applicationName)",
-                "Find an open dock with \(.applicationName)",
-                "Find the nearest dock with \(.applicationName)",
-                "Find a dock near me with \(.applicationName)",
-                "Nearest dock in \(.applicationName)",
+                "Ask \(.applicationName) to find a dock",
+                "Ask \(.applicationName) to find me a dock",
+                "Ask \(.applicationName) to find a dock near me",
+                "Ask \(.applicationName) to find an open dock",
+                "Ask \(.applicationName) to find the nearest dock",
+                "Ask \(.applicationName) for a dock",
+                "Ask \(.applicationName) for the nearest dock",
             ],
             shortTitle: "Find Dock",
             systemImageName: "bicycle"
         )
-        // Find Dock Near a Place has no Siri phrase on purpose (see above);
-        // it's still an action in the Shortcuts app.
         AppShortcut(
             intent: FindDockNearSavedPlaceIntent(),
             phrases: [
-                "Check my \(\.$place) dock with \(.applicationName)",
+                "Ask \(.applicationName) to check my \(\.$place) dock",
+                "Ask \(.applicationName) to find a dock near \(\.$place)",
+                "Ask \(.applicationName) to find a dock at \(\.$place)",
+                "Ask \(.applicationName) for a dock near \(\.$place)",
             ],
             shortTitle: "Dock Near Saved Place",
             systemImageName: "star"
         )
         AppShortcut(
+            intent: FindDockNearPlaceIntent(),
+            phrases: [
+                "Ask \(.applicationName) to find a dock somewhere else",
+                "Ask \(.applicationName) for a dock somewhere else",
+            ],
+            shortTitle: "Dock Near a Place",
+            systemImageName: "mappin.and.ellipse"
+        )
+        AppShortcut(
             intent: CheckStationIntent(),
             phrases: [
-                "Check a station with \(.applicationName)",
-                "Is a station full in \(.applicationName)",
+                "Ask \(.applicationName) to check \(\.$station)",
+                "Ask \(.applicationName) if \(\.$station) is full",
+                "Ask \(.applicationName) about \(\.$station)",
+                "Ask \(.applicationName) to check a station",
+                "Ask \(.applicationName) if a station is full",
             ],
             shortTitle: "Check Station",
             systemImageName: "parkingsign.circle"
@@ -95,31 +99,34 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: CitywideStatusIntent(),
             phrases: [
-                "Citi Bike status in \(.applicationName)",
-                "Check Citi Bike citywide with \(.applicationName)",
+                "Ask \(.applicationName) for Citi Bike status",
+                "Ask \(.applicationName) how many bikes are out",
+                "Ask \(.applicationName) to check Citi Bike citywide",
             ],
             shortTitle: "Citywide Status",
             systemImageName: "chart.bar"
         )
         AppShortcut(
-            intent: StopDirectionsIntent(),
-            phrases: [
-                "Stop directions with \(.applicationName)",
-                "Cancel directions with \(.applicationName)",
-                "Stop guiding with \(.applicationName)",
-            ],
-            shortTitle: "Stop Directions",
-            systemImageName: "location.slash"
-        )
-        AppShortcut(
             intent: DirectMeIntent(),
             phrases: [
-                "Direct me with \(.applicationName)",
-                "Guide me to a dock with \(.applicationName)",
-                "Get directions with \(.applicationName)",
+                "Ask \(.applicationName) to direct me",
+                "Ask \(.applicationName) to direct me there",
+                "Ask \(.applicationName) to take me there",
+                "Ask \(.applicationName) to guide me to a dock",
+                "Ask \(.applicationName) for directions",
             ],
             shortTitle: "Direct Me",
             systemImageName: "location.north.line"
+        )
+        AppShortcut(
+            intent: StopDirectionsIntent(),
+            phrases: [
+                "Ask \(.applicationName) to stop directions",
+                "Ask \(.applicationName) to cancel directions",
+                "Ask \(.applicationName) to stop guiding me",
+            ],
+            shortTitle: "Stop Directions",
+            systemImageName: "location.slash"
         )
     }
 

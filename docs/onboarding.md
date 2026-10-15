@@ -99,4 +99,4 @@ To share them:
 
 ## Native app (developer preview, for testers with a Mac)
 
-Dustin is building a native **Dock Finder** app (`ios/`) that runs the dock logic on the phone and saves places by name. It isn't on the App Store or TestFlight yet. Installing it needs a Mac with Xcode, and free installs expire every 7 days. If you want to help test it, follow [ios/README.md](../ios/README.md#testing-the-developer-preview-on-your-own-iphone). With the app installed, the Siri phrase changes to "Hey Siri, **ask** Dock Finder" (see that README for current phrases).
+Dustin is building a native **Dock Finder** app (`ios/`) that runs the dock logic on the phone and saves places by name. It isn't on the App Store or TestFlight yet. Installing it needs a Mac with Xcode, and free installs expire every 7 days. If you want to help test it, follow [ios/README.md](../ios/README.md#testing-the-developer-preview-on-your-own-iphone). With the app installed, every Siri phrase starts with "Hey Siri, **ask Dock Finder to** …", like "ask Dock Finder to find a dock" (see that README for current phrases).

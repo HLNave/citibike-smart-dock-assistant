@@ -23,7 +23,7 @@ struct SiriInstructionsView: View {
                         .accessibilityHidden(true)
                     Text("Use Dock Finder with Siri")
                         .font(.title.bold())
-                    Text("Dock Finder is available through Siri and Apple Shortcuts.")
+                    Text("Every request starts with “Ask Dock Finder”, said in one go.")
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
@@ -32,11 +32,9 @@ struct SiriInstructionsView: View {
                     Text("Starting a ride")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    PhraseRow(text: "“Hey Siri, start a ride with Dock Finder.”", systemImage: "mic.fill")
+                    PhraseRow(text: "“Hey Siri, ask Dock Finder to start a ride to school.”", systemImage: "mic.fill")
                         .font(.title3.weight(.semibold))
-                    PhraseRow(text: "Siri asks: “Where are you heading?”", systemImage: "bubble.left.fill")
-                        .foregroundStyle(.secondary)
-                    PhraseRow(text: "Say a saved place (“school”), a landmark (“Union Square”), or an address.", systemImage: "mappin.and.ellipse")
+                    PhraseRow(text: "Works with any saved place. Going somewhere else? Say “…to start a ride”, and when Siri asks “Where are you heading?”, say a landmark (“Union Square”) or an address.", systemImage: "mappin.and.ellipse")
                     Text("As you get close, Dock Finder tells you where to dock, through your headphones, even with your phone locked. Say “yes” when Siri asks “Want me to guide you to the dock when you're close?” to also hear each turn on the way there.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -50,7 +48,7 @@ struct SiriInstructionsView: View {
                     Text("Need a dock right now?")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    PhraseRow(text: "“Hey Siri, find a dock with Dock Finder.”", systemImage: "mic.fill")
+                    PhraseRow(text: "“Hey Siri, ask Dock Finder to find a dock.”", systemImage: "mic.fill")
                         .font(.title3.weight(.semibold))
                     Text("Siri tells you the nearest station that has room, then asks “Want me to direct you there?” Say “yes” to hear each turn through your headphones.")
                         .font(.footnote)
@@ -68,7 +66,7 @@ struct SiriInstructionsView: View {
                         PhraseRow(text: phrase, systemImage: "mic")
                             .font(.subheadline)
                     }
-                    Text("“Ask Dock Finder” takes anything in your own words, like “is Mercer and Bleecker full?” or “my school dock is Court and State”.")
+                    Text("Siri knows your usual and backup docks, the stations near your saved places, and stations you've checked recently by name. For any other station, say “…to check a station” and Siri asks which one. No “Hey Siri”? Hold the side button, or long-press an AirPods stem, and say the same thing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -109,13 +107,14 @@ struct SiriInstructionsView: View {
     }
 
     static let morePhrases = [
-        "“Hey Siri, stop directions with Dock Finder.”",
-        "“Hey Siri, direct me with Dock Finder.”",
-        "“Hey Siri, end my ride with Dock Finder.”",
-        "“Hey Siri, check my school dock with Dock Finder.”",
-        "“Hey Siri, check a station with Dock Finder.”",
-        "“Hey Siri, Citi Bike status in Dock Finder.”",
-        "“Hey Siri, ask Dock Finder.”",
+        "“Ask Dock Finder to check my school dock.”",
+        "“Ask Dock Finder to find a dock near work.”",
+        "“Ask Dock Finder if Mercer and Bleecker is full.”",
+        "“Ask Dock Finder to find a dock somewhere else.”",
+        "“Ask Dock Finder to direct me.”",
+        "“Ask Dock Finder to stop directions.”",
+        "“Ask Dock Finder to end my ride.”",
+        "“Ask Dock Finder how many bikes are out.”",
     ]
 
     private var locationIsUnavailable: Bool {

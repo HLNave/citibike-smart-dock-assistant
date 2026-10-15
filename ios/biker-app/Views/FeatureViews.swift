@@ -104,6 +104,8 @@ struct StationSearchView: View {
                 Section(query.isEmpty ? "Stations" : "Matches") {
                     ForEach(matches, id: \.stationID) { station in
                         Button(station.name) {
+                            // So Siri knows it next time: "Ask Dock Finder to check …".
+                            RecentStations.shared.add(id: station.stationID, name: station.name)
                             Task {
                                 await model.run {
                                     try await DockFinderService.live.checkStation(station.stationID).answer
@@ -227,7 +229,7 @@ struct AskView: View {
             .frame(maxWidth: 500)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle("Ask Dock Finder")
+        .navigationTitle("Ask a Question")
     }
 
     private var routingNote: String {

@@ -77,7 +77,7 @@ struct HomeView: View {
                             HomeRow(title: "Citywide Status", subtitle: "Bikes, open docks, full stations", systemImage: "chart.bar")
                         }
                         NavigationLink(value: HomeRoute.ask) {
-                            HomeRow(title: "Ask Dock Finder", subtitle: "Anything, in your own words", systemImage: "bubble.left")
+                            HomeRow(title: "Ask a Question", subtitle: "Type anything, in your own words", systemImage: "bubble.left")
                         }
                     }
 

@@ -89,7 +89,7 @@ struct AssistantRouter {
         case .station(let spoken):
             if let saved = savedPlaceForDock(spoken) {
                 guard let stationID = saved.usualStationID else {
-                    return DockAnswer(text: "You haven't set a usual dock for \(saved.name) yet. Say, for example, my \(saved.name.lowercased()) dock is Mercer and Bleecker.")
+                    return DockAnswer(text: "You haven't set a usual dock for \(saved.name) yet. Pick one under \(saved.name) in Dock Finder.")
                 }
                 return try await service.checkStation(stationID).answer
             }
@@ -153,7 +153,7 @@ struct AssistantRouter {
     private func startRide(to answer: String) async throws -> DockAnswer {
         let spoken = KeywordRequestParser.destination(from: answer)
         guard !spoken.isEmpty else {
-            return DockAnswer(text: "Where are you heading? Say, for example, start a ride to school.")
+            return DockAnswer(text: "Where are you heading? Say, for example, ask Dock Finder to start a ride to school.")
         }
 
         let ride: Ride
@@ -193,7 +193,7 @@ struct AssistantRouter {
         let address = await placeSearch.address(for: here)
         let displayName = name.prefix(1).uppercased() + name.dropFirst()
         store.add(SavedPlace(name: displayName, latitude: here.coordinate.latitude, longitude: here.coordinate.longitude, address: address))
-        return DockAnswer(text: "Saved this spot as \(name). Next time, say start a ride to \(name).")
+        return DockAnswer(text: "Saved this spot as \(name). Next time, ask Dock Finder to start a ride to \(name).")
     }
 
     // MARK: - Helpers

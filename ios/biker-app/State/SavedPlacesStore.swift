@@ -4,8 +4,8 @@
 //
 //  The rider's regular destinations (school, work, home…): what they call
 //  each one, its usual and backup docks, and how early to warn them on a
-//  ride. Stored on this device only. Siri phrases like "Find a dock near
-//  school with Dock Finder" are built from this list.
+//  ride. Stored on this device only. Siri phrases like "Ask Dock Finder to
+//  find a dock near school" are built from this list.
 //
 
 import AppIntents
