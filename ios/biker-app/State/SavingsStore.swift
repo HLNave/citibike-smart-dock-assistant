@@ -13,7 +13,7 @@ import Observation
 
 @Observable
 final class SavingsStore {
-    static let shared = SavingsStore()
+    static let shared = SavingsStore(metrics: .shared)
 
     nonisolated static let storageKey = "savingsEvents"
 
@@ -22,7 +22,7 @@ final class SavingsStore {
 
     private(set) var events: [SavingsEvent]
 
-    init(defaults: UserDefaults = .standard, metrics: Metrics? = .shared) {
+    init(defaults: UserDefaults = .standard, metrics: Metrics? = nil) {
         self.defaults = defaults
         self.metrics = metrics
         events = defaults.data(forKey: Self.storageKey)

@@ -79,16 +79,19 @@ final class Metrics {
     var queuedCount: Int { queue.count }
 
     /// Records an event, if the rider agreed to share, and sends it soon.
-    /// The rider's location defaults to the latest one iOS has.
+    /// Without a `location`, the latest one iOS has is used.
     func log(
         _ name: String,
         station: String? = nil,
         avoidedStation: String? = nil,
         minutesSaved: Double? = nil,
-        location: CLLocation? = LocationService.shared.lastKnownLocation,
+        location: CLLocation? = nil,
         details: [String: String] = [:]
     ) {
         guard UsageSharing.current(in: defaults) == .granted else { return }
+        // Looked up here rather than as the parameter's default: default
+        // values aren't evaluated on the main actor, and LocationService is.
+        let location = location ?? LocationService.shared.lastKnownLocation
         let event = MetricsEvent(
             id: UUID(),
             date: .now,
