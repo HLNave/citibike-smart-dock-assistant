@@ -58,9 +58,18 @@ struct SiriPhraseTests {
         #expect(!phrases.contains("Ask ${applicationName}"))
     }
 
+    @Test func everyDockPhraseAlsoTakesDoc() throws {
+        // Siri often hears "dock" as "doc".
+        let phrases = Set(try shortcuts().flatMap(\.phrases))
+        for phrase in phrases where phrase.contains("dock") {
+            let doc = phrase.replacingOccurrences(of: "dock", with: "doc")
+            #expect(phrases.contains(doc), "Missing \"\(doc)\"")
+        }
+    }
+
     @Test func onlyFindDockFindsADockWithoutAPlace() throws {
         let owners = try shortcuts()
-            .filter { $0.phrases.contains { $0.lowercased().hasSuffix(" to find a dock") } }
+            .filter { $0.phrases.contains { [" to find a dock", " to find a doc"].contains(where: $0.lowercased().hasSuffix) } }
             .map(\.intent)
         #expect(owners == ["FindDockIntent"], "Another plain \"find a dock\" phrase can steal Find Dock's requests.")
     }

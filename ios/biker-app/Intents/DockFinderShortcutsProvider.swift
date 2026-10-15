@@ -60,6 +60,14 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 "Ask \(.applicationName) to find the nearest dock",
                 "Ask \(.applicationName) for a dock",
                 "Ask \(.applicationName) for the nearest dock",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) to find a doc",
+                "Ask \(.applicationName) to find me a doc",
+                "Ask \(.applicationName) to find a doc near me",
+                "Ask \(.applicationName) to find an open doc",
+                "Ask \(.applicationName) to find the nearest doc",
+                "Ask \(.applicationName) for a doc",
+                "Ask \(.applicationName) for the nearest doc",
             ],
             shortTitle: "Find Dock",
             systemImageName: "bicycle"
@@ -71,6 +79,11 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 "Ask \(.applicationName) to find a dock near \(\.$place)",
                 "Ask \(.applicationName) to find a dock at \(\.$place)",
                 "Ask \(.applicationName) for a dock near \(\.$place)",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) to check my \(\.$place) doc",
+                "Ask \(.applicationName) to find a doc near \(\.$place)",
+                "Ask \(.applicationName) to find a doc at \(\.$place)",
+                "Ask \(.applicationName) for a doc near \(\.$place)",
             ],
             shortTitle: "Dock Near Saved Place",
             systemImageName: "star"
@@ -80,6 +93,9 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             phrases: [
                 "Ask \(.applicationName) to find a dock somewhere else",
                 "Ask \(.applicationName) for a dock somewhere else",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) to find a doc somewhere else",
+                "Ask \(.applicationName) for a doc somewhere else",
             ],
             shortTitle: "Dock Near a Place",
             systemImageName: "mappin.and.ellipse"
@@ -114,6 +130,8 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 "Ask \(.applicationName) to take me there",
                 "Ask \(.applicationName) to guide me to a dock",
                 "Ask \(.applicationName) for directions",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) to guide me to a doc",
             ],
             shortTitle: "Direct Me",
             systemImageName: "location.north.line"

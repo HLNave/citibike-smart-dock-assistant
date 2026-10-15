@@ -66,6 +66,8 @@ Say "Hey Siri, …". *school* stands for any saved place's name or nickname; *Me
 | **Ask Dock Finder to direct me**<br>also: *…to direct me there*, *…to take me there*, *…to guide me to a dock*, *Ask Dock Finder for directions* | Turn-by-turn directions to the dock you were just told about, or the nearest dock with room |
 | **Ask Dock Finder to stop directions**<br>also: *…to cancel directions*, *…to stop guiding me* | Stops turn-by-turn directions (during a ride, before you arrive, it turns off guidance for that ride) |
 
+Every phrase with "dock" also works with **"doc"** ("Ask Dock Finder to find a doc"), since Siri often hears it that way.
+
 Siri can only fill in names the app gives it ahead of time (saved places and those stations), so an address or a station Siri doesn't know needs the "…somewhere else" or "…check a station" phrase, which asks for it. There's no bare "Ask Dock Finder": Siri could stop listening after those three words. Setting a usual dock or saving a spot is done in the app (or by typing it under **Ask a Question**).
 
 ### Tips
