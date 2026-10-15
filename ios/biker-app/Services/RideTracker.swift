@@ -227,6 +227,7 @@ final class RideTracker: RideControlling {
             details: ["destination": ride.destination.name, "answer": answer.text]
         )
         SavingsStore.shared.record(answer, from: here, context: "ride_arrival")
+        SavingsStore.shared.recordHandsFree(context: "ride_arrival")
         await announcer.announce(answer.text, title: "Docking near \(ride.destination.name)")
 
         // Guidance starts before this ride's tracking stops, so location

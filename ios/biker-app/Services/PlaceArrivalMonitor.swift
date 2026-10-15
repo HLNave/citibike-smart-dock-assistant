@@ -114,6 +114,7 @@ final class PlaceArrivalMonitor {
                 details: ["place": place.name, "answer": answer.text]
             )
             SavingsStore.shared.record(answer, from: here, context: "place_arrival")
+            SavingsStore.shared.recordHandsFree(context: "place_arrival")
             if let station = answer.station {
                 GuidanceSession.shared.offer(station)
                 text += " For directions, say: Hey Siri, direct me with Dock Finder."

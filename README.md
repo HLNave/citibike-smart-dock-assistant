@@ -110,7 +110,9 @@ The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about lo
 
 Every time Dock Finder steers you away from a full or closed dock (your usual dock, the one nearest your destination or you, or a dock that fills up while you're getting directions), it estimates the time that saved: riding to that dock, finding it full and riding on, versus riding straight to one with room. That's the extra distance on city streets at about 15 km/h, plus 1.5 minutes for finding it full, capped at 15 minutes per dock. Money is that time at Citi Bike's member **e-bike** rate, **$0.27 a minute** (everyone is assumed to ride e-bikes). The same redirect shown twice within half an hour counts once.
 
-Until you have your own numbers, the card shows a typical commuter: about 50 rides a month, 10% ending at a full dock, 5 minutes lost each, so about **25 minutes and $6.75 a month**. The rate and every assumption are constants at the top of `ios/biker-app/Models/Savings.swift`.
+**Hands-free checks and safety:** every dock answer given by voice (Siri, ride alerts, arriving at a saved place, "direct me") is a time you didn't stop to take out your phone. Each counts as **1 minute** saved (pulling over, unlocking, opening the Citi Bike map) and adds to the safety stat, "N times you didn't take out your phone". Voice answers within 5 minutes of each other count once. Answers read on screen in the app don't count.
+
+Until you have your own numbers, the card shows a typical commuter: about 50 rides a month, each with one hands-free check (50 minutes), and 10% ending at a full dock with 5 minutes lost each (25 minutes), so about **75 minutes and $20.25 a month**. The rate and every assumption are constants at the top of `ios/biker-app/Models/Savings.swift`.
 
 ### Privacy and usage data
 

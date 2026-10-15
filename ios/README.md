@@ -194,6 +194,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Onboarding asks for Motion & Fitness after the two location prompts, then asks whether to share usage data. An existing install is asked once on the home screen instead.
 - [ ] With sharing on and `DOCKFINDER_METRICS_URL` set, rows appear in the sheet's Events tab within a few seconds of using the app (`app_launch`, `siri_answer`, …). With sharing off, nothing new appears; turning it back on under **Privacy** resumes.
 - [ ] Getting steered away from a full dock (e.g. "Your usual dock is full. Go to…") adds a `full_dock_avoided` row and moves the home screen's **Savings** card off the "typical commuter" estimate.
+- [ ] A Siri dock answer adds a `hands_free_check` row and one to "times you didn't take out your phone"; saying "yes" to directions right after doesn't add a second one.
 - [ ] Without starting a ride, bike toward a saved place with the phone locked: about the alert distance out, the dock answer is spoken and shows as a notification. "Hey Siri, direct me with Dock Finder" then starts directions to that dock.
 - [ ] Walking (or arriving by subway) into the same place doesn't alert. A second arrival within the hour doesn't alert. Turning **Alert Me When I Arrive** off stops it.
 - [ ] With the app swiped away, biking up to a saved place still alerts (iOS relaunches it for the geofence).

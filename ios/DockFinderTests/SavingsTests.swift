@@ -34,8 +34,11 @@ struct SavingsModelTests {
     }
 
     @Test func typicalCommuterMonth() {
-        #expect(abs(SavingsModel.typicalMonthlyMinutes - 25) < 0.001)
-        #expect(abs(SavingsModel.dollars(forMinutes: 25) - 6.75) < 0.001)
+        // 50 rides × 1 hands-free minute, plus 5 full docks × 5 minutes.
+        #expect(abs(SavingsModel.typicalFullDockMinutes - 25) < 0.001)
+        #expect(abs(SavingsModel.typicalHandsFreeMinutes - 50) < 0.001)
+        #expect(abs(SavingsModel.typicalMonthlyMinutes - 75) < 0.001)
+        #expect(abs(SavingsModel.dollars(forMinutes: SavingsModel.typicalMonthlyMinutes) - 20.25) < 0.001)
     }
 }
 
@@ -77,6 +80,27 @@ struct SavingsStoreTests {
         SavingsStore(defaults: defaults, metrics: nil)
             .record(DockAnswer(text: "", station: chosen, avoided: avoided), from: rider, context: "siri")
         #expect(SavingsStore(defaults: defaults, metrics: nil).events.count == 1)
+    }
+
+    @Test func voiceAnswersCloseTogetherAreOneHandsFreeCheck() {
+        let savings = store()
+        #expect(savings.recordHandsFree(context: "siri", now: referenceNow) != nil)
+        // "Yes, direct me" right after the Siri answer: same check.
+        #expect(savings.recordHandsFree(context: "directions", now: referenceNow.addingTimeInterval(60)) == nil)
+        #expect(savings.recordHandsFree(context: "ride_arrival", now: referenceNow.addingTimeInterval(20 * 60)) != nil)
+        #expect(savings.allTime.handsFreeChecks == 2)
+        #expect(savings.hasMeasuredSavings)
+    }
+
+    @Test func handsFreeChecksAddToTimeAndMoney() {
+        let checks = [HandsFreeCheck(id: UUID(), date: referenceNow, context: "siri"),
+                      HandsFreeCheck(id: UUID(), date: referenceNow, context: "ride_arrival")]
+        let event = SavingsEvent(id: UUID(), date: referenceNow, avoided: avoided, chosenID: "room", chosenName: "x", minutes: 3, context: "siri")
+        let summary = SavingsSummary.of([event], handsFree: checks)
+        #expect(summary.fullDockMinutes == 3)
+        #expect(summary.handsFreeMinutes == 2)
+        #expect(summary.minutes == 5)
+        #expect(abs(summary.dollars - 1.35) < 0.001)
     }
 
     @Test func monthlySummaryOnlyCountsThisMonth() {

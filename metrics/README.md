@@ -34,13 +34,15 @@ When a rider agrees to share usage data (asked once in the app; changeable under
 | `details` | Extra fields as JSON: the spoken answer, Siri intent, destination, etc. |
 | `event_id` | Unique per event, for spotting duplicates if a send was retried |
 
-Events: `app_launch`, `sharing_turned_on`, `siri_answer`, `app_answer`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`.
+Events: `app_launch`, `sharing_turned_on`, `siri_answer`, `app_answer`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
 
 ## Savings numbers
 
-Each `full_dock_avoided` row is one redirect away from a full or closed dock, with the minutes and dollars the app credited (the model is in `ios/biker-app/Models/Savings.swift` and explained on the app's Savings screen). Useful formulas, assuming the default column order:
+Each `full_dock_avoided` row is one redirect away from a full or closed dock, and each `hands_free_check` row is one dock answer given by voice (a time the rider didn't take out their phone, credited 1 minute). Both carry the minutes and dollars the app credited (the model is in `ios/biker-app/Models/Savings.swift` and explained on the app's Savings screen). Useful formulas, assuming the default column order:
 
-- Total minutes saved: `=SUMIF(C:C, "full_dock_avoided", J:J)`
-- Total dollars saved: `=SUMIF(C:C, "full_dock_avoided", K:K)`
+- Total minutes saved: `=SUM(J2:J)` (only those two events fill this column)
+- Total dollars saved: `=SUM(K2:K)`
+- From full docks only: `=SUMIF(C:C, "full_dock_avoided", K:K)`
+- Times riders didn't take out their phone: `=COUNTIF(C:C, "hands_free_check")`
 - Riders who shared data: `=COUNTUNIQUE(D2:D)`
 - Average dollars per rider: total dollars ÷ riders

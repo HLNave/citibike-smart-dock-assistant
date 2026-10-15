@@ -52,6 +52,10 @@ extension AppIntent {
             details: ["intent": String(describing: Self.self), "answer": answer.text]
         )
         SavingsStore.shared.record(answer, from: here, context: "siri")
+        if answer.station != nil {
+            // Dock information by voice: the rider didn't take out their phone.
+            SavingsStore.shared.recordHandsFree(context: "siri")
+        }
 
         if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
             do {
@@ -303,7 +307,11 @@ struct DirectMeIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live().handle(.directions).intentResult
+        let answer = try await AssistantRouter.live().handle(.directions)
+        if GuidanceSession.shared.isActive {
+            SavingsStore.shared.recordHandsFree(context: "directions")
+        }
+        return answer.intentResult
     }
 }
 

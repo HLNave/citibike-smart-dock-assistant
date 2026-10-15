@@ -6,8 +6,13 @@
 //  full docks it steers them away from. Without Dock Finder, the rider
 //  rides to the full dock, finds it full and rides on to one with room;
 //  with it, they ride straight there. The difference, plus a moment for
-//  finding the dock full, is the time saved. Everyone is assumed to ride
-//  e-bikes, which members pay for by the minute.
+//  finding the dock full, is the time saved.
+//
+//  On top of that, every dock answer given by voice (Siri, ride and
+//  saved-place arrival alerts) is a time the rider didn't stop to take out
+//  their phone: a "hands-free check", worth a minute each and counted as
+//  a safety stat. Everyone is assumed to ride e-bikes, which members pay
+//  for by the minute.
 //
 
 import CoreLocation
@@ -57,9 +62,20 @@ nonisolated enum SavingsModel {
     /// The same redirect shown again (Check Again, asking Siri twice) counts once.
     static let duplicateWindow: TimeInterval = 30 * 60
 
+    /// Pulling over, unlocking the phone, opening the Citi Bike map and
+    /// finding a dock: what each answer by voice saves.
+    static let handsFreeMinutes = 1.0
+    /// Voice answers this close together (e.g. a Siri answer, then "yes,
+    /// direct me") are one check.
+    static let handsFreeWindow: TimeInterval = 5 * 60
+
     /// The rough model shown before a rider has measured savings: about 50
-    /// rides a month, 10% ending at a full dock, 5 minutes lost each.
-    static let typicalMonthlyMinutes = 50 * 0.10 * 5.0
+    /// rides a month, each with one hands-free check, and 10% ending at a
+    /// full dock with 5 minutes lost each.
+    static let typicalMonthlyRides = 50.0
+    static let typicalFullDockMinutes = typicalMonthlyRides * 0.10 * 5.0
+    static let typicalHandsFreeMinutes = typicalMonthlyRides * handsFreeMinutes
+    static var typicalMonthlyMinutes: Double { typicalFullDockMinutes + typicalHandsFreeMinutes }
 
     /// Minutes saved by going straight to `chosen` instead of to the full
     /// `avoided` dock first. With no starting point, only the ride on from
@@ -95,19 +111,35 @@ nonisolated struct SavingsEvent: Codable, Sendable, Equatable, Identifiable {
     var dollars: Double { SavingsModel.dollars(forMinutes: minutes) }
 }
 
+/// One dock answer given by voice: a time the rider didn't take out their phone.
+nonisolated struct HandsFreeCheck: Codable, Sendable, Equatable, Identifiable {
+    let id: UUID
+    let date: Date
+    /// "siri", "ride_arrival", "place_arrival" or "directions".
+    let context: String
+}
+
 nonisolated struct SavingsSummary: Sendable, Equatable {
     var fullDocksAvoided = 0
-    var minutes = 0.0
+    var fullDockMinutes = 0.0
+    var handsFreeChecks = 0
 
+    var handsFreeMinutes: Double { Double(handsFreeChecks) * SavingsModel.handsFreeMinutes }
+    var minutes: Double { fullDockMinutes + handsFreeMinutes }
     var dollars: Double { SavingsModel.dollars(forMinutes: minutes) }
 
-    static func of(_ events: [SavingsEvent], since start: Date? = nil) -> SavingsSummary {
-        events
-            .filter { start == nil || $0.date >= start! }
-            .reduce(into: SavingsSummary()) { summary, event in
-                summary.fullDocksAvoided += 1
-                summary.minutes += event.minutes
-            }
+    static func of(
+        _ events: [SavingsEvent],
+        handsFree checks: [HandsFreeCheck] = [],
+        since start: Date? = nil
+    ) -> SavingsSummary {
+        var summary = SavingsSummary()
+        for event in events where start == nil || event.date >= start! {
+            summary.fullDocksAvoided += 1
+            summary.fullDockMinutes += event.minutes
+        }
+        summary.handsFreeChecks = checks.filter { start == nil || $0.date >= start! }.count
+        return summary
     }
 
     static func startOfMonth(containing date: Date, calendar: Calendar = .current) -> Date {
