@@ -56,6 +56,8 @@ final class VoiceAsk {
     /// (that's when iOS allows the microphone from the Lock Screen). The
     /// answer is spoken afterwards in the background.
     func begin() async {
+        // Logged first, so the sheet shows whether presses reach the app.
+        Metrics.shared.log("voice_button_pressed", details: ["permissions": Self.hasPermissions ? "yes" : "no"])
         guard !isRunning else { return }
         isRunning = true
         startedActivity = false
