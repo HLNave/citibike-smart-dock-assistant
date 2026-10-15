@@ -60,8 +60,9 @@ extension AppIntent {
         if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
             do {
                 try await requestConfirmation(
-                    result: .result(dialog: "\(answer.text) \(GuidanceSession.rideQuestion)"),
-                    confirmationActionName: .go
+                    conditions: [],
+                    actionName: .go,
+                    dialog: "\(answer.text) \(GuidanceSession.rideQuestion)"
                 )
             } catch {
                 return spokenResult(answer.text, dialog: "Okay. I'll just tell you where to dock.")
@@ -75,8 +76,9 @@ extension AppIntent {
         guard guidance.station?.id != station.id else { return spokenResult(answer.text) }
         do {
             try await requestConfirmation(
-                result: .result(dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"),
-                confirmationActionName: .go
+                conditions: [],
+                actionName: .go,
+                dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"
             )
         } catch {
             // "No", or Siri couldn't ask. The answer was already spoken with
