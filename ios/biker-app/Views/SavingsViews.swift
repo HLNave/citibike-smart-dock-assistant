@@ -91,7 +91,7 @@ struct SavingsView: View {
                 Label(SavingsCard.phoneFree(savings.allTime.handsFreeChecks), systemImage: "iphone.slash")
                     .font(.headline)
             } header: {
-                InfoLabel("Safety", message: Self.safetyInfo)
+                InfoHeader("Safety", message: Self.safetyInfo)
             }
             if !savings.events.isEmpty {
                 Section("Recent") {

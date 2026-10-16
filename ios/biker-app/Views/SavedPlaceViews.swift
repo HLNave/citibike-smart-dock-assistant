@@ -54,7 +54,7 @@ struct SavedPlaceView: View {
                             .foregroundStyle(.orange)
                     }
                 } header: {
-                    InfoLabel("Docks", message: "Dock Finder checks your usual dock first, then your backup, and only then suggests the nearest other station with room.")
+                    InfoHeader("Docks", message: "Dock Finder checks your usual dock first, then your backup, and only then suggests the nearest other station with room.")
                 }
 
                 Section {
