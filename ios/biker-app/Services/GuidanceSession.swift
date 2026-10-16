@@ -7,7 +7,8 @@
 //  button, or a ride's arrival when the rider asked to be guided. It
 //  follows live location the way RideTracker does, speaks each turn as it
 //  comes up, re-routes when the rider leaves the route, and re-checks the
-//  dock on the way in case it fills up.
+//  dock every minute, saying whether it still has room and heading
+//  somewhere else if it filled up.
 //
 
 import AVFoundation
@@ -81,8 +82,9 @@ final class GuidanceSession: GuidanceControlling {
     static let maxDuration: TimeInterval = 45 * 60
     /// "Take me there" works for this long after a dock was offered.
     static let offerLifetime: TimeInterval = 10 * 60
-    /// How often the target dock's availability is re-checked on the way.
-    static let dockCheckInterval: TimeInterval = 2 * 60
+    /// How often the target dock's availability is re-checked (and said
+    /// out loud) on the way.
+    static let dockCheckInterval: TimeInterval = 60
     /// The dock is also checked once more when the rider gets this close.
     static let finalDockCheckDistance: CLLocationDistance = 400
     /// Minimum time between re-routes, so a bad GPS patch can't cause a storm.
@@ -306,14 +308,16 @@ final class GuidanceSession: GuidanceControlling {
         let next = fresh.opening()
         progress = fresh
         prompter.say("\(announcement) \(next)")
+        // The new first turn (and dock), without waiting for the next fix.
+        await DockFinderLiveActivity.shared.update(.guiding(fresh, docksOpen: docksOpen), force: true)
         if newStation == nil {
             Metrics.shared.log("directions_rerouted", station: current.name, location: location)
         }
         return true
     }
 
-    /// Re-checks the dock every couple of minutes and once more near the
-    /// end, and heads somewhere else if it filled up.
+    /// Re-checks the dock every minute and once more near the end, says
+    /// whether it still has room, and heads somewhere else if it filled up.
     private func checkDockIfDue(from location: CLLocation) async {
         guard let progress else { return }
         let nearEnd = progress.remaining <= Self.finalDockCheckDistance && !checkedNearEnd
@@ -328,6 +332,7 @@ final class GuidanceSession: GuidanceControlling {
 
         switch DockCheckOutcome.check(target.id, in: network) {
         case .fine(let docks):
+            prompter.say(DockCheckOutcome.statusLine(for: target.spokenName, docksOpen: docks, previously: docksOpen))
             docksOpen = docks
         case .switchTo(let alternative, let problem):
             let switched = await reroute(

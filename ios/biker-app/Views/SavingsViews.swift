@@ -75,21 +75,24 @@ struct SavingsCard: View {
 struct SavingsView: View {
     private let savings = SavingsStore.shared
 
+    static let timeSavedInfo = "Each time Dock Finder steers you away from a full or closed dock, we compare two trips: riding to that dock, finding it full and riding on to one with room, versus riding straight to the one with room. The extra distance on city streets at about 15 km/h, plus 1.5 minutes for finding the dock full and picking another, is the time saved (at most 15 minutes per dock).\n\nEvery dock answer by voice also counts as a hands-free check, worth \(SavingsCard.minutes(SavingsModel.handsFreeMinutes)): the time it takes to pull over, unlock your phone, open the Citi Bike map and find a dock. Voice answers within 5 minutes of each other count once."
+    static let moneySavedInfo = "The time saved, at Citi Bike's member e-bike rate of \(SavingsCard.money(SavingsModel.ebikeDollarsPerMinute)) a minute."
+    static let safetyInfo = "Each time Dock Finder told you where to dock by voice (Siri, ride alerts, arriving at a saved place), you didn't have to stop, unlock your phone or look down at a map while riding."
+
     var body: some View {
         List {
             Section("This Month") {
-                summaryRows(savings.thisMonth)
+                summaryRows(savings.thisMonth, explained: true)
             }
             Section("All Time") {
-                summaryRows(savings.allTime)
+                summaryRows(savings.allTime, explained: false)
             }
-            Section {
-                Label(SavingsCard.phoneFree(savings.allTime.handsFreeChecks), systemImage: "iphone.slash")
-                    .font(.headline)
-            } header: {
-                Text("Safety")
-            } footer: {
-                Text("Each time Dock Finder told you where to dock by voice (Siri, ride alerts, arriving at a saved place), you didn't have to stop, unlock your phone or look down at a map while riding.")
+            Section("Safety") {
+                HStack(spacing: 6) {
+                    Label(SavingsCard.phoneFree(savings.allTime.handsFreeChecks), systemImage: "iphone.slash")
+                        .font(.headline)
+                    InfoButton("Phone-free", message: Self.safetyInfo)
+                }
             }
             if !savings.events.isEmpty {
                 Section("Recent") {
@@ -105,26 +108,31 @@ struct SavingsView: View {
                     }
                 }
             }
-            Section("How We Calculate This") {
-                Text("Each time Dock Finder steers you away from a full or closed dock, we compare two trips: riding to that dock, finding it full and riding on to one with room, versus riding straight to the one with room. The extra distance on city streets at about 15 km/h, plus 1.5 minutes for finding the dock full and picking another, is the time saved (at most 15 minutes per dock).")
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Every dock answer by voice also counts as a hands-free check, worth \(SavingsCard.minutes(SavingsModel.handsFreeMinutes)): the time it takes to pull over, unlock your phone, open the Citi Bike map and find a dock. Voice answers within 5 minutes of each other count once.")
-                    .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("Money is that time at Citi Bike's member e-bike rate of \(SavingsCard.money(SavingsModel.ebikeDollarsPerMinute)) a minute. These are estimates; the same redirect shown twice within half an hour counts once.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
         .navigationTitle("Savings")
     }
 
+    /// `explained` adds the ⓘ to money and time saved (in the top section only).
     @ViewBuilder
-    private func summaryRows(_ summary: SavingsSummary) -> some View {
-        LabeledContent("Money saved", value: SavingsCard.money(summary.dollars))
-        LabeledContent("Time saved", value: SavingsCard.minutes(summary.minutes))
+    private func summaryRows(_ summary: SavingsSummary, explained: Bool) -> some View {
+        LabeledContent {
+            Text(SavingsCard.money(summary.dollars))
+        } label: {
+            if explained {
+                InfoLabel("Money saved", message: Self.moneySavedInfo)
+            } else {
+                Text("Money saved")
+            }
+        }
+        LabeledContent {
+            Text(SavingsCard.minutes(summary.minutes))
+        } label: {
+            if explained {
+                InfoLabel("Time saved", message: Self.timeSavedInfo)
+            } else {
+                Text("Time saved")
+            }
+        }
         LabeledContent("Full docks avoided", value: "\(summary.fullDocksAvoided) · \(SavingsCard.minutes(summary.fullDockMinutes))")
         LabeledContent("Hands-free checks", value: "\(summary.handsFreeChecks) · \(SavingsCard.minutes(summary.handsFreeMinutes))")
     }

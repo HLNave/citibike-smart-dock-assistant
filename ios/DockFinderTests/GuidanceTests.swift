@@ -90,6 +90,33 @@ struct GuidanceProgressTests {
         #expect(progress.update(at: fix(40.7310, -73.9900)).isEmpty)
     }
 
+    @Test func aRouteLoopingBackPastTheStartDoesntSkipAhead() {
+        // East 100 m, north 80 m, west past the start, then south on a street
+        // 30 m west of it to the dock: the last leg passes closer to a fix
+        // near the start than the first street does.
+        let a = GuidanceCoordinate(latitude: 40.7300, longitude: -73.9950)
+        let b = GuidanceCoordinate(latitude: 40.7300, longitude: -73.993815)
+        let c = GuidanceCoordinate(latitude: 40.730719, longitude: -73.993815)
+        let d = GuidanceCoordinate(latitude: 40.730719, longitude: -73.995356)
+        let e = GuidanceCoordinate(latitude: 40.729461, longitude: -73.995356)
+        let loopDock = DockStation(
+            id: "loop", name: "Mercer St & W 3 St", latitude: e.latitude, longitude: e.longitude,
+            availableDocks: 8, straightLineDistance: 0, observedAt: nil
+        )
+        let route = GuidanceRoute(station: loopDock, legs: [
+            (instruction: "", points: [a, b]),
+            (instruction: "Turn left onto Greene St", points: [b, c]),
+            (instruction: "Turn left onto W 4th St", points: [c, d]),
+            (instruction: "Turn left onto Mercer St", points: [d, e]),
+            (instruction: "The destination is on your right", points: [e]),
+        ])
+        var progress = GuidanceProgress(route: route)
+        _ = progress.opening()
+        _ = progress.update(at: fix(40.7300, -73.995237))   // 20 m west of the start
+        #expect(progress.nextManeuver?.instruction == "Turn left onto Greene St")
+        #expect(progress.along < 5)
+    }
+
     @Test func inaccurateFixesAreIgnored() {
         var progress = GuidanceProgress(route: testRoute())
         #expect(progress.update(at: fix(40.7325, -73.9950, accuracy: 120)).isEmpty)
@@ -210,6 +237,16 @@ struct DockCheckTests {
 
     @Test func removedStation() throws {
         #expect(DockCheckOutcome.check("gone", in: try network(target: 6, nearby: 9)) == .unknown)
+    }
+
+    @Test(arguments: [
+        (8, Int?.some(9), "West 4th and Mercer still has 8 docks open."),
+        (4, Int?.some(4), "West 4th and Mercer still has 4 docks open."),
+        (3, Int?.some(6), "West 4th and Mercer is filling up, 3 docks open."),
+        (9, Int?.none, "West 4th and Mercer still has 9 docks open."),
+    ])
+    func statusIsSaidAfterEachCheck(docks: Int, previously: Int?, expected: String) {
+        #expect(DockCheckOutcome.statusLine(for: "West 4th and Mercer", docksOpen: docks, previously: previously) == expected)
     }
 }
 

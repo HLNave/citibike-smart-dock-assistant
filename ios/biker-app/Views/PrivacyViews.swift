@@ -13,7 +13,7 @@ import SwiftUI
 struct UsageSharingExplanation: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("While Dock Finder is being tested, it can send the Dock Finder team a record of how you use it, so we can measure what it saves riders and fix what doesn't work:")
+            Text("Dock Finder can send the Dock Finder team a record of how you use it, so we can measure what it saves riders and fix what doesn't work:")
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 8) {
                 Label("When you open and use it: rides, arrival alerts, directions and Siri answers", systemImage: "list.bullet")
@@ -29,7 +29,7 @@ struct UsageSharingExplanation: View {
     }
 }
 
-/// Lets testers be told apart in the team's sheet. Optional.
+/// Lets riders be told apart in the team's records. Optional.
 struct UsageNameField: View {
     @Binding var name: String
 
@@ -40,7 +40,7 @@ struct UsageNameField: View {
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .submitLabel(.done)
-            Text("Shown next to your usage in the team's sheet, so we know who's testing. Leave it blank to stay anonymous.")
+            Text("Shown next to your usage in the team's records, so we know who's riding with Dock Finder. Leave it blank to stay anonymous.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

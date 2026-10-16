@@ -177,6 +177,10 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     /// Fixes less accurate than this are ignored; Manhattan's tall
     /// buildings produce plenty of them.
     static let maxUsableAccuracy: CLLocationAccuracy = 65
+    /// How far ahead along the route a fix may match before the rider has
+    /// moved: enough for GPS jitter, not enough to land on a later street
+    /// that loops back past the start.
+    static let initialLookahead: CLLocationDistance = 60
 
     enum Event: Sendable, Equatable {
         case say(String)
@@ -192,6 +196,8 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     private(set) var nextStep = 0
     private var preparedSteps: Set<Int> = []
     private var offRouteCount = 0
+    /// The last fix that matched the route.
+    private var lastFix: GuidanceCoordinate?
 
     init(route: GuidanceRoute) {
         self.route = route
@@ -258,7 +264,13 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
             return [.arrived]
         }
 
-        let match = route.locate(location, from: segment, along: along)
+        // Only look as far ahead as the rider could have ridden since the
+        // last fix. Short routes around Manhattan's one-way blocks often
+        // pass back near where they started; matching the rider to that
+        // later street skipped every turn but the last.
+        let moved = lastFix.map { location.distance(from: $0.location) }
+        let lookahead = moved.map { max($0 * 2 + 40, Self.initialLookahead) } ?? Self.initialLookahead
+        let match = route.locate(location, from: segment, along: along, lookahead: lookahead)
         guard match.distance <= Self.offRouteDistance else {
             offRouteCount += 1
             if offRouteCount >= Self.offRouteFixes {
@@ -268,6 +280,7 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
             return []
         }
         offRouteCount = 0
+        lastFix = GuidanceCoordinate(location.coordinate)
         segment = match.segment
         along = max(along, match.along)
 
@@ -293,6 +306,20 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
 
 /// What a mid-ride check of the target dock found.
 nonisolated enum DockCheckOutcome: Sendable, Equatable {
+    /// At or below this many open docks, and fewer than last time, the dock
+    /// is "filling up".
+    static let fillingUpDocks = 5
+
+    /// Said after each check that found room: "West 4th and Mercer still
+    /// has 8 docks open." / "West 4th and Mercer is filling up, 3 docks open."
+    static func statusLine(for dockName: String, docksOpen: Int, previously: Int?) -> String {
+        let name = Speech.sentence(dockName)
+        if docksOpen <= fillingUpDocks, let previously, docksOpen < previously {
+            return "\(name) is filling up, \(Speech.docksOpen(docksOpen))."
+        }
+        return "\(name) still has \(Speech.docksOpen(docksOpen))."
+    }
+
     /// Still has room: this many open docks.
     case fine(docksOpen: Int)
     /// Filled up or closed; head to `alternative` instead.

@@ -54,9 +54,7 @@ struct SavedPlaceView: View {
                             .foregroundStyle(.orange)
                     }
                 } header: {
-                    Text("Docks")
-                } footer: {
-                    Text("Dock Finder checks your usual dock first, then your backup, and only then suggests the nearest other station with room.")
+                    InfoLabel("Docks", message: "Dock Finder checks your usual dock first, then your backup, and only then suggests the nearest other station with room.")
                 }
 
                 Section {
@@ -70,16 +68,19 @@ struct SavedPlaceView: View {
                 }
 
                 Section {
-                    Toggle("Alert Me When I Arrive", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { place.arrivalAlerts },
                         set: { enabled in
                             var updated = place
                             updated.arrivalAlerts = enabled
                             savedPlaces.update(updated)
                         }
-                    ))
-                } footer: {
-                    Text("When you bike within \(Speech.length(place.alertDistance)) of \(place.name), Dock Finder tells you where to dock, even if you didn't start a ride. Needs location access set to Always; walking and the subway are skipped when Motion & Fitness is allowed.")
+                    )) {
+                        InfoLabel(
+                            "Alert Me When I Arrive",
+                            message: "When you bike within \(Speech.length(place.alertDistance)) of \(place.name), Dock Finder tells you where to dock, even if you didn't start a ride. Needs location access set to Always; walking and the subway are skipped when Motion & Fitness is allowed."
+                        )
+                    }
                 }
 
                 Section {

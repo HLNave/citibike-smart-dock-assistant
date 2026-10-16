@@ -134,7 +134,8 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 - **Route:** Apple's cycling directions (`MKDirections`, `.cycling`). Apple Maps instructions are rewritten to be spoken ("W 4th St" → "West 4th Street", "The destination is on your left" → "The dock is on your left").
 - **When it speaks:** each turn about 150 m ahead ("In 500 feet, turn right onto Bleecker Street") and again about 35 m ahead ("Turn right onto Bleecker Street"); arrival within 30 m of the dock. Fixes worse than 65 m accuracy are ignored.
 - **Off route:** two fixes in a row more than 45 m from the route → "Rerouting." and the new next turn (at most every 20 s).
-- **Dock re-checks:** every 2 minutes and once more 400 m out. If the dock has filled up or closed, it says so and re-routes to the nearest station with room; if nothing nearby has room, it says that and keeps going.
+- **Dock re-checks:** every minute and once more 400 m out, each followed by a spoken status ("West 4th and Mercer still has 8 docks open", or "…is filling up, 3 docks open" at 5 or fewer and dropping; `DockCheckOutcome.statusLine`). If the dock has filled up or closed, it says so and re-routes to the nearest station with room; if nothing nearby has room, it says that and keeps going.
+- **Following the route:** each fix only matches as far ahead as the rider could have ridden since the last one (twice the distance moved, plus 40 m; 60 m before moving), so a route that loops back near its start can't jump to its last turn. The Live Activity updates with each new next turn and right after a re-route.
 - **Ends** at the dock, on "stop directions" / "end my ride" / **Stop Directions** in the app, or after 45 minutes.
 - **Locked phone:** like rides, needs **Always** location access; with only *While Using*, it works while Dock Finder is open, and Siri's answer says how to fix it.
 - **Live Activity:** next-turn arrow, instruction, distance, dock name and open docks on the Lock Screen and Dynamic Island. iOS only lets apps *start* one while on screen or running a Live Activity intent, so every intent that can start directions or a ride is a `LiveActivityIntent`.
@@ -208,7 +209,9 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] "Hey Siri, ask Dock Finder to find a dock" (and "…to find me a dock", "…for the nearest dock") answers with the nearest dock **without asking anything first**, then asks "Want me to direct you there?"
 - [ ] With the phone locked and headphones in, "yes" to that question starts directions **without unlocking**: Siri says "Okay, directing you to …", then Dock Finder's voice gives the first instruction (with a direction, e.g. "Head east on…") without the two overlapping. "No" just ends with "Okay."
 - [ ] Riding with directions, phone locked: each turn is announced ahead and at the corner, music ducks, and arrival is announced at the dock. Taking a wrong turn gives "Rerouting." within a few seconds.
-- [ ] The Lock Screen and Dynamic Island show the next turn, the distance and the dock's open docks, and update as you ride; the activity ends a couple of minutes after arrival.
+- [ ] The Lock Screen and Dynamic Island show the next turn, the distance and the dock's open docks, and update to each following turn as you ride (also on a short route around a block); the activity ends a couple of minutes after arrival.
+- [ ] During directions, about every minute you hear the dock's status ("… still has 8 docks open").
+- [ ] The ⓘ buttons (Savings: money saved, time saved, phone-free; a saved place: Docks, Alert Me When I Arrive) open a small popover, and tapping the rest of the row does nothing.
 - [ ] "Hey Siri, ask Dock Finder to stop directions" stops directions and removes the Live Activity. "Hey Siri, ask Dock Finder to direct me" after saying "no" starts directions to the same dock.
 - [ ] "Ask Dock Finder to start a ride to school" asks "Want me to guide you to the dock when you're close?" With "yes", the arrival alert is followed by directions to the dock it named.
 - [ ] A ride shows a "Riding to school" Live Activity with the distance to go.
