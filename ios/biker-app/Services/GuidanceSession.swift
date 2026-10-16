@@ -374,6 +374,9 @@ final class VoicePrompter: NSObject {
 
     private var heldUntil: ContinuousClock.Instant?
     private var held: [String] = []
+    /// The latest prompt waiting for audio to start; each waits for the one
+    /// before, so prompts are spoken in the order they were said.
+    private var starting: Task<Void, Never>?
 
     /// Roughly how long Siri takes to say `text`, including the moment
     /// before it starts talking.
@@ -418,19 +421,18 @@ final class VoicePrompter: NSObject {
     }
 
     private func speak(_ text: String) {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
-            try session.setActive(true)
-        } catch {
-            return
+        let previous = starting
+        starting = Task { [weak self] in
+            await previous?.value
+            guard await SpeechAudio.activate(), let self else { return }
+            self.synthesizer.speak(SpokenVoice.utterance(text))
         }
-        synthesizer.speak(SpokenVoice.utterance(text))
     }
 
     /// Returns once everything queued has been spoken, or after `timeout`.
     func waitUntilDone(timeout: Duration = .seconds(20)) async {
         let deadline = ContinuousClock.now + timeout
+        await starting?.value
         // Speaking starts asynchronously, so give it a moment to begin.
         try? await Task.sleep(for: .milliseconds(300))
         while synthesizer.isSpeaking, ContinuousClock.now < deadline {
@@ -440,7 +442,7 @@ final class VoicePrompter: NSObject {
 
     private func deactivateIfIdle() {
         guard !synthesizer.isSpeaking else { return }
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        SpeechAudio.deactivate()
     }
 }
 

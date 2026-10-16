@@ -35,14 +35,8 @@ final class Announcer: NSObject {
     }
 
     private func speak(_ text: String) async {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
-            try session.setActive(true)
-        } catch {
-            // The notification still carries the answer.
-            return
-        }
+        // The notification still carries the answer if audio can't start.
+        guard await SpeechAudio.activate() else { return }
         utteranceID += 1
         let id = utteranceID
         await withCheckedContinuation { continuation in
@@ -53,7 +47,7 @@ final class Announcer: NSObject {
                 if self?.utteranceID == id { self?.finishSpeaking() }
             }
         }
-        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        SpeechAudio.deactivate()
     }
 
     private func finishSpeaking() {
@@ -141,5 +135,37 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list]
+    }
+}
+
+/// Turns audio on for spoken prompts (lowering music or navigation the way
+/// Maps does) and back off afterwards. Done on a background queue: iOS
+/// warns that the audio session can block for a while, freezing the
+/// screen if it's called on the main thread. The queue is serial, so an
+/// "off" and a following "on" always happen in order.
+nonisolated enum SpeechAudio {
+    private static let queue = DispatchQueue(label: "DockFinder.speechAudio", qos: .userInitiated)
+
+    /// `false` if audio couldn't start (e.g. during a phone call).
+    static func activate() async -> Bool {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                let session = AVAudioSession.sharedInstance()
+                do {
+                    try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+                    try session.setActive(true)
+                    continuation.resume(returning: true)
+                } catch {
+                    continuation.resume(returning: false)
+                }
+            }
+        }
+    }
+
+    /// Lets other audio come back to full volume.
+    static func deactivate() {
+        queue.async {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 }
