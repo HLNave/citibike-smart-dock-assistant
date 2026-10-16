@@ -226,7 +226,7 @@ struct CheckStationIntent: LiveActivityIntent {
         } else if let stationName, !stationName.isEmpty {
             spoken = stationName
         } else {
-            spoken = try await $stationName.requestValue("Which station?") ?? ""
+            spoken = try await $stationName.requestValue("Which station?")
         }
         guard !spoken.trimmingCharacters(in: .whitespaces).isEmpty else {
             return try await reply(with: DockAnswer(text: Self.whichStationHelp))
@@ -320,7 +320,7 @@ struct StartRideIntent: LiveActivityIntent {
         } else if let destination, !destination.isEmpty {
             spoken = destination
         } else {
-            spoken = try await $destination.requestValue("Where are you heading?") ?? ""
+            spoken = try await $destination.requestValue("Where are you heading?")
         }
         let answer = try await AssistantRouter.live().handle(.startRide(spoken))
         return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
