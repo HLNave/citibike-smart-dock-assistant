@@ -47,7 +47,9 @@ struct InfoButton: View {
             // rather than `.primary`, which in a header means its gray.
             .textCase(nil)
             .foregroundStyle(Color.primary)
-            .padding()
+            // Explicit: inside a section header the default padding shrinks to nothing.
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
             .frame(width: 300, alignment: .leading)
             // A bubble on iPhone too, rather than a full sheet.
             .presentationCompactAdaptation(.popover)
