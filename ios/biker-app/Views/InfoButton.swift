@@ -42,6 +42,10 @@ struct InfoButton: View {
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // The same look wherever the ⓘ sits: a section header would
+            // otherwise make it small, capitalized and gray.
+            .textCase(nil)
+            .foregroundStyle(.primary)
             .padding()
             .frame(width: 300, alignment: .leading)
             // A bubble on iPhone too, rather than a full sheet.

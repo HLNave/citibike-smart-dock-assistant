@@ -87,12 +87,11 @@ struct SavingsView: View {
             Section("All Time") {
                 summaryRows(savings.allTime, explained: false)
             }
-            Section("Safety") {
-                HStack(spacing: 6) {
-                    Label(SavingsCard.phoneFree(savings.allTime.handsFreeChecks), systemImage: "iphone.slash")
-                        .font(.headline)
-                    InfoButton("Phone-free", message: Self.safetyInfo)
-                }
+            Section {
+                Label(SavingsCard.phoneFree(savings.allTime.handsFreeChecks), systemImage: "iphone.slash")
+                    .font(.headline)
+            } header: {
+                InfoLabel("Safety", message: Self.safetyInfo)
             }
             if !savings.events.isEmpty {
                 Section("Recent") {
@@ -112,25 +111,19 @@ struct SavingsView: View {
         .navigationTitle("Savings")
     }
 
-    /// `explained` adds the ⓘ to money and time saved (in the top section only).
+    /// `explained` adds the ⓘ after money and time saved (in the top section only).
     @ViewBuilder
     private func summaryRows(_ summary: SavingsSummary, explained: Bool) -> some View {
-        LabeledContent {
-            Text(SavingsCard.money(summary.dollars))
-        } label: {
-            if explained {
-                InfoLabel("Money saved", message: Self.moneySavedInfo)
-            } else {
-                Text("Money saved")
+        LabeledContent("Money saved") {
+            HStack(spacing: 6) {
+                Text(SavingsCard.money(summary.dollars))
+                if explained { InfoButton("Money saved", message: Self.moneySavedInfo) }
             }
         }
-        LabeledContent {
-            Text(SavingsCard.minutes(summary.minutes))
-        } label: {
-            if explained {
-                InfoLabel("Time saved", message: Self.timeSavedInfo)
-            } else {
-                Text("Time saved")
+        LabeledContent("Time saved") {
+            HStack(spacing: 6) {
+                Text(SavingsCard.minutes(summary.minutes))
+                if explained { InfoButton("Time saved", message: Self.timeSavedInfo) }
             }
         }
         LabeledContent("Full docks avoided", value: "\(summary.fullDocksAvoided) · \(SavingsCard.minutes(summary.fullDockMinutes))")

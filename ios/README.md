@@ -211,7 +211,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Riding with directions, phone locked: each turn is announced ahead and at the corner, music ducks, and arrival is announced at the dock. Taking a wrong turn gives "Rerouting." within a few seconds.
 - [ ] The Lock Screen and Dynamic Island show the next turn, the distance and the dock's open docks, and update to each following turn as you ride (also on a short route around a block); the activity ends a couple of minutes after arrival.
 - [ ] During directions, about every minute you hear the dock's status ("… still has 8 docks open").
-- [ ] The ⓘ buttons (Savings: money saved, time saved, phone-free; a saved place: Docks, Alert Me When I Arrive) open a small popover, and tapping the rest of the row does nothing.
+- [ ] The ⓘ buttons (Savings: after money and time saved, and next to Safety; a saved place: Docks, Alert Me When I Arrive) open a small popover, and tapping the rest of the row does nothing.
 - [ ] "Hey Siri, ask Dock Finder to stop directions" stops directions and removes the Live Activity. "Hey Siri, ask Dock Finder to direct me" after saying "no" starts directions to the same dock.
 - [ ] "Ask Dock Finder to start a ride to school" asks "Want me to guide you to the dock when you're close?" With "yes", the arrival alert is followed by directions to the dock it named.
 - [ ] A ride shows a "Riding to school" Live Activity with the distance to go.
