@@ -293,7 +293,7 @@ struct SetUsualDockIntent: AppIntent {
 struct StartRideIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Start Ride"
     static let description = IntentDescription(
-        "Tells you where to dock when you're close to where you're heading. The destination can be a saved place or anywhere Apple Maps finds. Works with your phone locked when Dock Finder has Always location access."
+        "Tells you where to dock when you're close to where you're heading. The destination can be a saved place, a landmark or an address. Works with your phone locked when Dock Finder has Always location access."
     )
     static let supportedModes: IntentModes = .background
 
