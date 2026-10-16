@@ -213,6 +213,34 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
         nextManeuver.map { max($0.offset - along, 0) }
     }
 
+    /// What the rider is doing now, shown above the next turn: "Head north
+    /// on 6th Avenue" before the first turn, then "On Bleecker Street"
+    /// after turning onto it.
+    var currentInstruction: String? {
+        guard nextStep > 0, nextStep - 1 < route.steps.count else {
+            return route.startHeading.map { "Head \($0)" }
+        }
+        let passed = route.steps[nextStep - 1]
+        guard !passed.isArrival else { return nil }
+        let instruction = Speech.instruction(passed.instruction)
+        if passed.offset <= Self.turnNowDistance {
+            // The start ("Head north on 6th Avenue", "Start on 6th Avenue").
+            return Self.addingHeading(route.startHeading, to: instruction)
+        }
+        return Self.street(after: instruction)
+    }
+
+    /// "Turn right onto Bleecker Street" → "On Bleecker Street".
+    static func street(after instruction: String) -> String {
+        guard let match = instruction.range(of: #"\b(?:onto|on)\s+(.+?)\.?$"#, options: [.regularExpression, .caseInsensitive]) else {
+            return instruction
+        }
+        let phrase = instruction[match]
+        guard let space = phrase.firstIndex(where: \.isWhitespace) else { return instruction }
+        let street = phrase[space...].trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return street.isEmpty ? instruction : "On \(street)"
+    }
+
     /// What to say when guidance starts: how far it is, which way to set
     /// off, then the first maneuver. "0.3 miles to West 4th and Mercer.
     /// Head north on 6th Avenue." / "… Head east, then in 300 feet, turn

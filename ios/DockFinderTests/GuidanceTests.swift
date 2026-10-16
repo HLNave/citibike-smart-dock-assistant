@@ -117,6 +117,31 @@ struct GuidanceProgressTests {
         #expect(progress.along < 5)
     }
 
+    @Test func showsWhatTheRiderIsDoingNowAboveTheNextTurn() {
+        var progress = GuidanceProgress(route: testRoute())
+        _ = progress.opening()
+        #expect(progress.currentInstruction == "Head north")
+        #expect(progress.nextManeuver?.instruction == "Turn right onto Bleecker St")
+        _ = progress.update(at: fix(40.7300, -73.9950))
+        _ = progress.update(at: fix(40.7315, -73.9950))
+        _ = progress.update(at: fix(40.7325, -73.9950))                            // at the corner
+        #expect(progress.currentInstruction == "On Bleecker Street")
+
+        var started = GuidanceProgress(route: testRoute(firstInstruction: "Head north on 6th Ave"))
+        _ = started.opening()
+        #expect(started.currentInstruction == "Head north on 6th Avenue")
+    }
+
+    @Test(arguments: [
+        ("Turn right onto Bleecker Street", "On Bleecker Street"),
+        ("Slight left onto Broadway.", "On Broadway"),
+        ("Turn left to stay on West 4th Street", "On West 4th Street"),
+        ("Make a U-turn", "Make a U-turn"),
+    ])
+    func streetAfterATurn(instruction: String, expected: String) {
+        #expect(GuidanceProgress.street(after: instruction) == expected)
+    }
+
     @Test func inaccurateFixesAreIgnored() {
         var progress = GuidanceProgress(route: testRoute())
         #expect(progress.update(at: fix(40.7325, -73.9950, accuracy: 120)).isEmpty)

@@ -55,6 +55,7 @@ final class DockFinderLiveActivity {
     func update(_ state: State, minInterval: TimeInterval = 5, force: Bool = false) async {
         guard let activity, state != lastState else { return }
         let sameStep = state.headline == lastState?.headline
+            && state.current == lastState?.current
             && state.dockName == lastState?.dockName
             && state.docksOpen == lastState?.docksOpen
         if !force, sameStep, Date.now.timeIntervalSince(lastUpdate) < minInterval { return }
@@ -98,7 +99,8 @@ extension GuidanceActivityAttributes.ContentState {
             detail: detail,
             dockName: progress.route.station.spokenName,
             docksOpen: docksOpen,
-            symbol: maneuverSymbol(for: instruction)
+            symbol: maneuverSymbol(for: instruction),
+            current: progress.currentInstruction
         )
     }
 

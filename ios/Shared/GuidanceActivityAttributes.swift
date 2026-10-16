@@ -31,6 +31,9 @@ nonisolated struct GuidanceActivityAttributes: ActivityAttributes {
         var docksOpen: Int?
         /// SF Symbol for the next maneuver or phase.
         var symbol: String
+        /// While guiding, what the rider is doing now, above the next turn:
+        /// "Head north on 6th Avenue", "On Bleecker Street".
+        var current: String? = nil
     }
 
     /// Where the rider is heading: a saved place, a searched place, or the dock.

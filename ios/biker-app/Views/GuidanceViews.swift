@@ -130,6 +130,12 @@ private struct ActiveDirectionsCard: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.tint)
 
+            if let current = progress.currentInstruction {
+                Text(current)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
             HStack(spacing: 14) {
                 Image(systemName: symbol)
                     .font(.system(size: 26, weight: .semibold))

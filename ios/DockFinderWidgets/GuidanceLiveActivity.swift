@@ -35,6 +35,12 @@ struct GuidanceLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.center) {
                     VStack(spacing: 2) {
+                        if let current = context.state.current, context.state.phase == .guiding {
+                            Text(current)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                         Text(context.state.headline)
                             .font(.headline)
                             .lineLimit(2)
@@ -99,6 +105,14 @@ private struct LockScreenView: View {
                 .foregroundStyle(accent)
                 .frame(width: 48)
             VStack(alignment: .leading, spacing: 3) {
+                // Now, then the next turn: "Head north on 6th Avenue" above
+                // "Turn right onto 12th Street · In 0.2 miles".
+                if let current = state.current, state.phase == .guiding {
+                    Text(current)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                }
                 Text(state.headline)
                     .font(.headline)
                     .lineLimit(2)

@@ -43,7 +43,7 @@ Whenever Siri tells you about a dock (finding a dock, checking a station, your s
 - It always says which way to set off ("Head east on…"), even when Apple's route data only says "Start on West 14th Street".
 - If you leave the route, it says "Rerouting" and gives the new next turn.
 - It re-checks the dock every minute (and once more as you get close) and tells you: "West 4th and Mercer still has 8 docks open", or "…is filling up, 3 docks open" when it's dropping. If the dock fills up: "West 4th and Mercer is full now. Heading to Mercer and Bleecker instead, 6 docks open."
-- The Lock Screen always shows the next turn on the way, not a later one: on short routes that loop around a one-way block, it used to match you to a later street.
+- The Lock Screen shows what you're doing now ("Head north on 6th Avenue", then "On Bleecker Street") above the next turn and how far it is, and moves to each following turn as you ride.
 - The next turn, the distance to it and the dock's open docks also show on the **Lock Screen and in the Dynamic Island**.
 - **"Hey Siri, ask Dock Finder to stop directions"** (or "…to end my ride") stops it. It also stops on its own at the dock, or after 45 minutes.
 - Said "no" by mistake? **"Hey Siri, ask Dock Finder to direct me"** guides you to the dock you were just told about (or the nearest one with room).
