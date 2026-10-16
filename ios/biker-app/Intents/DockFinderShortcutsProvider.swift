@@ -79,11 +79,13 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 "Ask \(.applicationName) to find a dock near \(\.$place)",
                 "Ask \(.applicationName) to find a dock at \(\.$place)",
                 "Ask \(.applicationName) for a dock near \(\.$place)",
+                "Ask \(.applicationName) to find me a dock near \(\.$place)",
                 // Siri often hears "dock" as "doc".
                 "Ask \(.applicationName) to check my \(\.$place) doc",
                 "Ask \(.applicationName) to find a doc near \(\.$place)",
                 "Ask \(.applicationName) to find a doc at \(\.$place)",
                 "Ask \(.applicationName) for a doc near \(\.$place)",
+                "Ask \(.applicationName) to find me a doc near \(\.$place)",
             ],
             shortTitle: "Dock Near Saved Place",
             systemImageName: "star"
@@ -93,9 +95,19 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             phrases: [
                 "Ask \(.applicationName) to find a dock somewhere else",
                 "Ask \(.applicationName) for a dock somewhere else",
+                "Ask \(.applicationName) to find me a dock somewhere else",
+                "Ask \(.applicationName) to find a dock elsewhere",
+                "Ask \(.applicationName) to find me a dock elsewhere",
+                "Ask \(.applicationName) to find a dock someplace else",
+                "Ask \(.applicationName) to find a dock near another place",
                 // Siri often hears "dock" as "doc".
                 "Ask \(.applicationName) to find a doc somewhere else",
                 "Ask \(.applicationName) for a doc somewhere else",
+                "Ask \(.applicationName) to find me a doc somewhere else",
+                "Ask \(.applicationName) to find a doc elsewhere",
+                "Ask \(.applicationName) to find me a doc elsewhere",
+                "Ask \(.applicationName) to find a doc someplace else",
+                "Ask \(.applicationName) to find a doc near another place",
             ],
             shortTitle: "Dock Near a Place",
             systemImageName: "mappin.and.ellipse"
