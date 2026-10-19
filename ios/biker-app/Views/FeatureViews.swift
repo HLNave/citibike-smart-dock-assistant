@@ -64,7 +64,7 @@ struct PlaceSearchView: View {
     private func search() async {
         model.reset()
         do {
-            results = Array(try await MapKitPlaceSearch().search(query).prefix(8))
+            results = Array(try await MapKitPlaceSearch().search(query, rewritingWith: OnDeviceModelPlaceRewriter()).places.prefix(8))
             searchError = nil
             // The best match is usually right, so answer for it straight away.
             if let first = results.first { await findDock(near: first) }

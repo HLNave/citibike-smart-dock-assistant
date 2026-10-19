@@ -3,9 +3,11 @@
 //  Dock Finder
 //
 //  Answers a free-form request. Everything that can be answered on device
-//  is; the n8n backend is only asked when neither on-device parser
-//  understands the request, or when the place or station it names can't
-//  be found on device.
+//  is; the n8n backend is only asked when no on-device parser understands
+//  the request, or when the place or station it names can't be found on
+//  device. Before giving up on a place or station, Apple's on-device model
+//  (where available) gets one more try at finding it (OnDeviceRecovery).
+//  That second try also covers the Siri actions that call `handle(_:)`.
 //
 
 import CoreLocation
@@ -22,6 +24,8 @@ struct AssistantRouter {
     var location: any LocationProviding
     var sessionID: String
     var guidance: any GuidanceControlling = GuidanceSession.shared
+    /// Rewrites a place the map can't find. `nil`: no second try.
+    var placeRewriter: (any PlaceQueryRewriting)? = nil
 
     static let helpText = "You can ask whether a station has room, like is Mercer and Bleecker full, or how many bikes are out. To get docking directions on the way somewhere, say start a ride to school."
     static let stoppedDirections = "Okay, I stopped the directions."
@@ -48,7 +52,8 @@ struct AssistantRouter {
             ],
             backend: N8NAssistantClient.configured(),
             location: LocationService.shared,
-            sessionID: AssistantSession.id()
+            sessionID: AssistantSession.id(),
+            placeRewriter: OnDeviceModelPlaceRewriter()
         )
     }
 
@@ -87,8 +92,10 @@ struct AssistantRouter {
             if let saved = store.place(matching: spoken) {
                 return try await service.findDock(for: saved).answer
             }
-            let destination = try await searchedDestination(spoken)
-            return try await service.findDock(near: destination).answer
+            let found = try await searchedDestination(spoken)
+            var answer = try await service.findDock(near: found.destination).answer
+            if found.rewritten { answer.markAnswered(by: .appleIntelligence) }
+            return answer
 
         case .station(let spoken):
             if let saved = savedPlaceForDock(spoken) {
@@ -161,15 +168,25 @@ struct AssistantRouter {
         }
 
         let ride: Ride
+        var rewritten = false
         if let saved = store.place(matching: spoken) {
             ride = Ride(destination: saved.destination, savedPlaceID: saved.id, alertDistance: saved.alertDistance)
         } else if Self.personalPlaceNames.contains(spoken) || spoken.hasPrefix("my ") {
             let name = SavedPlace.normalizedName(spoken)
             return DockAnswer(text: "You don't have a saved place called \(name). Add it in Dock Finder, or say an address or landmark instead.")
         } else {
-            ride = Ride(destination: try await searchedDestination(spoken))
+            let found = try await searchedDestination(spoken)
+            ride = Ride(destination: found.destination)
+            rewritten = found.rewritten
         }
 
+        var answer = try await begin(ride)
+        if rewritten { answer.markAnswered(by: .appleIntelligence) }
+        return answer
+    }
+
+    /// Starts watching `ride`, or answers right away when the rider is already there.
+    private func begin(_ ride: Ride) async throws -> DockAnswer {
         // Already close: answer now instead of watching for an arrival that won't come.
         if let here = try? await location.currentLocation().location,
            here.distance(from: ride.destination.location) <= ride.alertDistance {
@@ -203,12 +220,15 @@ struct AssistantRouter {
     // MARK: - Helpers
 
     /// Speaks the rider's own words ("from union square"), not the map's
-    /// formal name ("from Union Square Park").
-    private func searchedDestination(_ spoken: String) async throws -> Destination {
-        guard let match = try await placeSearch.search(spoken).first else {
+    /// formal name ("from Union Square Park"), even when Apple's model
+    /// rewrote the search (`rewritten`).
+    private func searchedDestination(_ spoken: String) async throws -> (destination: Destination, rewritten: Bool) {
+        let found = try await placeSearch.search(spoken, rewritingWith: placeRewriter)
+        guard let match = found.places.first else {
             throw DockFinderError.placeNotFound(spoken)
         }
-        return Destination(name: spoken, latitude: match.latitude, longitude: match.longitude, address: match.address)
+        let destination = Destination(name: spoken, latitude: match.latitude, longitude: match.longitude, address: match.address)
+        return (destination, found.rewrittenQuery != nil)
     }
 
     private func askBackend(_ text: String, otherwise error: DockFinderError?) async throws -> DockAnswer {

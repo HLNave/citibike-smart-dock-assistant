@@ -4,8 +4,9 @@
 //
 //  Turns "Union Square" or "NYU Stern" into coordinates with Apple's
 //  built-in map search. Unlike the backend's OpenStreetMap lookup, it
-//  understands landmarks and business names directly, so no AI rewrite
-//  step is needed.
+//  understands landmarks and business names directly. For descriptions
+//  it can't find ("that bagel place by Stern"), Apple's on-device model
+//  can suggest a better search (see OnDeviceRecovery.swift).
 //
 
 import CoreLocation
@@ -21,6 +22,39 @@ nonisolated protocol PlaceSearching: Sendable {
 
 extension PlaceSearching {
     func address(for location: CLLocation) async -> String? { nil }
+
+    /// `search(_:)`, with one more try when nothing is found: `rewriter`
+    /// (Apple's on-device model) turns a description the map doesn't know
+    /// into a name or address it does. If that's not found either, the
+    /// error names what the rider said, not the rewrite.
+    func search(
+        _ query: String,
+        rewritingWith rewriter: (any PlaceQueryRewriting)?
+    ) async throws -> (places: [Destination], rewrittenQuery: String?) {
+        let notFound: DockFinderError
+        do {
+            let places = try await search(query)
+            guard places.isEmpty else { return (places, nil) }
+            notFound = .placeNotFound(query)
+        } catch let error as DockFinderError {
+            guard case .placeNotFound = error else { throw error }
+            notFound = error
+        }
+
+        let original = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let rewriter, !original.isEmpty,
+              let rewritten = await rewriter.rewrite(original)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rewritten.isEmpty, rewritten.lowercased() != original.lowercased()
+        else { throw notFound }
+
+        do {
+            let places = try await search(rewritten)
+            guard !places.isEmpty else { throw notFound }
+            return (places, rewritten)
+        } catch DockFinderError.placeNotFound {
+            throw notFound
+        }
+    }
 }
 
 nonisolated struct MapKitPlaceSearch: PlaceSearching {
