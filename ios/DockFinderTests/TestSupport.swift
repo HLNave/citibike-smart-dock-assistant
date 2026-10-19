@@ -124,3 +124,44 @@ final class GuidanceSpy: GuidanceControlling {
         isActive = false
     }
 }
+
+/// A router over two Brooklyn stations: Smith & Bergen ("near", full) and
+/// Court & State ("mid", 6 docks), with the rider at Smith & Bergen.
+@MainActor
+func testRouter(
+    parsers: [any RequestParsing] = [KeywordRequestParser()],
+    places: any PlaceSearching = StubPlaces(),
+    saved: [SavedPlace] = [],
+    rides: RideSpy? = nil,
+    backend: (any AssistantBackend)? = nil
+) -> AssistantRouter {
+    let fix = LocationFix(location: userLocation, isApproximate: false)
+    return AssistantRouter(
+        service: DockFinderService(
+            location: StubLocation(result: .success(fix)),
+            feeds: StubFeeds(
+                information: .success(informationFeed([
+                    info("near", "Smith St & Bergen St", 40.6861, -73.9906),
+                    info("mid", "Court St & State St", 40.6900, -73.9920),
+                ])),
+                status: .success(statusFeed([status("near", docks: 0, bikes: 3), status("mid", docks: 6, bikes: 2)]))
+            ),
+            now: { referenceNow }
+        ),
+        placeSearch: places,
+        store: testStore(saved),
+        rides: rides ?? RideSpy(),
+        parsers: parsers,
+        backend: backend,
+        location: StubLocation(result: .success(fix)),
+        sessionID: "app-test"
+    )
+}
+
+struct StubBackend: AssistantBackend {
+    var reply: String
+
+    func ask(_ text: String, location: CLLocation?, sessionID: String) async throws -> String {
+        reply
+    }
+}

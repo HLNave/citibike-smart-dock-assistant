@@ -59,7 +59,11 @@ struct AssistantRouter {
             guard let request = await parser.parse(text) else { continue }
             do {
                 var answer = try await handle(request)
-                answer.source = parser.answerSource
+                // Unless Apple's model found the place or station, the
+                // parser is what understood it.
+                if answer.answeredBy == .fixedAction {
+                    answer.markAnswered(by: parser.answeredBy)
+                }
                 return answer
             } catch DockFinderError.placeNotFound(let query) {
                 // The backend's AI rewrite may still find it ("that bagel place by Stern").
@@ -215,7 +219,9 @@ struct AssistantRouter {
         let here = try? await location.currentLocation().location
         do {
             let reply = try await backend.ask(text, location: here, sessionID: sessionID)
-            return DockAnswer(text: reply, source: .server)
+            var answer = DockAnswer(text: reply)
+            answer.markAnswered(by: .server)
+            return answer
         } catch {
             throw error as? DockFinderError ?? .backendUnavailable
         }

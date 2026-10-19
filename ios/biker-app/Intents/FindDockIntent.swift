@@ -53,7 +53,11 @@ extension AppIntent {
             station: answer.station?.name,
             avoidedStation: answer.avoided?.name,
             location: here,
-            details: ["intent": String(describing: Self.self), "answer": answer.text]
+            details: [
+                "intent": String(describing: Self.self),
+                "answer": answer.text,
+                "answered_by": answer.answeredBy.rawValue,
+            ]
         )
         SavingsStore.shared.record(answer, from: here, context: "siri")
         if answer.station != nil {
