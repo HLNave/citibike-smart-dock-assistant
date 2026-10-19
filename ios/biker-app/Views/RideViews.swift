@@ -149,8 +149,9 @@ struct StartRideView: View {
     @State private var results: [Destination] = []
     @State private var error: DockFinderError?
     @State private var outcome: AnswerModel = AnswerModel()
-    /// Remembered between rides.
-    @AppStorage("guideRidesToDock") private var guidesToDock = true
+    /// Starts where the Directions setting says (with Ask Me, as it was
+    /// left last time).
+    @State private var guidesToDock = DirectionsPreference.rideSwitchDefault()
 
     var body: some View {
         NavigationStack {
@@ -208,6 +209,7 @@ struct StartRideView: View {
                 }
                 Section {
                     Toggle("Guide me to the dock when I'm close", isOn: $guidesToDock)
+                        .onChange(of: guidesToDock) { _, isOn in DirectionsPreference.rememberRideSwitch(isOn) }
                     AlwaysLocationNotice()
                 } footer: {
                     Text("Hands-free: “Hey Siri, ask Dock Finder to start a ride to school” (any saved place), or “…to start a ride” and then say where you're heading.")

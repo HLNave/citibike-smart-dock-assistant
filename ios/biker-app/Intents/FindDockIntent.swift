@@ -9,9 +9,10 @@
 //  Answers that name a dock end with "Want me to direct you there?", and
 //  a new ride asks "Want me to guide you to the dock when you're close?".
 //  Siri is already in the conversation, so the rider can answer by voice
-//  with the phone locked. Intents that can start guidance or a ride are
-//  LiveActivityIntents, which lets them start the Lock Screen activity
-//  from the background.
+//  with the phone locked. The Directions setting (DirectionsPreference)
+//  can skip both questions: always start directions, or never offer them.
+//  Intents that can start guidance or a ride are LiveActivityIntents,
+//  which lets them start the Lock Screen activity from the background.
 //
 
 import AppIntents
@@ -31,11 +32,14 @@ extension DockAnswer {
 }
 
 extension AppIntent {
-    /// Speaks `answer`, then follows up:
+    /// Speaks `answer`, then follows up (see `SiriFollowUp`):
     /// - When `answer` started a ride (it's not the ride from before), asks
-    ///   whether to guide the rider to the dock on arrival.
+    ///   whether to guide the rider to the dock on arrival, unless the
+    ///   Directions setting already says.
     /// - When it names a dock, asks "Want me to direct you there?" and, on
     ///   yes, confirms and starts turn-by-turn guidance in the app's voice.
+    ///   With the setting on Start Right Away it starts without asking;
+    ///   with Don't Offer it doesn't ask.
     @MainActor
     func reply(
         with answer: DockAnswer,
@@ -57,7 +61,30 @@ extension AppIntent {
             SavingsStore.shared.recordHandsFree(context: "siri")
         }
 
-        if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
+        let startedRide = checksForNewRide
+            && RideTracker.shared.currentRide != nil
+            && RideTracker.shared.currentRide != rideBefore
+        if !startedRide, let station = answer.station {
+            // For "direct me", whatever happens next.
+            guidance.offer(station)
+        }
+        let followUp = SiriFollowUp.after(
+            answer,
+            startedRide: startedRide,
+            guidingToStationID: guidance.station?.id,
+            preference: DirectionsPreference.current()
+        )
+
+        switch followUp {
+        case .none:
+            return spokenResult(answer.text)
+
+        case .guideRide(let guides):
+            RideTracker.shared.setGuidesToDock(guides)
+            guard guides else { return spokenResult(answer.text) }
+            return spokenResult(answer.text, dialog: "\(answer.text) When you're close, I'll guide you to the dock.")
+
+        case .askToGuideRide:
             do {
                 try await requestConfirmation(
                     conditions: [],
@@ -69,27 +96,37 @@ extension AppIntent {
             }
             RideTracker.shared.setGuidesToDock(true)
             return spokenResult(answer.text, dialog: "Okay. When you're close, I'll guide you to the dock.")
-        }
 
-        guard let station = answer.station else { return spokenResult(answer.text) }
-        guidance.offer(station)
-        guard guidance.station?.id != station.id else { return spokenResult(answer.text) }
-        do {
-            try await requestConfirmation(
-                conditions: [],
-                actionName: .go,
-                dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"
-            )
-        } catch {
-            // "No", or Siri couldn't ask. The answer was already spoken with
-            // the question, so don't repeat it.
-            return spokenResult(answer.text, dialog: "Okay.")
+        case .offerDirections(let station):
+            do {
+                try await requestConfirmation(
+                    conditions: [],
+                    actionName: .go,
+                    dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"
+                )
+            } catch {
+                // "No", or Siri couldn't ask. The answer was already spoken with
+                // the question, so don't repeat it.
+                return spokenResult(answer.text, dialog: "Okay.")
+            }
+            // Siri only confirms; the app's voice gives the directions once Siri
+            // has finished, so the two don't talk over each other.
+            let siriLine = guidance.siriConfirmation(for: station)
+            let reply = try await guidance.start(to: station, siriWillSay: siriLine)
+            return spokenResult(guidance.isActive ? siriLine : reply)
+
+        case .startDirections(let station):
+            // As if the rider had said yes, but Siri also says the answer,
+            // so the app's voice waits for both.
+            let siriLine = "\(answer.text) \(guidance.siriConfirmation(for: station))"
+            do {
+                let reply = try await guidance.start(to: station, siriWillSay: siriLine)
+                return spokenResult(answer.text, dialog: guidance.isActive ? siriLine : "\(answer.text) \(reply)")
+            } catch let error as DockFinderError {
+                // Keep the answer even when directions can't start.
+                return spokenResult(answer.text, dialog: "\(answer.text) \(String(localized: error.localizedStringResource))")
+            }
         }
-        // Siri only confirms; the app's voice gives the directions once Siri
-        // has finished, so the two don't talk over each other.
-        let siriLine = guidance.siriConfirmation(for: station)
-        let reply = try await guidance.start(to: station, siriWillSay: siriLine)
-        return spokenResult(guidance.isActive ? siriLine : reply)
     }
 }
 
