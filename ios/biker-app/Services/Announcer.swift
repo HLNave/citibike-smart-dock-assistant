@@ -6,6 +6,7 @@
 //  music or navigation the way Maps does) and posts it as a notification,
 //  so it still reaches the rider if speech can't play. With AirPods and
 //  Announce Notifications on, Siri also reads the notification aloud.
+//  Also speaks the Action Button's answer (speakAnswer).
 //
 
 import AVFoundation
@@ -34,9 +35,20 @@ final class Announcer: NSObject {
         await speak(text)
     }
 
-    private func speak(_ text: String) async {
+    /// Speaks an answer the rider just asked for (the Action Button). The
+    /// notification is only a fallback here, posted if audio can't start,
+    /// so AirPods with Announce Notifications on don't say it twice.
+    func speakAnswer(_ text: String, title: String) async {
+        if await !speak(text) {
+            await Self.postNotification(text, title: title)
+        }
+    }
+
+    /// `false` if audio couldn't start, so nothing was said.
+    @discardableResult
+    private func speak(_ text: String) async -> Bool {
         // The notification still carries the answer if audio can't start.
-        guard await SpeechAudio.activate() else { return }
+        guard await SpeechAudio.activate() else { return false }
         utteranceID += 1
         let id = utteranceID
         await withCheckedContinuation { continuation in
@@ -48,6 +60,7 @@ final class Announcer: NSObject {
             }
         }
         SpeechAudio.deactivate()
+        return true
     }
 
     private func finishSpeaking() {

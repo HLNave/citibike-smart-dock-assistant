@@ -107,6 +107,10 @@ final class GuidanceSpy: GuidanceControlling {
         self.offered = offered
     }
 
+    func offer(_ station: DockStation, now: Date) {
+        offered = station
+    }
+
     func recentOffer(now: Date) -> DockStation? { offered }
 
     func start(to station: DockStation, siriWillSay siriLine: String?) async throws -> String {
@@ -122,5 +126,14 @@ final class GuidanceSpy: GuidanceControlling {
     func stop() async {
         stopCount += 1
         isActive = false
+    }
+}
+
+@MainActor
+final class SpeakerSpy: AnswerSpeaking {
+    private(set) var spoken: [String] = []
+
+    func speakAnswer(_ text: String, title: String) async {
+        spoken.append(text)
     }
 }
