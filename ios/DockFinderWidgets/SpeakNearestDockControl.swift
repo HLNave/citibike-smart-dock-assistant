@@ -22,7 +22,8 @@ struct SpeakNearestDockControl: ControlWidget {
         StaticControlConfiguration(kind: Self.kind) {
             ControlWidgetButton(action: SpeakNearestDockIntent()) {
                 Label("Nearest Dock", systemImage: "bicycle")
-                    // The Action Button shows "Hold to Hear Nearest Dock".
+                    // The Action Button shows this as its hint (exact
+                    // wording not yet seen on a phone).
                     .controlWidgetActionHint("Hear Nearest Dock")
             }
         }
