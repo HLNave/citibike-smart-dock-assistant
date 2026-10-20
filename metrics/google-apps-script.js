@@ -32,17 +32,27 @@ const COUNTED = {
   full_docks_avoided: ['full_dock_avoided'],
 };
 
+// The app only drops a batch from its queue when the reply says ok: true,
+// and resends it otherwise. So ok is about the Events rows alone: once
+// they're saved, a failure in the Users tab must not make the app resend
+// them as duplicates (run rebuildUsers to fix the tab instead).
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000); // one batch at a time, so rows never interleave
+  // One batch at a time, so rows never interleave. Gives up well before
+  // the app's 20-second timeout, so the app hears the answer.
+  if (!lock.tryLock(10000)) return json({ ok: false, error: 'busy' });
   try {
     const book = SpreadsheetApp.getActiveSpreadsheet();
     const events = (JSON.parse(e.postData.contents).events || []);
     appendEvents(book, events, new Date());
-    if (book.getSheetByName('Users')) {
-      updateUsers(book, events, readUsers(book));
-    } else {
-      rebuildUsers(); // first batch since adding the Users tab: include past events
+    try {
+      if (book.getSheetByName('Users')) {
+        updateUsers(book, events, readUsers(book));
+      } else {
+        rebuildUsers(); // first batch since adding the Users tab: include past events
+      }
+    } catch (error) {
+      return json({ ok: true, added: events.length, usersError: String(error) });
     }
     return json({ ok: true, added: events.length });
   } catch (error) {

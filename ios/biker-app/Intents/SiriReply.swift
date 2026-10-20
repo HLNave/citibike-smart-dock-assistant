@@ -10,6 +10,15 @@
 
 import Foundation
 
+/// The yes/no questions Siri can ask after an answer, as the team's sheet
+/// names them (`siri_followup`).
+enum SiriQuestion: String {
+    /// "Want me to direct you there?"
+    case directions
+    /// A new ride's "Want me to guide you to the dock when you're close?"
+    case rideGuidance = "ride_guidance"
+}
+
 struct SiriReply: Equatable {
     /// What Shortcuts receives.
     let value: String
@@ -24,6 +33,9 @@ struct SiriReplier {
     var preference: DirectionsPreference
     /// Asks Siri's yes/no question. Throws for "no", or when Siri couldn't ask.
     var confirm: (String) async throws -> Void
+    /// Told the rider's reply to each question asked: `nil` for yes, or
+    /// what `confirm` threw.
+    var replied: (SiriQuestion, (any Error)?) -> Void = { _, _ in }
 
     func reply(to answer: DockAnswer, rideBefore: Ride?, checksForNewRide: Bool) async throws -> SiriReply {
         let startedRide = checksForNewRide && rides.currentRide != nil && rides.currentRide != rideBefore
@@ -51,8 +63,10 @@ struct SiriReplier {
             do {
                 try await confirm("\(answer.text) \(GuidanceSession.rideQuestion)")
             } catch {
+                replied(.rideGuidance, error)
                 return SiriReply(value: answer.text, dialog: "Okay. I'll just tell you where to dock.")
             }
+            replied(.rideGuidance, nil)
             rides.setGuidesToDock(true)
             return SiriReply(value: answer.text, dialog: "Okay. When you're close, I'll guide you to the dock.")
 
@@ -60,10 +74,12 @@ struct SiriReplier {
             do {
                 try await confirm("\(answer.text) \(GuidanceSession.offerQuestion)")
             } catch {
+                replied(.directions, error)
                 // "No", or Siri couldn't ask. The answer was already spoken with
                 // the question, so don't repeat it.
                 return SiriReply(value: answer.text, dialog: "Okay.")
             }
+            replied(.directions, nil)
             // Siri only confirms; the app's voice gives the directions once Siri
             // has finished, so the two don't talk over each other.
             let siriLine = guidance.siriConfirmation(for: station)

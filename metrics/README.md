@@ -21,6 +21,10 @@ When a rider agrees to share usage data (asked once in the app; changeable under
 
 **The team's sheet is already set up** and its URL is committed in `ios/Config/DockFinder.xcconfig`, so every build reports there with no setup. Only the sheet's owner ever signs in to Google (once, when deploying); riders never do. The repo is public, so anyone who finds the URL could add junk rows, but they can't read anything: the script only writes to the sheet, never returns its contents. To build without sending anywhere, add `DOCKFINDER_METRICS_URL =` to your `Local.xcconfig`. If you change the script later, use **Deploy → Manage deployments → Edit → New version**, so the URL stays the same.
 
+## Retries
+
+The app keeps each event on the phone until the script replies `{"ok": true}`, and resends it otherwise: offline, a timeout, the script failing, or Google returning an error page (which it does with a 200 status, so the status alone can't be trusted). The script says `ok` as soon as the Events rows are saved, even if updating Users fails, so a retry never duplicates rows that made it in. A phone keeps at most 1,000 unsent events. A send that times out after the script saved it can still arrive twice; `event_id` tells those apart.
+
 ## What a row contains
 
 | Column | Meaning |
@@ -56,7 +60,22 @@ One row per install, newest activity first, rewritten after every batch of event
 
 If the numbers ever look off (say, after deleting rows from Events), run **`rebuildUsers`** from the Apps Script editor (pick it in the function menu, then **▶ Run**) to rebuild the tab from Events.
 
-Events: `app_opened` (the app came on screen; `app_launch` in older builds, which also fired for background relaunches), `name_changed`, `sharing_turned_on`, `siri_answer`, `app_answer`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
+Events: `app_opened` (the app came on screen; `app_launch` in older builds, which also fired for background relaunches), `name_changed`, `sharing_turned_on`, `siri_answer`, `siri_failed`, `siri_followup`, `request_understood`, `app_answer`, `app_failed`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
+
+## Requests that didn't help
+
+These rows show where riders aren't getting what they need. Their `details` hold:
+
+| Event | When | `details` |
+|---|---|---|
+| `siri_answer` | Siri gave an answer. Every Siri command logs it; older builds skipped citywide totals, ending a ride, directions and setting a usual dock | `intent`, `answer`, `heard` (the destination, place or station the rider named, or the whole request for "Ask Dock Finder a question", as Siri heard it), `answered_by` (which step answered), `seconds` (from the command starting to the answer), `location_age_seconds` |
+| `siri_failed` | A Siri command ended in an error, which Siri spoke instead of an answer | `intent`, `heard`, `seconds`, `error` (e.g. `locationPermissionDenied`, `networkUnavailable`, `staleData`, `placeNotFound`, `cancelled`), plus `query`, `status_code` or `last_updated` for the errors that have one. Other errors, including ones from Siri itself (like the rider cancelling a question), give their domain and code (e.g. `NSURLErrorDomain -1001`) and `error_text` |
+| `siri_followup` | The rider answered "Want me to direct you there?" (`question`: `directions`) or a new ride's "guide you to the dock?" (`ride_guidance`) | `intent`, `heard`, `question`, `reply` (`yes` or `no`). A `no` also has `error`: iOS reports a spoken "no" and Siri being unable to ask the same way, so compare the `error` values to tell them apart |
+| `request_understood` | A free-form request ("Ask Dock Finder a question", or typed under Ask a Question) was read, before it's answered; also every "direct me" | `text` (the request), `answered_by` (which step understood it), `request` (the action it became). From "direct me": `intent`, `place` (the saved place Siri passed, if any), `request` |
+| `app_answer` | An answer shown in the app | `answer`, `answered_by`, `seconds` |
+| `app_failed` | An in-app lookup ended in an error | `error` (as above), `seconds` |
+
+Signs a rider didn't get what they needed: a `siri_failed`; the help text (`"You can ask whether a station has room…"`) as a `siri_answer`; the same `intent` again within a couple of minutes; or an `app_opened` right after a `siri_answer`.
 
 ## Savings numbers
 

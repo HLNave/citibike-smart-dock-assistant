@@ -55,10 +55,14 @@ struct NearestDockAnnouncement {
     /// speech has finished (so the app stays awake until then) with the
     /// sentence that was said.
     func run() async -> String {
+        let log = SiriRequestLog(intent: String(describing: SpeakNearestDockIntent.self))
         let answer: DockAnswer
         do {
             answer = try await service.findNearestDock().answer
         } catch {
+            // Said instead of an answer, so it's a failed request for the
+            // team's sheet, as when Siri speaks an error.
+            metrics.log("siri_failed", details: log.details().merging(Metrics.errorDetails(error)) { $1 })
             // The messages are written to be spoken (DockFinderError).
             let message = (error as? DockFinderError)?.errorDescription ?? Self.fallbackError
             await say(message)
@@ -68,16 +72,16 @@ struct NearestDockAnnouncement {
         let here = lastKnownLocation()
         // Same event as a Siri answer, so it counts toward the team's
         // Siri requests; `intent` tells them apart.
+        var details = log.details()
+        details["answer"] = answer.text
+        details["answered_by"] = answer.answeredBy.rawValue
+        details.merge(Metrics.locationAge(here)) { $1 }
         metrics.log(
             "siri_answer",
             station: answer.station?.name,
             avoidedStation: answer.avoided?.name,
             location: here,
-            details: [
-                "intent": String(describing: SpeakNearestDockIntent.self),
-                "answer": answer.text,
-                "answered_by": answer.answeredBy.rawValue,
-            ]
+            details: details
         )
         savings.record(answer, from: here, context: "action_button")
         if let station = answer.station {

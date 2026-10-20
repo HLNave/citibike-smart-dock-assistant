@@ -8,9 +8,9 @@
 //  random per-install ID (not an Apple ID), the name the rider chose to
 //  give, if any, the rider's location at the time, and the docks involved.
 //
-//  The sheet's address comes from `DOCKFINDER_METRICS_URL` in the
-//  gitignored Local.xcconfig (see metrics/README.md). Without it, nothing
-//  is sent anywhere.
+//  The sheet's address comes from `DOCKFINDER_METRICS_URL`, committed in
+//  Config/DockFinder.xcconfig. Setting it empty in the gitignored
+//  Local.xcconfig sends nothing anywhere (see metrics/README.md).
 //
 
 import CoreLocation
@@ -163,13 +163,47 @@ final class Metrics {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             guard let body = try? Self.encoder.encode(["events": batch]) else { return }
             request.httpBody = body
-            guard let result = try? await send(request),
-                  let http = result.1 as? HTTPURLResponse, (200..<300).contains(http.statusCode)
-            else { return }
+            guard let result = try? await send(request), Self.sheetSaved(result) else { return }
             let sent = Set(batch.map(\.id))
             queue.removeAll { sent.contains($0.id) }
             save()
         }
+    }
+
+    /// Whether the sheet stored the batch. Apps Script answers 200 even
+    /// when the script fails, so the status alone isn't enough: only a
+    /// reply of `{"ok": true}` counts. Anything else (`{"ok": false}`, or
+    /// Google's HTML error page) keeps the batch queued for a retry.
+    nonisolated static func sheetSaved(_ result: (Data, URLResponse)) -> Bool {
+        guard let http = result.1 as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let reply = try? JSONSerialization.jsonObject(with: result.0) as? [String: Any]
+        else { return false }
+        return reply["ok"] as? Bool == true
+    }
+
+    /// What went wrong, for `siri_failed` and `app_failed` rows.
+    nonisolated static func errorDetails(_ error: any Error) -> [String: String] {
+        switch error {
+        case let error as DockFinderError:
+            error.metricsDetails
+        case is CancellationError:
+            ["error": "cancelled"]
+        default:
+            // Errors from Siri itself, e.g. the rider cancelling a question.
+            // Their type name is often just "NSError", so the domain and
+            // code are what tell them apart.
+            errorDetails(error as NSError)
+        }
+    }
+
+    private nonisolated static func errorDetails(_ error: NSError) -> [String: String] {
+        ["error": "\(error.domain) \(error.code)", "error_text": String(error.localizedDescription.prefix(200))]
+    }
+
+    /// How old `location` was when an answer used it, in whole seconds.
+    nonisolated static func locationAge(_ location: CLLocation?, now: Date = .now) -> [String: String] {
+        guard let location else { return [:] }
+        return ["location_age_seconds": String(Int(max(0, now.timeIntervalSince(location.timestamp))))]
     }
 
     /// When the rider stops sharing, anything not yet sent is deleted.

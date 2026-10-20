@@ -124,6 +124,36 @@ struct SiriReplyTests {
         #expect(reply.dialog == "Okay. I'll just tell you where to dock.")
     }
 
+    // MARK: Usage data
+
+    /// Each question Siri asks is reported once, with the rider's reply,
+    /// for the team's `siri_followup` rows. Answers that ask nothing report nothing.
+    @Test(arguments: [
+        (DirectionsPreference.ask, true, false, [SiriQuestion.directions], [true]),
+        (.ask, false, false, [.directions], [false]),
+        (.ask, true, true, [.rideGuidance], [true]),
+        (.ask, false, true, [.rideGuidance], [false]),
+        (.always, true, false, [], []),
+        (.never, true, false, [], []),
+    ])
+    func repliesAreReported(
+        preference: DirectionsPreference, says: Bool, ride: Bool,
+        questions: [SiriQuestion], yes: [Bool]
+    ) async throws {
+        var reported: [(SiriQuestion, Bool)] = []
+        let siri = SiriSpy(says: says)
+        let replier = SiriReplier(
+            guidance: GuidanceSpy(),
+            rides: ride ? RideSpy(currentRide: Ride(destination: school)) : RideSpy(),
+            preference: preference,
+            confirm: siri.ask,
+            replied: { question, declined in reported.append((question, declined == nil)) }
+        )
+        _ = try await replier.reply(to: ride ? rideAnswer : dockAnswer, rideBefore: nil, checksForNewRide: ride)
+        #expect(reported.map(\.0) == questions)
+        #expect(reported.map(\.1) == yes)
+    }
+
     @Test func alreadyThereIsADockAnswerNotARide() async throws {
         // "Start a ride to school" from right by school answers with a dock,
         // and the ride from before is still the current one.
