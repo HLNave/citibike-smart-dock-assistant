@@ -94,6 +94,11 @@ struct HomeView: View {
                     }
                     .controlSize(.large)
 
+                    NavigationLink(value: HomeRoute.directions) {
+                        Label("Directions", systemImage: "location.north.line")
+                            .font(.subheadline)
+                    }
+
                     NavigationLink(value: HomeRoute.privacy) {
                         Label("Privacy", systemImage: "hand.raised")
                             .font(.subheadline)
@@ -112,6 +117,7 @@ struct HomeView: View {
                 case .citywide: CitywideView()
                 case .ask: AskView()
                 case .savings: SavingsView()
+                case .directions: DirectionsSettingView()
                 case .privacy: PrivacyView()
                 }
             }
@@ -147,6 +153,7 @@ enum HomeRoute: Hashable {
     case citywide
     case ask
     case savings
+    case directions
     case privacy
 }
 

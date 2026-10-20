@@ -24,6 +24,7 @@ struct SiriPhraseTests {
         "CitywideStatusIntent",
         "DirectMeIntent",
         "StopDirectionsIntent",
+        "AskDockFinderIntent",
     ]
 
     /// The App Shortcuts metadata Xcode extracts into the app bundle.

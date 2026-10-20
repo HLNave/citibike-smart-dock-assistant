@@ -115,6 +115,7 @@ struct SiriInstructionsView: View {
         "“Ask Dock Finder to stop directions.”",
         "“Ask Dock Finder to end my ride.”",
         "“Ask Dock Finder how many bikes are out.”",
+        "“Ask Dock Finder a question.” Then say anything, in your own words.",
     ]
 
     private var locationIsUnavailable: Bool {

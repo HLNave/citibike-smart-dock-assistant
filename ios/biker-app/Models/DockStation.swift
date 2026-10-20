@@ -48,6 +48,23 @@ nonisolated struct DockAnswer: Sendable, Equatable {
         case server
     }
 
+    /// Which step understood the request, finer than `source`. Sent with
+    /// usage data as `answered_by`.
+    enum Step: String, Sendable, Equatable {
+        /// A fixed action (a Siri phrase or an app button), so there was
+        /// nothing to understand.
+        case fixedAction = "on_device"
+        /// The phrase rules (KeywordRequestParser).
+        case phraseRules = "phrase_rules"
+        /// A saved place or station name on its own (ShortAnswerParser).
+        case shortAnswer = "short_answer"
+        /// Apple's on-device model: it understood the request, or found the
+        /// place or station the other steps couldn't.
+        case appleIntelligence = "apple_intelligence"
+        /// The n8n backend.
+        case server
+    }
+
     let text: String
     /// The station the answer recommends, for directions. `nil` for
     /// answers that aren't about one station (citywide totals, server replies).
@@ -56,6 +73,17 @@ nonisolated struct DockAnswer: Sendable, Equatable {
     /// when the answer steers them away from one. Counts toward savings.
     var avoided: AvoidedDock? = nil
     var source: Source = .onDevice
+    private(set) var answeredBy: Step = .fixedAction
+
+    /// Sets `answeredBy`, and `source` to match.
+    mutating func markAnswered(by step: Step) {
+        answeredBy = step
+        switch step {
+        case .fixedAction, .phraseRules, .shortAnswer: source = .onDevice
+        case .appleIntelligence: source = .onDeviceModel
+        case .server: source = .server
+        }
+    }
 }
 
 // MARK: - Nearest dock to the rider
