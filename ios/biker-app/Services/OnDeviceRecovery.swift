@@ -51,3 +51,55 @@ nonisolated struct OnDeviceModelPlaceRewriter: PlaceQueryRewriting {
     }
 }
 
+// MARK: - Stations
+
+/// One station the rider may have meant.
+nonisolated struct StationChoice: Sendable, Equatable {
+    let id: String
+    let name: String
+}
+
+nonisolated protocol StationPicking: Sendable {
+    /// The ID of the station in `candidates` the rider meant by `spoken`
+    /// ("mercy and bleaker"), or `nil` when it's none of them.
+    func pick(_ spoken: String, from candidates: [StationChoice]) async -> String?
+}
+
+nonisolated struct OnDeviceModelStationPicker: StationPicking {
+    static let noneOfThem = "None of these"
+
+    private static let instructions = """
+        A Citi Bike rider in New York City said the name of a station, possibly misheard or shortened. \
+        Choose the station from the list that they most likely meant. If none of them fits, choose "\(noneOfThem)".
+        """
+
+    func pick(_ spoken: String, from candidates: [StationChoice]) async -> String? {
+        guard OnDeviceModelParser.isAvailable, !candidates.isEmpty else { return nil }
+        // The answer can only be one of these names, so it's always a real station.
+        var names: [String] = []
+        for candidate in candidates where !names.contains(candidate.name) {
+            names.append(candidate.name)
+        }
+        let list = names.map { "- \($0)" }.joined(separator: "\n")
+        do {
+            let schema = try GenerationSchema(
+                root: DynamicGenerationSchema(
+                    name: "StationChoice",
+                    description: "The station the rider meant, or \(Self.noneOfThem).",
+                    anyOf: names + [Self.noneOfThem]
+                ),
+                dependencies: []
+            )
+            let session = LanguageModelSession(instructions: Self.instructions)
+            let response = try await session.respond(
+                to: "The rider said: \"\(spoken)\"\nStations:\n\(list)",
+                schema: schema,
+                options: GenerationOptions(samplingMode: .greedy)
+            )
+            let chosen = try response.content.value(String.self)
+            return candidates.first { $0.name == chosen }?.id
+        } catch {
+            return nil
+        }
+    }
+}

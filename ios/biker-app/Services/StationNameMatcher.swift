@@ -84,6 +84,18 @@ nonisolated enum StationNameMatcher {
         return queryTokens.count >= 2 || best.score >= 10_000 ? best.station : nil
     }
 
+    /// The stations whose names come closest to `query` without being
+    /// close enough to match, best first: what Apple's model chooses from
+    /// when nothing matches. Only stations sharing at least one word.
+    static func shortlist(for query: String, in stations: [StationSnapshot], limit: Int = 8) -> [StationSnapshot] {
+        stations
+            .map { (station: $0, score: score(name: $0.name, query: query)) }
+            .filter { $0.score > 0 && $0.score < threshold }
+            .sorted { ($0.score, -$0.station.name.count) > ($1.score, -$1.station.name.count) }
+            .prefix(limit)
+            .map(\.station)
+    }
+
     /// Exact, or one typo apart for longer words ("Bleeker" ≈ "Bleecker").
     private static func similar(_ a: String, _ b: String) -> Bool {
         if a == b { return true }

@@ -26,6 +26,8 @@ struct AssistantRouter {
     var guidance: any GuidanceControlling = GuidanceSession.shared
     /// Rewrites a place the map can't find. `nil`: no second try.
     var placeRewriter: (any PlaceQueryRewriting)? = nil
+    /// Picks the station meant when no name matches. `nil`: no second try.
+    var stationPicker: (any StationPicking)? = nil
 
     static let helpText = "You can ask whether a station has room, like is Mercer and Bleecker full, or how many bikes are out. To get docking directions on the way somewhere, say start a ride to school."
     static let stoppedDirections = "Okay, I stopped the directions."
@@ -53,7 +55,8 @@ struct AssistantRouter {
             backend: N8NAssistantClient.configured(),
             location: LocationService.shared,
             sessionID: AssistantSession.id(),
-            placeRewriter: OnDeviceModelPlaceRewriter()
+            placeRewriter: OnDeviceModelPlaceRewriter(),
+            stationPicker: OnDeviceModelStationPicker()
         )
     }
 
@@ -104,7 +107,7 @@ struct AssistantRouter {
                 }
                 return try await service.checkStation(stationID).answer
             }
-            return try await service.checkStation(spoken).answer
+            return try await checkStation(named: spoken)
 
         case .startRide(let spoken):
             return try await startRide(to: spoken)
@@ -218,6 +221,26 @@ struct AssistantRouter {
     }
 
     // MARK: - Helpers
+
+    /// When no station's name is close enough, Apple's model gets to pick
+    /// which of the closest names the rider meant ("mercy and bleaker").
+    private func checkStation(named spoken: String) async throws -> DockAnswer {
+        do {
+            return try await service.checkStation(spoken).answer
+        } catch DockFinderError.stationNotFound(let query) {
+            guard let stationPicker, let network = try? await service.loadNetwork() else {
+                throw DockFinderError.stationNotFound(query)
+            }
+            let shortlist = StationNameMatcher.shortlist(for: spoken, in: network.stations)
+            guard !shortlist.isEmpty,
+                  let id = await stationPicker.pick(spoken, from: shortlist.map { StationChoice(id: $0.id, name: $0.name) }),
+                  let station = shortlist.first(where: { $0.id == id })
+            else { throw DockFinderError.stationNotFound(query) }
+            var answer = DockFinderService.check(station, in: network).answer
+            answer.markAnswered(by: .appleIntelligence)
+            return answer
+        }
+    }
 
     /// Speaks the rider's own words ("from union square"), not the map's
     /// formal name ("from Union Square Park"), even when Apple's model

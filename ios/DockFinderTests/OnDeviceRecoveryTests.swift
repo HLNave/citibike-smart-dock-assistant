@@ -179,3 +179,115 @@ private actor SearchCounter: PlaceSearching {
         throw DockFinderError.placeNotFound(query)
     }
 }
+
+// MARK: - Stations
+
+/// Picks by name (or returns a made-up ID) and remembers what it was offered.
+actor PickerSpy: StationPicking {
+    enum Choice: Sendable {
+        case name(String)
+        case id(String)
+        case none
+    }
+
+    let choice: Choice
+    private(set) var offered: [(spoken: String, candidates: [StationChoice])] = []
+
+    init(_ choice: Choice) {
+        self.choice = choice
+    }
+
+    func pick(_ spoken: String, from candidates: [StationChoice]) async -> String? {
+        offered.append((spoken, candidates))
+        switch choice {
+        case .name(let name): return candidates.first { $0.name == name }?.id
+        case .id(let id): return id
+        case .none: return nil
+        }
+    }
+}
+
+@MainActor
+struct StationRecoveryTests {
+    /// Shares only "court" with Court St & State St: too little to match.
+    private let misheard = "court one on pacific"
+
+    private func router(_ picker: PickerSpy, parsers: [any RequestParsing] = [KeywordRequestParser()]) -> AssistantRouter {
+        var router = testRouter(parsers: parsers)
+        router.stationPicker = picker
+        return router
+    }
+
+    @Test func siriStationThatDoesntMatchIsPickedFromTheClosestNames() async throws {
+        let picker = PickerSpy(.name("Court St & State St"))
+        let answer = try await router(picker).handle(.station(misheard))
+        #expect(answer.text == "Court and State has 6 docks open and 2 bikes.")
+        #expect(answer.station?.id == "mid")
+        #expect(answer.answeredBy == .appleIntelligence)
+        #expect(answer.source == .onDeviceModel)
+        let offer = try #require(await picker.offered.first)
+        #expect(offer.spoken == misheard)
+        #expect(offer.candidates == [StationChoice(id: "mid", name: "Court St & State St")])
+    }
+
+    @Test func typedStationThatDoesntMatchIsPickedToo() async throws {
+        let picker = PickerSpy(.name("Court St & State St"))
+        let answer = try await router(picker).answer("is the \(misheard) full?")
+        #expect(answer.station?.id == "mid")
+        #expect(answer.answeredBy.rawValue == "apple_intelligence")
+    }
+
+    @Test func noneOfThemMeansNotFound() async {
+        await #expect(throws: DockFinderError.stationNotFound(misheard)) {
+            try await router(PickerSpy(.none)).handle(.station(misheard))
+        }
+    }
+
+    @Test func onlyAStationFromTheShortlistCounts() async {
+        await #expect(throws: DockFinderError.stationNotFound(misheard)) {
+            try await router(PickerSpy(.id("near"))).handle(.station(misheard))
+        }
+    }
+
+    @Test func nothingInCommonIsntOffered() async {
+        let picker = PickerSpy(.name("Court St & State St"))
+        await #expect(throws: DockFinderError.stationNotFound("atlantis")) {
+            try await router(picker).handle(.station("atlantis"))
+        }
+        #expect(await picker.offered.isEmpty)
+    }
+
+    @Test func matchingNamesNeverAskTheModel() async throws {
+        let picker = PickerSpy(.none)
+        let answer = try await router(picker).handle(.station("court and state"))
+        #expect(answer.answeredBy == .fixedAction)
+        #expect(await picker.offered.isEmpty)
+    }
+
+    @Test func shortlistIsTheClosestNonMatchesBestFirst() {
+        let network = try! StationNetwork(
+            information: informationFeed([
+                info("1", "Court St & State St", 40.69, -73.99),
+                info("2", "Court St & Pacific St", 40.69, -73.99),
+                info("3", "Smith St & Bergen St", 40.69, -73.99),
+            ] + (10..<30).map { info("\($0)", "Court St & \($0) St", 40.69, -73.99) }),
+            status: statusFeed([status("1", docks: 5), status("2", docks: 5), status("3", docks: 5)]
+                + (10..<30).map { status("\($0)", docks: 5) }),
+            now: referenceNow
+        )
+        // Two of six words match Court & Pacific: the closest, but not a match.
+        let shortlist = StationNameMatcher.shortlist(for: "court corner by pacific ocean side", in: network.stations)
+        #expect(shortlist.count == 8)
+        #expect(shortlist.first?.id == "2")
+        #expect(shortlist.allSatisfy { StationNameMatcher.score(name: $0.name, query: "court corner by pacific ocean side") < StationNameMatcher.threshold })
+        #expect(!shortlist.contains { $0.id == "3" }, "no words in common")
+        #expect(StationNameMatcher.shortlist(for: "court and pacific", in: network.stations).allSatisfy { $0.id != "2" },
+                "a name that matches isn't a candidate")
+    }
+
+    @Test func withoutTheModelNothingIsPicked() async {
+        if !OnDeviceModelParser.isAvailable {
+            #expect(await OnDeviceModelStationPicker().pick(misheard, from: [StationChoice(id: "mid", name: "Court St & State St")]) == nil)
+        }
+    }
+}
