@@ -165,7 +165,6 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             intent: AskDockFinderIntent(),
             phrases: [
                 "Ask \(.applicationName) a question",
-                "Ask \(.applicationName) something",
                 "Ask \(.applicationName) for help with a dock",
                 // Siri often hears "dock" as "doc".
                 "Ask \(.applicationName) for help with a doc",
