@@ -298,7 +298,10 @@ struct GuidanceParsingTests {
 struct GuidanceRouterTests {
     let near = info("near", "Smith St & Bergen St", 40.6861, -73.9906)
 
-    private func router(_ guidance: GuidanceSpy, rides: RideSpy = RideSpy()) -> AssistantRouter {
+    // `rides` defaults to nil rather than `RideSpy()`: default arguments
+    // aren't evaluated on the main actor, and RideSpy's init is.
+    private func router(_ guidance: GuidanceSpy, rides: RideSpy? = nil) -> AssistantRouter {
+        let rides = rides ?? RideSpy()
         let fix = LocationFix(location: userLocation, isApproximate: false)
         return AssistantRouter(
             service: DockFinderService(

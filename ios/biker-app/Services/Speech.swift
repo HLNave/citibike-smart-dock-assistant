@@ -50,8 +50,13 @@ nonisolated enum Speech {
     }
 
     /// A rounded distance for settings and ride messages: "0.3 miles",
-    /// "500 feet", "500 meters", "1.2 kilometers".
-    static func length(_ meters: CLLocationDistance, locale: Locale = .autoupdatingCurrent) -> String {
+    /// "500 feet", "500 meters", "1.2 kilometers". `.abbreviated` gives
+    /// "0.3 mi" or "500 m" for tight spots on screen.
+    static func length(
+        _ meters: CLLocationDistance,
+        width: Measurement<UnitLength>.FormatStyle.UnitWidth = .wide,
+        locale: Locale = .autoupdatingCurrent
+    ) -> String {
         let measurement: Measurement<UnitLength>
         if locale.measurementSystem == .us {
             let miles = meters / 1_609.344
@@ -63,7 +68,16 @@ nonisolated enum Speech {
                 ? Measurement(value: (meters / 100).rounded() / 10, unit: .kilometers)
                 : Measurement(value: (meters / 50).rounded() * 50, unit: .meters)
         }
-        return measurement.formatted(.measurement(width: .wide, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0...1))).locale(locale))
+        return measurement.formatted(.measurement(width: width, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0...1))).locale(locale))
+    }
+
+    /// Roughly how long riding a straight-line distance takes, on city
+    /// streets at a typical speed: "about 3 minutes by bike".
+    static func bikeTime(_ meters: CLLocationDistance) -> String {
+        let minutes = meters * SavingsModel.streetFactor / SavingsModel.ridingSpeed / 60
+        if minutes < 1 { return "under a minute by bike" }
+        let rounded = Int(minutes.rounded())
+        return rounded == 1 ? "about 1 minute by bike" : "about \(rounded) minutes by bike"
     }
 
     /// Thousands separators for large counts: "35,393".

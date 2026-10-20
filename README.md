@@ -31,7 +31,7 @@ Bike up to a saved place (school, work, home) and Dock Finder tells you where to
 
 - It only speaks up when you're **biking**, using the iPhone's motion sensor (allow **Motion & Fitness** when asked). Walking, driving or the subway don't trigger it. Without that permission it can't tell, so every arrival alerts. If Motion & Fitness is on but iOS has no recent cycling reading, the alert is skipped too.
 - At most once an hour per place, and not while a ride or directions are already running.
-- Uses each place's alert distance, and needs location access set to **Always**.
+- Triggers at each place's alert radius (the circle on its map, see Saved Places below), and needs location access set to **Always**.
 - Turn it off per place with **Alert Me When I Arrive** on the place's screen.
 
 ### Directions to the dock
@@ -92,7 +92,7 @@ The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about lo
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
-- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out you're alerted (300 m, 500 m, 800 m or 1.2 km; shown as 0.2–0.7 miles in US settings). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
+- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then drag the pin (or tap the map) to put it exactly where you're going. Name it (that's what you say to Siri), add nicknames, and set how far out you're alerted with a slider: the alert radius is drawn on the map as a circle, from 150 m to 1.5 km in 50 m steps (500 ft to 0.9 miles in US settings), so you can see where it'll trigger. Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status and its map, tap the map to move the pin or change the radius, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
 - **Savings**: how much time and money Dock Finder has saved you this month (see [Savings](#savings)). Tap it for all-time totals, recent full docks avoided, and how it's calculated.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask a Question (type anything in your own words, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again.

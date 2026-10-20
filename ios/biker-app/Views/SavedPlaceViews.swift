@@ -3,7 +3,8 @@
 //  Dock Finder
 //
 //  Saved places: checking one, choosing its usual and backup docks, adding,
-//  editing (name, nicknames, location, alert distance), and reordering.
+//  editing (name, nicknames, and the pin and alert radius on a map), and
+//  reordering.
 //
 
 import CoreLocation
@@ -18,8 +19,13 @@ struct SavedPlaceView: View {
     @State private var rideModel = AnswerModel()
     @State private var confirmsDelete = false
     @State private var showsEdit = false
+    @State private var showsAlertEditor = false
     /// Docks that are no longer in Citi Bike's station list.
     @State private var missingDocks: [String] = []
+    /// Warnings for docks past the distance the dock search covers.
+    @State private var distantDocks: [String] = []
+    /// Every station, for the map.
+    @State private var stations: [StationInformation] = []
 
     var body: some View {
         if let place = savedPlaces.place(id: placeID) {
@@ -53,18 +59,48 @@ struct SavedPlaceView: View {
                             .font(.footnote)
                             .foregroundStyle(.orange)
                     }
+                    ForEach(distantDocks, id: \.self) { warning in
+                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
                 } header: {
                     InfoHeader("Docks", message: "Dock Finder checks your usual dock first, then your backup, and only then suggests the nearest other station with room.")
                 }
 
                 Section {
+                    Button {
+                        showsAlertEditor = true
+                    } label: {
+                        PlaceAlertMap(
+                            coordinate: .constant(place.location.coordinate),
+                            alertDistance: .constant(place.alertDistance),
+                            pinLabel: place.name,
+                            stations: stations,
+                            usualStationID: place.usualStationID,
+                            backupStationID: place.backupStationID,
+                            isEditable: false
+                        )
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets())
+                    .accessibilityLabel("Map of \(place.name) with its alert radius, \(Speech.length(place.alertDistance))")
+                    .accessibilityHint("Opens the map to move the pin or change the radius.")
                     if let address = place.address {
                         LabeledContent("Address", value: address)
                     }
                     if !place.aliases.isEmpty {
                         LabeledContent("Also Called", value: place.aliases.joined(separator: ", "))
                     }
-                    LabeledContent("Ride Alert", value: "\(Speech.length(place.alertDistance)) out")
+                    Button {
+                        showsAlertEditor = true
+                    } label: {
+                        LabeledContent("Alert Radius", value: Speech.length(place.alertDistance))
+                    }
+                    .tint(.primary)
+                } footer: {
+                    Text("On a ride here, or arriving with Alert Me When I Arrive on, Dock Finder tells you where to dock as you bike into the circle. Tap the map to move the pin or change the radius.")
                 }
 
                 Section {
@@ -116,6 +152,9 @@ struct SavedPlaceView: View {
             .sheet(isPresented: $showsEdit) {
                 EditPlaceView(place: place)
             }
+            .sheet(isPresented: $showsAlertEditor) {
+                PlaceAlertEditor(place: place)
+            }
             .task(id: place) {
                 await check(place)
                 await findMissingDocks(place)
@@ -139,6 +178,10 @@ struct SavedPlaceView: View {
 
     private func findMissingDocks(_ place: SavedPlace) async {
         guard let directory = try? await DockFinderService.live.stationDirectory() else { return }
+        stations = directory
+        distantDocks = place.distantDocks(from: place.location, in: directory).map { dock in
+            "\(dock.name) is \(Speech.length(dock.distance)) from \(place.name). Pick a closer dock."
+        }
         let known = Set(directory.map(\.stationID))
         missingDocks = [
             (place.usualStationID, place.usualStationName),
@@ -255,28 +298,56 @@ struct DockPicker: View {
     }
 }
 
-/// Search, or use where you're standing, to set a place's location.
+/// Sets a place's location and alert radius: search or use where you're
+/// standing to drop the pin, then drag it or tap the map to fine-tune, and
+/// slide to size the circle.
 struct PlaceLocationPicker: View {
+    /// What a moved pin is called until its address is found.
+    static let droppedPinName = "Dropped Pin"
+
     @Binding var selected: Destination?
+    @Binding var alertDistance: CLLocationDistance
+    /// The place being edited, for its usual and backup docks. Nil when adding.
+    var place: SavedPlace? = nil
 
     @State private var query = ""
     @State private var results: [Destination] = []
     @State private var searchError: DockFinderError?
     @State private var isWorking = false
+    @State private var stations: [StationInformation] = []
     /// Set when the chosen spot has no Citi Bike station nearby.
     @State private var nearestStation: CLLocationDistance?
+    /// The usual or backup dock is past the distance the dock search covers.
+    @State private var distantDocks: [(name: String, distance: CLLocationDistance)] = []
+    /// Bumped each time the pin is moved on the map, restarting the address lookup.
+    @State private var pinMoves = 0
+    @State private var isFindingAddress = false
 
     var body: some View {
         Section {
+            PlaceAlertMap(
+                coordinate: pin,
+                alertDistance: $alertDistance,
+                pinLabel: selected?.name ?? "New place",
+                stations: stations,
+                usualStationID: place?.usualStationID,
+                backupStationID: place?.backupStationID
+            )
+            .listRowInsets(EdgeInsets())
             if let selected {
                 VStack(alignment: .leading, spacing: 2) {
-                    Label(selected.name, systemImage: "mappin.circle.fill")
+                    Label(isFindingAddress ? "Finding the address…" : selected.name, systemImage: "mappin.circle.fill")
                     if let address = selected.address, address != selected.name {
                         Text(address).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 if let nearestStation, nearestStation > StationNetwork.nearbyRadius {
                     Label("The nearest Citi Bike station is \(Speech.length(nearestStation)) away, so Dock Finder won't find docks here.", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+                ForEach(distantDocks, id: \.name) { dock in
+                    Label("\(dock.name) is \(Speech.length(dock.distance)) from here. Pick a closer dock after you save.", systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
                         .foregroundStyle(.orange)
                 }
@@ -324,11 +395,27 @@ struct PlaceLocationPicker: View {
             }
         } header: {
             Text("Where is it?")
+        } footer: {
+            Text("Search or use your current location, then drag the pin or tap the map to put it exactly where you're going. On a ride here, or arriving with Alert Me When I Arrive on, Dock Finder tells you where to dock as you bike into the circle. Bigger gives you more time to change course.")
         }
-        .task(id: selected) { await checkServiceArea() }
+        .task(id: selected) { await checkDistances() }
+        .task(id: pinMoves) { await lookUpAddress() }
+    }
+
+    /// The pin on the map. Moving it drops a new, unnamed spot there.
+    private var pin: Binding<CLLocationCoordinate2D?> {
+        Binding(
+            get: { selected?.location.coordinate },
+            set: { coordinate in
+                guard let coordinate else { return }
+                selected = Destination(name: Self.droppedPinName, latitude: coordinate.latitude, longitude: coordinate.longitude)
+                pinMoves += 1
+            }
+        )
     }
 
     private func choose(_ destination: Destination) {
+        isFindingAddress = false
         selected = destination
     }
 
@@ -367,22 +454,46 @@ struct PlaceLocationPicker: View {
         } catch {}
     }
 
-    private func checkServiceArea() async {
-        guard let selected,
-              let directory = try? await DockFinderService.live.stationDirectory()
-        else {
+    /// Looks up the street address of a pin moved on the map. Waits for the
+    /// pin to settle first, so dropping it a few times in a row (or a drag)
+    /// is one lookup rather than one per move.
+    private func lookUpAddress() async {
+        guard pinMoves > 0, let pinned = selected else { return }
+        isFindingAddress = true
+        try? await Task.sleep(for: .milliseconds(600))
+        // A newer move restarted this task and will finish the job.
+        guard !Task.isCancelled else { return }
+        let address = await MapKitPlaceSearch().address(for: pinned.location)
+        guard !Task.isCancelled else { return }
+        isFindingAddress = false
+        // Unless the rider searched or picked another spot meanwhile.
+        guard selected == pinned else { return }
+        selected = Destination(
+            name: address ?? Self.droppedPinName,
+            latitude: pinned.latitude,
+            longitude: pinned.longitude,
+            address: address
+        )
+    }
+
+    private func checkDistances() async {
+        if stations.isEmpty {
+            stations = (try? await DockFinderService.live.stationDirectory()) ?? []
+        }
+        guard let selected, !stations.isEmpty else {
             nearestStation = nil
+            distantDocks = []
             return
         }
-        nearestStation = MapKitPlaceSearch.distanceToNearestStation(from: selected.location, in: directory)
+        nearestStation = MapKitPlaceSearch.distanceToNearestStation(from: selected.location, in: stations)
+        distantDocks = place?.distantDocks(from: selected.location, in: stations) ?? []
     }
 }
 
-/// Name, nicknames and alert distance, shared by Add and Edit.
+/// Name and nicknames, shared by Add and Edit.
 private struct PlaceDetailsSections: View {
     @Binding var name: String
     @Binding var aliases: [String]
-    @Binding var alertDistance: CLLocationDistance
     let validationError: SavedPlacesStore.ValidationError?
 
     @State private var newAlias = ""
@@ -430,18 +541,6 @@ private struct PlaceDetailsSections: View {
         } footer: {
             Text("Optional. Siri will recognize these too.")
         }
-
-        Section {
-            Picker("Alert me", selection: $alertDistance) {
-                ForEach(SavedPlace.alertDistanceOptions, id: \.self) { distance in
-                    Text("\(Speech.length(distance)) out").tag(distance)
-                }
-            }
-        } header: {
-            Text("Rides")
-        } footer: {
-            Text("On a ride here, Dock Finder tells you where to dock once you're this close. Farther gives you more time to change course.")
-        }
     }
 
     private func addAlias() {
@@ -464,8 +563,8 @@ struct AddPlaceView: View {
     var body: some View {
         NavigationStack {
             Form {
-                PlaceDetailsSections(name: $name, aliases: $aliases, alertDistance: $alertDistance, validationError: validationError)
-                PlaceLocationPicker(selected: $selected)
+                PlaceDetailsSections(name: $name, aliases: $aliases, validationError: validationError)
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance)
             }
             .navigationTitle("Add a Place")
             .navigationBarTitleDisplayMode(.inline)
@@ -515,19 +614,14 @@ struct EditPlaceView: View {
         _name = State(initialValue: place.name)
         _aliases = State(initialValue: place.aliases)
         _alertDistance = State(initialValue: place.alertDistance)
-        _selected = State(initialValue: Destination(
-            name: place.address ?? place.name,
-            latitude: place.latitude,
-            longitude: place.longitude,
-            address: place.address
-        ))
+        _selected = State(initialValue: place.pickedLocation)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                PlaceDetailsSections(name: $name, aliases: $aliases, alertDistance: $alertDistance, validationError: validationError)
-                PlaceLocationPicker(selected: $selected)
+                PlaceDetailsSections(name: $name, aliases: $aliases, validationError: validationError)
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, place: place)
             }
             .navigationTitle("Edit \(place.name)")
             .navigationBarTitleDisplayMode(.inline)
@@ -549,18 +643,61 @@ struct EditPlaceView: View {
 
     private func save() {
         guard let selected, validationError == nil else { return }
-        var updated = place
+        // Start from the stored place, so a dock picked meanwhile isn't undone.
+        var updated = (savedPlaces.place(id: place.id) ?? place).relocated(to: selected, alertDistance: alertDistance)
         updated.name = name
         updated.aliases = aliases
-        updated.alertDistance = alertDistance
-        let moved = selected.latitude != place.latitude || selected.longitude != place.longitude
-        if moved {
-            updated.latitude = selected.latitude
-            updated.longitude = selected.longitude
-            updated.address = selected.address ?? selected.name
-        }
         savedPlaces.update(updated)
         dismiss()
+    }
+}
+
+/// The place's pin and alert radius on their own, opened from its map.
+struct PlaceAlertEditor: View {
+    let place: SavedPlace
+
+    @Environment(SavedPlacesStore.self) private var savedPlaces
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var alertDistance: CLLocationDistance
+    @State private var selected: Destination?
+
+    init(place: SavedPlace) {
+        self.place = place
+        _alertDistance = State(initialValue: place.alertDistance)
+        _selected = State(initialValue: place.pickedLocation)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, place: place)
+            }
+            .navigationTitle(place.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(selected == nil)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        guard let selected, let current = savedPlaces.place(id: place.id) else { return }
+        savedPlaces.update(current.relocated(to: selected, alertDistance: alertDistance))
+        dismiss()
+    }
+}
+
+private extension SavedPlace {
+    /// Where the location picker starts when editing this place.
+    var pickedLocation: Destination {
+        Destination(name: address ?? name, latitude: latitude, longitude: longitude, address: address)
     }
 }
 
