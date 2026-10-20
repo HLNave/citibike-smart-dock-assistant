@@ -249,12 +249,28 @@ struct StationRecoveryTests {
         }
     }
 
-    @Test func nothingInCommonIsntOffered() async {
-        let picker = PickerSpy(.name("Court St & State St"))
+    @Test func misheardNamesStillReachTheModel() async throws {
+        let mercer = (info: info("mercer", "Mercer St & Bleecker St", 40.7271, -73.9965), status: status("mercer", docks: 9, bikes: 4))
+        let picker = PickerSpy(.name("Mercer St & Bleecker St"))
+        var router = testRouter(moreStations: [mercer])
+        router.stationPicker = picker
+        let answer = try await router.handle(.station("mercy and bleaker"))
+        let offer = try #require(await picker.offered.first)
+        #expect(offer.candidates.first == StationChoice(id: "mercer", name: "Mercer St & Bleecker St"))
+        #expect(answer.text == "Mercer and Bleecker has 9 docks open and 4 bikes.")
+        #expect(answer.answeredBy == .appleIntelligence)
+    }
+
+    @Test func nothingSimilarOffersSavedDocksThenTheNearestStations() async throws {
+        let school = SavedPlace(name: "School", latitude: 0, longitude: 0, usualStationID: "mid", usualStationName: "Court St & State St")
+        let picker = PickerSpy(.none)
+        var router = testRouter(saved: [school])
+        router.stationPicker = picker
         await #expect(throws: DockFinderError.stationNotFound("atlantis")) {
-            try await router(picker).handle(.station("atlantis"))
+            try await router.handle(.station("atlantis"))
         }
-        #expect(await picker.offered.isEmpty)
+        let offer = try #require(await picker.offered.first)
+        #expect(offer.candidates.map(\.id) == ["mid", "near"], "the usual dock first, then by distance from the rider")
     }
 
     @Test func matchingNamesNeverAskTheModel() async throws {
@@ -275,19 +291,119 @@ struct StationRecoveryTests {
                 + (10..<30).map { status("\($0)", docks: 5) }),
             now: referenceNow
         )
-        // Two of six words match Court & Pacific: the closest, but not a match.
+        // Two of six words match Court & Pacific: the closest.
         let shortlist = StationNameMatcher.shortlist(for: "court corner by pacific ocean side", in: network.stations)
         #expect(shortlist.count == 8)
         #expect(shortlist.first?.id == "2")
-        #expect(shortlist.allSatisfy { StationNameMatcher.score(name: $0.name, query: "court corner by pacific ocean side") < StationNameMatcher.threshold })
         #expect(!shortlist.contains { $0.id == "3" }, "no words in common")
-        #expect(StationNameMatcher.shortlist(for: "court and pacific", in: network.stations).allSatisfy { $0.id != "2" },
-                "a name that matches isn't a candidate")
     }
 
     @Test func withoutTheModelNothingIsPicked() async {
         if !OnDeviceModelParser.isAvailable {
             #expect(await OnDeviceModelStationPicker().pick(misheard, from: [StationChoice(id: "mid", name: "Court St & State St")]) == nil)
         }
+    }
+}
+
+// MARK: - Time limits and repeats
+
+/// Takes `delay` to answer and ignores cancellation, like a stuck model.
+private struct SlowRewriter: PlaceQueryRewriting {
+    var delay: Duration
+
+    func rewrite(_ description: String) async -> String? {
+        await sleepIgnoringCancellation(delay)
+        return "russ & daughters"
+    }
+}
+
+private struct SlowPicker: StationPicking {
+    var delay: Duration
+
+    func pick(_ spoken: String, from candidates: [StationChoice]) async -> String? {
+        await sleepIgnoringCancellation(delay)
+        return candidates.first?.id
+    }
+}
+
+private func sleepIgnoringCancellation(_ delay: Duration) async {
+    await Task.detached { try? await Task.sleep(for: delay) }.value
+}
+
+private struct ModelParserStub: RequestParsing {
+    var result: ParsedRequest?
+    var answerSource: DockAnswer.Source { .onDeviceModel }
+    func parse(_ text: String) async -> ParsedRequest? { result }
+}
+
+@MainActor
+struct RecoveryLimitTests {
+    @Test func aSlowAnswerIsDroppedOnTime() async {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let result = await withTimeLimit(.milliseconds(100)) {
+            await sleepIgnoringCancellation(.seconds(3))
+            return "late"
+        }
+        #expect(result == nil)
+        #expect(clock.now - start < .seconds(1))
+    }
+
+    @Test func aQuickAnswerComesThrough() async {
+        #expect(await withTimeLimit(.seconds(3)) { "quick" } == "quick")
+    }
+
+    @Test func aSlowPlaceRewriteGivesUp() async {
+        var router = testRouter(places: StubPlaces(results: ["russ & daughters": Destination(name: "Russ & Daughters", latitude: 40.69, longitude: -73.992)]))
+        router.placeRewriter = SlowRewriter(delay: .seconds(3))
+        router.recoveryTimeLimit = .milliseconds(100)
+        let clock = ContinuousClock()
+        let start = clock.now
+        await #expect(throws: DockFinderError.placeNotFound("that bagel place by stern")) {
+            try await router.handle(.place("that bagel place by stern"))
+        }
+        #expect(clock.now - start < .seconds(1))
+    }
+
+    @Test func aSlowStationPickGivesUp() async {
+        var router = testRouter()
+        router.stationPicker = SlowPicker(delay: .seconds(3))
+        router.recoveryTimeLimit = .milliseconds(100)
+        let clock = ContinuousClock()
+        let start = clock.now
+        await #expect(throws: DockFinderError.stationNotFound("court one on pacific")) {
+            try await router.handle(.station("court one on pacific"))
+        }
+        #expect(clock.now - start < .seconds(1))
+    }
+
+    @Test func aPlaceWordedByTheModelIsntRewritten() async {
+        let spy = RewriterSpy(["the bagel place": "russ & daughters"])
+        var router = testRouter(parsers: [ModelParserStub(result: .place("the bagel place"))])
+        router.placeRewriter = spy
+        await #expect(throws: DockFinderError.placeNotFound("the bagel place")) {
+            try await router.answer("somewhere for a bagel and to park my bike")
+        }
+        #expect(await spy.asked.isEmpty)
+    }
+
+    @Test func placesFromThePhraseRulesAreStillRewritten() async throws {
+        let spy = RewriterSpy(["the bagel place": "russ & daughters"])
+        var router = testRouter(places: StubPlaces(results: ["russ & daughters": Destination(name: "Russ & Daughters", latitude: 40.69, longitude: -73.992)]))
+        router.placeRewriter = spy
+        _ = try await router.answer("find a dock near the bagel place")
+        #expect(await spy.asked == ["the bagel place"])
+    }
+}
+
+struct LooseStationMatchingTests {
+    @Test(arguments: [("mercy", "mercer"), ("bleaker", "bleecker"), ("bleeck", "bleecker"), ("lafayete", "lafayette")])
+    func resembles(said: String, name: String) {
+        #expect(StationNameMatcher.resembles(said, name))
+    }
+
+    @Test(arguments: [("15", "16"), ("15", "150"), ("court", "state"), ("by", "broadway")])
+    func doesntResemble(said: String, name: String) {
+        #expect(!StationNameMatcher.resembles(said, name))
     }
 }

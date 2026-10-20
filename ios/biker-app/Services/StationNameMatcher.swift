@@ -49,6 +49,10 @@ nonisolated enum StationNameMatcher {
 
     /// Higher is better. Exact token matches score 10,000.
     static func score(name: String, query: String) -> Double {
+        score(name: name, query: query, matching: similar)
+    }
+
+    private static func score(name: String, query: String, matching similar: (String, String) -> Bool) -> Double {
         let queryTokens = tokens(query)
         let nameTokens = tokens(name)
         guard !queryTokens.isEmpty, !nameTokens.isEmpty else { return 0 }
@@ -84,16 +88,29 @@ nonisolated enum StationNameMatcher {
         return queryTokens.count >= 2 || best.score >= 10_000 ? best.station : nil
     }
 
-    /// The stations whose names come closest to `query` without being
-    /// close enough to match, best first: what Apple's model chooses from
-    /// when nothing matches. Only stations sharing at least one word.
+    /// The stations whose names come closest to `query`, best first: what
+    /// Apple's model chooses from when nothing matches. Words are compared
+    /// more loosely than for a match (`resembles`), so a misheard name
+    /// ("mercy and bleaker") still finds the station it was meant to be.
+    /// Empty when no name has even a loosely similar word.
     static func shortlist(for query: String, in stations: [StationSnapshot], limit: Int = 8) -> [StationSnapshot] {
         stations
-            .map { (station: $0, score: score(name: $0.name, query: query)) }
-            .filter { $0.score > 0 && $0.score < threshold }
+            .map { (station: $0, score: score(name: $0.name, query: query, matching: resembles)) }
+            .filter { $0.score > 0 }
             .sorted { ($0.score, -$0.station.name.count) > ($1.score, -$1.station.name.count) }
             .prefix(limit)
             .map(\.station)
+    }
+
+    /// For the shortlist only: up to two letters apart for words of four
+    /// letters or more ("mercy" ≈ "mercer", "bleaker" ≈ "bleecker"), or one
+    /// the start of the other ("bleeck"). Numbers must still match exactly.
+    static func resembles(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        if a.contains(where: \.isNumber) || b.contains(where: \.isNumber) { return false }
+        if min(a.count, b.count) >= 3, a.hasPrefix(b) || b.hasPrefix(a) { return true }
+        guard a.count >= 4, b.count >= 4, abs(a.count - b.count) <= 2 else { return false }
+        return editDistance(a, b) <= 2
     }
 
     /// Exact, or one typo apart for longer words ("Bleeker" ≈ "Bleecker").

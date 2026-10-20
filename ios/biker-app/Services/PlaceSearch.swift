@@ -25,11 +25,13 @@ extension PlaceSearching {
 
     /// `search(_:)`, with one more try when nothing is found: `rewriter`
     /// (Apple's on-device model) turns a description the map doesn't know
-    /// into a name or address it does. If that's not found either, the
-    /// error names what the rider said, not the rewrite.
+    /// into a name or address it does, if it can within `timeLimit`. If
+    /// that's not found either, the error names what the rider said, not
+    /// the rewrite.
     func search(
         _ query: String,
-        rewritingWith rewriter: (any PlaceQueryRewriting)?
+        rewritingWith rewriter: (any PlaceQueryRewriting)?,
+        timeLimit: Duration = OnDeviceRecovery.timeLimit
     ) async throws -> (places: [Destination], rewrittenQuery: String?) {
         let notFound: DockFinderError
         do {
@@ -43,7 +45,8 @@ extension PlaceSearching {
 
         let original = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let rewriter, !original.isEmpty,
-              let rewritten = await rewriter.rewrite(original)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let rewritten = await withTimeLimit(timeLimit, { await rewriter.rewrite(original) })?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
               !rewritten.isEmpty, rewritten.lowercased() != original.lowercased()
         else { throw notFound }
 

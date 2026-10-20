@@ -98,20 +98,30 @@ final class RideSpy: RideControlling {
 @MainActor
 final class GuidanceSpy: GuidanceControlling {
     var isActive: Bool
+    var station: DockStation?
     var offered: DockStation?
+    /// Thrown by `start`, when set.
+    var startError: DockFinderError?
     private(set) var started: [DockStation] = []
+    private(set) var siriLines: [String?] = []
     private(set) var stopCount = 0
 
-    init(isActive: Bool = false, offered: DockStation? = nil) {
-        self.isActive = isActive
+    init(isActive: Bool = false, offered: DockStation? = nil, guidingTo station: DockStation? = nil) {
+        self.isActive = isActive || station != nil
         self.offered = offered
+        self.station = station
     }
+
+    func offer(_ station: DockStation, now: Date) { offered = station }
 
     func recentOffer(now: Date) -> DockStation? { offered }
 
     func start(to station: DockStation, siriWillSay siriLine: String?) async throws -> String {
+        if let startError { throw startError }
         started.append(station)
+        siriLines.append(siriLine)
         isActive = true
+        self.station = station
         return "Head to \(station.spokenName)."
     }
 
@@ -122,6 +132,7 @@ final class GuidanceSpy: GuidanceControlling {
     func stop() async {
         stopCount += 1
         isActive = false
+        station = nil
     }
 }
 
@@ -133,7 +144,8 @@ func testRouter(
     places: any PlaceSearching = StubPlaces(),
     saved: [SavedPlace] = [],
     rides: RideSpy? = nil,
-    backend: (any AssistantBackend)? = nil
+    backend: (any AssistantBackend)? = nil,
+    moreStations: [(info: StationInformation, status: StationStatus)] = []
 ) -> AssistantRouter {
     let fix = LocationFix(location: userLocation, isApproximate: false)
     return AssistantRouter(
@@ -143,8 +155,8 @@ func testRouter(
                 information: .success(informationFeed([
                     info("near", "Smith St & Bergen St", 40.6861, -73.9906),
                     info("mid", "Court St & State St", 40.6900, -73.9920),
-                ])),
-                status: .success(statusFeed([status("near", docks: 0, bikes: 3), status("mid", docks: 6, bikes: 2)]))
+                ] + moreStations.map(\.info))),
+                status: .success(statusFeed([status("near", docks: 0, bikes: 3), status("mid", docks: 6, bikes: 2)] + moreStations.map(\.status)))
             ),
             now: { referenceNow }
         ),
@@ -163,5 +175,19 @@ struct StubBackend: AssistantBackend {
 
     func ask(_ text: String, location: CLLocation?, sessionID: String) async throws -> String {
         reply
+    }
+}
+
+/// A throwaway UserDefaults suite, deleted when the test that made it ends.
+final class TemporaryDefaults {
+    let name = "test-\(UUID())"
+    let defaults: UserDefaults
+
+    init() {
+        defaults = UserDefaults(suiteName: name)!
+    }
+
+    deinit {
+        defaults.removePersistentDomain(forName: name)
     }
 }

@@ -28,6 +28,8 @@ struct AssistantRouter {
     var placeRewriter: (any PlaceQueryRewriting)? = nil
     /// Picks the station meant when no name matches. `nil`: no second try.
     var stationPicker: (any StationPicking)? = nil
+    /// How long either second try may take.
+    var recoveryTimeLimit: Duration = OnDeviceRecovery.timeLimit
 
     static let helpText = "You can ask whether a station has room, like is Mercer and Bleecker full, or how many bikes are out. To get docking directions on the way somewhere, say start a ride to school."
     static let stoppedDirections = "Okay, I stopped the directions."
@@ -65,8 +67,13 @@ struct AssistantRouter {
     func answer(_ text: String) async throws -> DockAnswer {
         for parser in parsers {
             guard let request = await parser.parse(text) else { continue }
+            // A place Apple's model already wrote isn't worth asking it to rewrite.
+            var router = self
+            if parser.answeredBy == .appleIntelligence {
+                router.placeRewriter = nil
+            }
             do {
-                var answer = try await handle(request)
+                var answer = try await router.handle(request)
                 // Unless Apple's model found the place or station, the
                 // parser is what understood it.
                 if answer.answeredBy == .fixedAction {
@@ -225,28 +232,45 @@ struct AssistantRouter {
     /// When no station's name is close enough, Apple's model gets to pick
     /// which of the closest names the rider meant ("mercy and bleaker").
     private func checkStation(named spoken: String) async throws -> DockAnswer {
-        do {
-            return try await service.checkStation(spoken).answer
-        } catch DockFinderError.stationNotFound(let query) {
-            guard let stationPicker, let network = try? await service.loadNetwork() else {
-                throw DockFinderError.stationNotFound(query)
-            }
-            let shortlist = StationNameMatcher.shortlist(for: spoken, in: network.stations)
-            guard !shortlist.isEmpty,
-                  let id = await stationPicker.pick(spoken, from: shortlist.map { StationChoice(id: $0.id, name: $0.name) }),
-                  let station = shortlist.first(where: { $0.id == id })
-            else { throw DockFinderError.stationNotFound(query) }
-            var answer = DockFinderService.check(station, in: network).answer
-            answer.markAnswered(by: .appleIntelligence)
-            return answer
+        let network = try await service.loadNetwork()
+        if let station = network.bestMatch(for: spoken) {
+            return DockFinderService.check(station, in: network).answer
         }
+        guard let stationPicker else { throw DockFinderError.stationNotFound(spoken) }
+        let candidates = await stationCandidates(for: spoken, in: network)
+        let choices = candidates.map { StationChoice(id: $0.id, name: $0.name) }
+        guard !choices.isEmpty,
+              let id = await withTimeLimit(recoveryTimeLimit, { await stationPicker.pick(spoken, from: choices) }),
+              let station = candidates.first(where: { $0.id == id })
+        else { throw DockFinderError.stationNotFound(spoken) }
+        var answer = DockFinderService.check(station, in: network).answer
+        answer.markAnswered(by: .appleIntelligence)
+        return answer
+    }
+
+    /// What the model chooses from: names like what was said, or failing
+    /// that, the stations the rider most likely means: their saved places'
+    /// docks, then the ones nearest them.
+    private func stationCandidates(for spoken: String, in network: StationNetwork) async -> [StationSnapshot] {
+        let similar = StationNameMatcher.shortlist(for: spoken, in: network.stations)
+        guard similar.isEmpty else { return similar }
+        var ids = savedPlaces.flatMap { [$0.usualStationID, $0.backupStationID] }.compactMap { $0 }
+        let location = location
+        if let here = await withTimeLimit(recoveryTimeLimit, { try? await location.currentLocation().location }) {
+            ids += network.stations
+                .sorted { here.distance(from: $0.location) < here.distance(from: $1.location) }
+                .prefix(8)
+                .map(\.id)
+        }
+        var seen: Set<String> = []
+        return Array(ids.filter { seen.insert($0).inserted }.compactMap(network.station(id:)).prefix(8))
     }
 
     /// Speaks the rider's own words ("from union square"), not the map's
     /// formal name ("from Union Square Park"), even when Apple's model
     /// rewrote the search (`rewritten`).
     private func searchedDestination(_ spoken: String) async throws -> (destination: Destination, rewritten: Bool) {
-        let found = try await placeSearch.search(spoken, rewritingWith: placeRewriter)
+        let found = try await placeSearch.search(spoken, rewritingWith: placeRewriter, timeLimit: recoveryTimeLimit)
         guard let match = found.places.first else {
             throw DockFinderError.placeNotFound(spoken)
         }

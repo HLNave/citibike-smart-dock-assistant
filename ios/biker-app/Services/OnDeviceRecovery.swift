@@ -12,6 +12,51 @@
 
 import Foundation
 import FoundationModels
+import Synchronization
+
+nonisolated enum OnDeviceRecovery {
+    /// How long a second try may take. Siri actions run in the background
+    /// with only a few seconds to answer, so a slow model gives up instead
+    /// of holding the answer.
+    static let timeLimit: Duration = .seconds(3)
+}
+
+/// `operation`'s result, or `nil` if it takes longer than `limit` (the
+/// operation is then cancelled). Returns on time even if the operation
+/// ignores cancellation.
+nonisolated func withTimeLimit<T: Sendable>(
+    _ limit: Duration,
+    _ operation: @escaping @Sendable () async -> T?
+) async -> T? {
+    let once = Once()
+    return await withCheckedContinuation { continuation in
+        let work = Task { await operation() }
+        let timer = Task {
+            try? await Task.sleep(for: limit)
+            guard once.claim() else { return }
+            work.cancel()
+            continuation.resume(returning: nil)
+        }
+        Task {
+            let result = await work.value
+            guard once.claim() else { return }
+            timer.cancel()
+            continuation.resume(returning: result)
+        }
+    }
+}
+
+/// True for the first caller only.
+private nonisolated final class Once: Sendable {
+    private let claimed = Mutex(false)
+
+    func claim() -> Bool {
+        claimed.withLock { claimed in
+            defer { claimed = true }
+            return !claimed
+        }
+    }
+}
 
 // MARK: - Places
 
