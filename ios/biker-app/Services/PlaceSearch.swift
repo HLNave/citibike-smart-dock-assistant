@@ -12,6 +12,7 @@
 import CoreLocation
 import Foundation
 import MapKit
+import os
 
 nonisolated protocol PlaceSearching: Sendable {
     /// Best matches first. Throws `DockFinderError.placeNotFound` when nothing matches.
@@ -22,6 +23,12 @@ nonisolated protocol PlaceSearching: Sendable {
 
 extension PlaceSearching {
     func address(for location: CLLocation) async -> String? { nil }
+
+    /// `address(for:)`, or nil if it takes longer than `timeout`, so a slow
+    /// or offline lookup can't hold up saving a place.
+    func address(for location: CLLocation, timeout: Duration) async -> String? {
+        await firstValue(within: timeout) { await self.address(for: location) }
+    }
 
     /// `search(_:)`, with one more try when nothing is found: `rewriter`
     /// (Apple's on-device model) turns a description the map doesn't know
@@ -58,6 +65,13 @@ extension PlaceSearching {
             throw notFound
         }
     }
+}
+
+/// What `operation` returns, or nil once `timeout` passes. Returns at the
+/// deadline rather than waiting for a slow operation to notice it was
+/// cancelled.
+nonisolated func firstValue<T: Sendable>(within timeout: Duration, _ operation: @escaping @Sendable () async -> T?) async -> T? {
+    await withTimeLimit(timeout, operation)
 }
 
 nonisolated struct MapKitPlaceSearch: PlaceSearching {

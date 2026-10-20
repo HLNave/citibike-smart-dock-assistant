@@ -302,11 +302,14 @@ struct DockPicker: View {
 /// standing to drop the pin, then drag it or tap the map to fine-tune, and
 /// slide to size the circle.
 struct PlaceLocationPicker: View {
-    /// What a moved pin is called until its address is found.
-    static let droppedPinName = "Dropped Pin"
+    /// How long to wait for a moved pin's address before saving without one.
+    static let addressTimeout: Duration = .seconds(5)
 
     @Binding var selected: Destination?
     @Binding var alertDistance: CLLocationDistance
+    /// True from the moment the pin moves until its address is found (or
+    /// given up on), so Save can wait for it.
+    @Binding var isFindingAddress: Bool
     /// The place being edited, for its usual and backup docks. Nil when adding.
     var place: SavedPlace? = nil
 
@@ -321,7 +324,6 @@ struct PlaceLocationPicker: View {
     @State private var distantDocks: [(name: String, distance: CLLocationDistance)] = []
     /// Bumped each time the pin is moved on the map, restarting the address lookup.
     @State private var pinMoves = 0
-    @State private var isFindingAddress = false
 
     var body: some View {
         Section {
@@ -408,7 +410,8 @@ struct PlaceLocationPicker: View {
             get: { selected?.location.coordinate },
             set: { coordinate in
                 guard let coordinate else { return }
-                selected = Destination(name: Self.droppedPinName, latitude: coordinate.latitude, longitude: coordinate.longitude)
+                selected = Destination(name: Destination.droppedPinName, latitude: coordinate.latitude, longitude: coordinate.longitude)
+                isFindingAddress = true
                 pinMoves += 1
             }
         )
@@ -444,7 +447,7 @@ struct PlaceLocationPicker: View {
             results = []
             searchError = nil
             choose(Destination(
-                name: address ?? "Current Location",
+                name: address ?? Destination.currentLocationName,
                 latitude: here.coordinate.latitude,
                 longitude: here.coordinate.longitude,
                 address: address
@@ -463,13 +466,15 @@ struct PlaceLocationPicker: View {
         try? await Task.sleep(for: .milliseconds(600))
         // A newer move restarted this task and will finish the job.
         guard !Task.isCancelled else { return }
-        let address = await MapKitPlaceSearch().address(for: pinned.location)
+        let address = await MapKitPlaceSearch().address(for: pinned.location, timeout: Self.addressTimeout)
         guard !Task.isCancelled else { return }
         isFindingAddress = false
         // Unless the rider searched or picked another spot meanwhile.
         guard selected == pinned else { return }
+        // With no address it stays "Dropped Pin" on screen, and is saved
+        // without an address (see `Destination.savedAddress`).
         selected = Destination(
-            name: address ?? Self.droppedPinName,
+            name: address ?? Destination.droppedPinName,
             latitude: pinned.latitude,
             longitude: pinned.longitude,
             address: address
@@ -559,12 +564,13 @@ struct AddPlaceView: View {
     @State private var aliases: [String] = []
     @State private var alertDistance = SavedPlace.defaultAlertDistance
     @State private var selected: Destination?
+    @State private var isFindingAddress = false
 
     var body: some View {
         NavigationStack {
             Form {
                 PlaceDetailsSections(name: $name, aliases: $aliases, validationError: validationError)
-                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance)
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, isFindingAddress: $isFindingAddress)
             }
             .navigationTitle("Add a Place")
             .navigationBarTitleDisplayMode(.inline)
@@ -574,7 +580,7 @@ struct AddPlaceView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(name.isEmpty || validationError != nil || selected == nil)
+                        .disabled(name.isEmpty || validationError != nil || selected == nil || isFindingAddress)
                 }
             }
         }
@@ -591,7 +597,7 @@ struct AddPlaceView: View {
             aliases: aliases,
             latitude: selected.latitude,
             longitude: selected.longitude,
-            address: selected.address ?? selected.name,
+            address: selected.savedAddress,
             alertDistance: alertDistance
         ))
         dismiss()
@@ -608,6 +614,7 @@ struct EditPlaceView: View {
     @State private var aliases: [String]
     @State private var alertDistance: CLLocationDistance
     @State private var selected: Destination?
+    @State private var isFindingAddress = false
 
     init(place: SavedPlace) {
         self.place = place
@@ -621,7 +628,7 @@ struct EditPlaceView: View {
         NavigationStack {
             Form {
                 PlaceDetailsSections(name: $name, aliases: $aliases, validationError: validationError)
-                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, place: place)
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, isFindingAddress: $isFindingAddress, place: place)
             }
             .navigationTitle("Edit \(place.name)")
             .navigationBarTitleDisplayMode(.inline)
@@ -631,7 +638,7 @@ struct EditPlaceView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(validationError != nil || selected == nil)
+                        .disabled(validationError != nil || selected == nil || isFindingAddress)
                 }
             }
         }
@@ -661,6 +668,7 @@ struct PlaceAlertEditor: View {
 
     @State private var alertDistance: CLLocationDistance
     @State private var selected: Destination?
+    @State private var isFindingAddress = false
 
     init(place: SavedPlace) {
         self.place = place
@@ -671,7 +679,7 @@ struct PlaceAlertEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, place: place)
+                PlaceLocationPicker(selected: $selected, alertDistance: $alertDistance, isFindingAddress: $isFindingAddress, place: place)
             }
             .navigationTitle(place.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -681,7 +689,7 @@ struct PlaceAlertEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(selected == nil)
+                        .disabled(selected == nil || isFindingAddress)
                 }
             }
         }

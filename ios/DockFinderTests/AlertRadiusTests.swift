@@ -104,10 +104,35 @@ struct AlertRadiusTests {
         #expect(resized.usualStationID == "near")
     }
 
-    @Test func movedPinsWithoutAnAddressUseTheirName() {
+    @Test func movedPinsWithoutAnAddressAreSavedWithoutOne() {
         let school = SavedPlace(name: "School", latitude: 40.7290, longitude: -73.9965, address: "44 W 4th St")
-        let moved = school.relocated(to: Destination(name: "Dropped Pin", latitude: 40.74, longitude: -73.99), alertDistance: 500)
-        #expect(moved.address == "Dropped Pin")
+        let pin = Destination(name: Destination.droppedPinName, latitude: 40.74, longitude: -73.99)
+        let moved = school.relocated(to: pin, alertDistance: 500)
+        #expect(moved.address == nil, "not \"Dropped Pin\", and not the old address either")
+        #expect(moved.latitude == 40.74)
+    }
+
+    @Test func onlyRealAddressesOrPlaceNamesAreSaved() {
+        func spot(_ name: String, address: String? = nil) -> Destination {
+            Destination(name: name, latitude: 40.74, longitude: -73.99, address: address)
+        }
+        #expect(spot(Destination.droppedPinName).savedAddress == nil)
+        #expect(spot(Destination.currentLocationName).savedAddress == nil)
+        #expect(spot(Destination.droppedPinName, address: "60 Washington Sq S").savedAddress == "60 Washington Sq S")
+        #expect(spot("NYU Stern").savedAddress == "NYU Stern", "a search result without an address keeps its name")
+        #expect(spot("NYU Stern", address: "44 W 4th St").savedAddress == "44 W 4th St")
+    }
+
+    @Test(arguments: [
+        (500.0, 1, 550.0),
+        (500.0, -1, 450.0),
+        (512.0, 1, 550.0),
+        (150.0, -1, 150.0),
+        (1_500.0, 1, 1_500.0),
+        (1_480.0, 1, 1_500.0),
+    ])
+    func voiceOverStepsTheRadiusBy50Meters(from distance: Double, steps: Int, to stepped: Double) {
+        #expect(SavedPlace.steppedAlertDistance(distance, by: steps) == stepped)
     }
 
     @Test func geofencesAreReplacedWhenThePlaceMovesOrResizes() {
@@ -181,6 +206,32 @@ struct AlertMapGeometryTests {
         }
     }
 
+    @Test func tapsOnThePinAreNotTapsOnTheMap() {
+        let tip = CGPoint(x: 200, y: 300)
+        let area = AlertMapGeometry.pinHitArea(tip: tip)
+        // The pin's head sits about 25 pt above its tip: the tap that used to walk it north.
+        #expect(area.contains(CGPoint(x: 200, y: 275)))
+        #expect(area.contains(CGPoint(x: 200, y: 300)), "its tip")
+        #expect(area.contains(CGPoint(x: 225, y: 290)), "a near miss still counts")
+        #expect(!area.contains(CGPoint(x: 200, y: 320)), "just below the tip is the map")
+        #expect(!area.contains(CGPoint(x: 240, y: 290)))
+        #expect(!area.contains(CGPoint(x: 200, y: 230)))
+    }
+
+    @Test func aDraggedPinKeepsItsGapFromTheFinger() {
+        let tip = CGPoint(x: 200, y: 300)
+        // Grabbed by its head, 25 pt above the tip, and moved 40 right and 10 down.
+        let moved = AlertMapGeometry.draggedTip(tip, from: CGPoint(x: 202, y: 275), to: CGPoint(x: 242, y: 285))
+        #expect(moved == CGPoint(x: 240, y: 310))
+    }
+
+    @Test func holdingThePinWithoutMovingIsNotADrag() {
+        #expect(!AlertMapGeometry.isDrag(.zero))
+        #expect(!AlertMapGeometry.isDrag(CGSize(width: 1, height: 2)))
+        #expect(AlertMapGeometry.isDrag(CGSize(width: 3, height: 0)))
+        #expect(AlertMapGeometry.isDrag(CGSize(width: -40, height: 12)))
+    }
+
     @Test func onlyNearbyStationsAreShown() {
         let stations = [
             info("near", "Washington Pl & Greene St", 40.7299, -73.9955),
@@ -189,5 +240,78 @@ struct AlertMapGeometryTests {
         ]
         #expect(AlertMapGeometry.stations(stations, within: 1_200, of: stern).map(\.stationID) == ["near", "edge"])
         #expect(AlertMapGeometry.stations(stations, within: 300, of: stern).map(\.stationID) == ["near"])
+    }
+}
+
+// MARK: - When the editor reframes the circle
+
+struct AlertMapCameraTests {
+    @Test func aPinMovedOffScreenIsReframedEvenRightAfterAPan() {
+        #expect(AlertMapCamera.shouldReframe(after: .pinMoved, circleFits: false, riderMovedMapRecently: true))
+        #expect(AlertMapCamera.shouldReframe(after: .pinMoved, circleFits: false, riderMovedMapRecently: false))
+    }
+
+    @Test func fineTuningThatStillFitsLeavesTheCameraAlone() {
+        #expect(!AlertMapCamera.shouldReframe(after: .pinMoved, circleFits: true, riderMovedMapRecently: false))
+        #expect(!AlertMapCamera.shouldReframe(after: .radiusChanging, circleFits: true, riderMovedMapRecently: false))
+        #expect(AlertMapCamera.shouldReframe(after: .radiusChanging, circleFits: false, riderMovedMapRecently: true))
+    }
+
+    @Test func aNewPlaceIsFramedUnlessTheRiderIsAlreadyLookingAtIt() {
+        #expect(AlertMapCamera.shouldReframe(after: .placeChanged, circleFits: true, riderMovedMapRecently: false))
+        #expect(AlertMapCamera.shouldReframe(after: .placeChanged, circleFits: false, riderMovedMapRecently: true))
+        #expect(!AlertMapCamera.shouldReframe(after: .placeChanged, circleFits: true, riderMovedMapRecently: true))
+    }
+
+    @Test func theFirstPinAndASettledRadiusAreAlwaysFramed() {
+        for fits in [true, false] {
+            for panned in [true, false] {
+                #expect(AlertMapCamera.shouldReframe(after: .firstPin, circleFits: fits, riderMovedMapRecently: panned))
+                #expect(AlertMapCamera.shouldReframe(after: .radiusSet, circleFits: fits, riderMovedMapRecently: panned))
+            }
+        }
+    }
+}
+
+// MARK: - A moved pin's address lookup can't hold up Save
+
+struct AddressLookupTimeoutTests {
+    private struct SlowSearch: PlaceSearching {
+        let delay: Duration
+        let answer: String?
+        func search(_ query: String) async throws -> [Destination] { [] }
+        func address(for location: CLLocation) async -> String? {
+            try? await Task.sleep(for: delay)
+            return answer
+        }
+    }
+
+    private let spot = CLLocation(latitude: 40.7291, longitude: -73.9965)
+
+    @Test func aQuickLookupIsUsed() async {
+        let search = SlowSearch(delay: .zero, answer: "44 W 4th St")
+        #expect(await search.address(for: spot, timeout: .seconds(5)) == "44 W 4th St")
+    }
+
+    @Test func aLookupThatHangsGivesUpAtTheTimeout() async {
+        let search = SlowSearch(delay: .seconds(30), answer: "44 W 4th St")
+        let clock = ContinuousClock()
+        let started = clock.now
+        let address = await search.address(for: spot, timeout: .milliseconds(200))
+        #expect(address == nil)
+        #expect(clock.now - started < .seconds(5))
+    }
+
+    @Test func anOperationThatIgnoresCancellationDoesNotHoldItUp() async {
+        let clock = ContinuousClock()
+        let started = clock.now
+        let value: Int? = await firstValue(within: .milliseconds(100)) {
+            // Busy-waits rather than sleeping, so cancelling it does nothing.
+            let end = ContinuousClock.now + .seconds(1)
+            while ContinuousClock.now < end {}
+            return 1
+        }
+        #expect(value == nil)
+        #expect(clock.now - started < .milliseconds(800))
     }
 }
