@@ -36,13 +36,24 @@ How it's built:
 
 > **Why not "run Dock Finder"?** Siri treats "run", "open", "launch" or "start" plus an app's name as "open the app", which beats the app's own phrases and needs the phone unlocked. If you still have the old MVP's **Dock Finder** shortcut in the Shortcuts app, delete it.
 
+## The Action Button
+
+One press tells the rider the nearest dock with room, out loud. Set up once: **Settings → Action Button**, swipe to **Controls**, **Choose a Control**, then **Speak Nearest Dock** (search "Dock Finder"). Press and hold the button: *"West 15th and 6th has 53 docks open, 300 feet away."* It also appears in the Shortcuts app as **Speak Nearest Dock**, for a shortcut assigned under **Settings → Action Button → Shortcut**.
+
+How it's built:
+
+- **Why its own action.** When the Action Button runs an App Intent (through a shortcut), iOS shows the intent's dialog instead of speaking it and turns any follow-up question into a text box; only Siri talks. So `SpeakNearestDockIntent` (`Shared/SpeakNearestDockIntent.swift`) has no parameters, returns no dialog and never asks anything. `NearestDockAnnouncement` (`biker-app/Intents/`) finds the dock exactly as Find Dock does (`DockFinderService.findNearestDock()`), says it with `Announcer.speakAnswer` (the `.playback` / `.voicePrompt` audio session with ducking, the same voice as ride alerts; it posts a notification only if audio can't start), offers the dock to `GuidanceSession` so "Ask Dock Finder to direct me" works for 10 minutes, and logs a `siri_answer` event (`intent: SpeakNearestDockIntent`, so the team's Siri count includes it) plus a `hands_free_check` with context `action_button`. Errors (no location access, no network, no dock with room) are spoken too. The sentence is also returned as the intent's value, for shortcuts.
+- **A control, not just a shortcut.** A `ControlWidgetButton` (`DockFinderWidgets/SpeakNearestDockControl.swift`) puts it straight into the Action Button's **Controls** list with an icon; without it, the rider would first have to build a shortcut, since the App Shortcuts list (Siri phrases, at most ten) is kept for "Ask Dock Finder …". iOS offers any control in Control Center and on the Lock Screen too; there's no Action Button-only control.
+- **Runs in the app, not the widget extension.** The intent is compiled into both targets (it lives in `Shared/`, as the control has to name it), and it's a `LiveActivityIntent`: iOS performs a `LiveActivityIntent` from a widget or control in the app's process ([Apple: Adding interactivity to widgets and Live Activities](https://developer.apple.com/documentation/widgetkit/adding-interactivity-to-widgets-and-live-activities); [LiveActivityIntent](https://developer.apple.com/documentation/appintents/liveactivityintent) gives "a control in Control Center" as the example), where location, the network and the audio session work. The extension's copy, built with `WIDGET_EXTENSION`, has an empty `perform()` that iOS never calls.
+- **No AppShortcut entry.** It isn't in `DockFinderShortcutsProvider`; any App Intent still shows up in the Shortcuts app. `ActionButtonTests` checks both.
+
 ## What runs where
 
 | Feature | Runs on | Siri phrase |
 | --- | --- | --- |
 | **Ride alert**: start a ride to a saved place or anywhere, hear the best dock when you're ~500 m out, with the phone locked | iPhone (background location + speech) | "Ask Dock Finder to start a ride to school" |
 | **Saved-place arrival alert**: bike up to a saved place without starting a ride, hear the best dock at its alert distance | iPhone (geofences + motion activity + speech) | none, automatic |
-| Nearest dock to you, right now | iPhone | "Ask Dock Finder to find a dock" |
+| Nearest dock to you, right now | iPhone | "Ask Dock Finder to find a dock", or press and hold the [Action Button](#the-action-button) |
 | Your usual dock at a saved place, rerouting if it's full | iPhone | "Ask Dock Finder to check my school dock" |
 | Dock near any address, landmark or neighborhood, right now | iPhone (Apple map search) | "Ask Dock Finder to find a dock somewhere else", or in the app (**Dock Near a Place**) |
 | Is a station full, and where to go instead | iPhone | "Ask Dock Finder to check Mercer and Bleecker" / "…to check a station" |
@@ -53,7 +64,7 @@ How it's built:
 
 Dock rules match the n8n workflow: a station counts only if it's installed, accepting returns, has **at least 2** open docks, and reported in the last hour. Destination searches stay within **1.2 km**. Station names are spoken the way New Yorkers say them ("W 15 St & 6 Ave" → "West 15th and 6th").
 
-Every answer is one sentence. Siri speaks it and the app shows it.
+Every answer is one sentence. Siri speaks it (the Action Button's answer is spoken in the app's voice) and the app shows it.
 
 ## Layout
 
@@ -61,7 +72,7 @@ Every answer is one sentence. Siri speaks it and the app shows it.
 | --- | --- |
 | `biker-app/App/DockFinderApp.swift` | Entry point; shows onboarding or home |
 | `biker-app/Views/` | Home (with the ride card), Start Ride, saved places (add, edit, reorder, usual/backup dock pickers), dock near a place, station check, citywide, Ask, Siri instructions, onboarding |
-| `biker-app/Intents/` | App Intents (`FindDockIntent.swift`), Siri phrases (`DockFinderShortcutsProvider`), saved place and station entities |
+| `biker-app/Intents/` | App Intents (`FindDockIntent.swift`), Siri phrases (`DockFinderShortcutsProvider`), saved place and station entities, the Action Button's spoken answer (`NearestDockAnnouncement`) |
 | `biker-app/Services/DockFinderService.swift` | Every on-device feature, shared by Siri and the UI |
 | `biker-app/Models/StationNetwork.swift` | Joined station snapshot and the dock rules |
 | `biker-app/Services/Speech.swift` | Spoken sentences and station-name rewriting (port of n8n's `make-it-speakable`) |
@@ -75,8 +86,8 @@ Every answer is one sentence. Siri speaks it and the app shows it.
 | `biker-app/Models/Guidance.swift` | Directions rules: the route, where the rider is along it, what to say when, and mid-ride dock checks |
 | `biker-app/Services/GuidanceSession.swift` | Runs directions: Apple cycling routes, background location, spoken turns, re-routing, dock re-checks |
 | `biker-app/Services/DockFinderLiveActivity.swift` | Starts, updates and ends the ride / directions Live Activity |
-| `Shared/` | Code compiled into both the app and the widget extension (the Live Activity's data) |
-| `DockFinderWidgets/` | Widget extension that draws the Live Activity on the Lock Screen and in the Dynamic Island |
+| `Shared/` | Code compiled into both the app and the widget extension (the Live Activity's data, the Action Button intent) |
+| `DockFinderWidgets/` | Widget extension that draws the Live Activity on the Lock Screen and in the Dynamic Island, and the Action Button control |
 | `biker-app/Models/PlaceArrival.swift`, `biker-app/Services/PlaceArrivalMonitor.swift` | Saved-place arrival alerts without a ride: geofences per place, the "only when biking" check, and the alert |
 | `biker-app/Models/Savings.swift`, `biker-app/State/SavingsStore.swift`, `biker-app/Views/SavingsViews.swift` | Savings: the time/money model, the on-phone history of full docks avoided, and the dashboard |
 | `biker-app/Services/Metrics.swift`, `biker-app/Views/PrivacyViews.swift`, `biker-app/PrivacyInfo.xcprivacy` | Usage data: the consent question, the queue that sends events to the team's Google Sheet (see `metrics/README.md`), the Privacy screen, and Apple's privacy manifest |
@@ -201,6 +212,9 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] Walking (or arriving by subway) into the same place doesn't alert. A second arrival within the hour doesn't alert. Turning **Alert Me When I Arrive** off stops it.
 - [ ] With the app swiped away, biking up to a saved place still alerts (iOS relaunches it for the geofence).
 - [ ] On the "Use Dock Finder with Siri" screen, the Dock Finder shortcuts button (Apple's list of the app's Siri phrases) shows nine entries.
+- [ ] **Settings → Action Button → Controls → Choose a Control** lists **Speak Nearest Dock** under Dock Finder (with the bicycle icon). Pressing and holding the Action Button shows "Hold to Hear Nearest Dock", then says the nearest dock with room: with the phone locked in a pocket, through headphones, with music ducking and coming back afterwards. Nothing is asked and no dialog or text box appears; no notification either (one appears only if audio can't play, e.g. during a call). "Hey Siri, ask Dock Finder to direct me" within 10 minutes guides to that dock.
+- [ ] The same press with location access off, or in Airplane mode, says the error out loud. The app swiped away first still works (iOS launches it in the background).
+- [ ] **Speak Nearest Dock** appears once (not twice) among Dock Finder's actions in the Shortcuts app, and a shortcut with only that action, assigned under **Settings → Action Button → Shortcut**, behaves the same.
 - [ ] With the phone locked and headphones in, "Hey Siri, ask Dock Finder to start a ride to school" starts a ride **in one go, without opening the app** (also with a nickname). "Hey Siri, ask Dock Finder to start a ride" asks "Where are you heading?"; answering "Union Square" and "44 West 4th Street" each starts a ride; "home" (not saved) asks you to add it.
 - [ ] Every phrase in the root README runs its own action, not a neighbor's: especially "…to find a dock" (nearest to you, no question) vs "…to find a dock near school" vs "…to find a dock somewhere else" ("Where are you headed?"), and "…to start a ride to school" vs "…to start a ride". "Ask Dock Finder" alone does nothing of Dock Finder's.
 - [ ] "Hey Siri, ask Dock Finder to check Mercer and Bleecker" answers for a usual dock, a station near a saved place, and one just checked in the app (allow a minute after checking). An unknown station via "…to check a station" asks "Which station?" once. "Ask Dock Finder how many bikes are out" gives citywide totals.

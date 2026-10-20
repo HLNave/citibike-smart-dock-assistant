@@ -23,6 +23,17 @@ Every phrase starts with **"Ask Dock Finder"** and says the whole request in one
 | **"Hey Siri, ask Dock Finder to start a ride to school"** (any saved place) | Siri asks "Want me to guide you to the dock when you're close?" Ride; as you get close, you hear where to dock, and with "yes", each turn on the way there. Going somewhere that isn't saved? Say **"…to start a ride"**, and when Siri asks "Where are you heading?", say a landmark ("Union Square") or an address ("44 West 4th Street"). |
 | **"Hey Siri, ask Dock Finder to find a dock"** | The nearest station to you with room, right now, then "Want me to direct you there?" Say "yes" to hear each turn on the way. |
 
+### One press: the Action Button
+
+On an iPhone with an Action Button (iPhone 15 Pro and later), set it up once: **Settings → Action Button**, swipe to **Controls**, tap **Choose a Control**, and pick **Speak Nearest Dock** (search "Dock Finder"). Then press and hold the Action Button, and Dock Finder says the nearest station with room out loud, through your headphones, even with the phone locked in your pocket. Music gets quieter while it talks.
+
+> "West 15th and 6th has 53 docks open, 300 feet away."
+
+- It never asks anything back. For directions, say **"Hey Siri, ask Dock Finder to direct me"** within 10 minutes and it guides you to that dock.
+- If it can't answer (location access off, no internet, no dock with room nearby), it says why.
+- **Speak Nearest Dock** is also an action in the Shortcuts app, if you'd rather put it in your own shortcut (it hands the sentence on as text) and assign that under **Settings → Action Button → Shortcut**.
+- iOS also lets you add the same control to Control Center or the Lock Screen; Dock Finder doesn't put it there itself.
+
 ### Arriving at a saved place, no ride needed
 
 Bike up to a saved place (school, work, home) and Dock Finder tells you where to dock as you get close, through your headphones and as a notification, even if you never started a ride:
@@ -78,7 +89,7 @@ Siri can only fill in names the app gives it ahead of time (saved places and tho
 - **"Home", "work", "my gym"** only work as destinations once you've saved them in the app. Dock Finder won't guess a business called "Home" on the map.
 - **Nicknames:** give a saved place other names ("Stern", "class") in the app, and Siri recognizes them too.
 - **"Doc" vs "dock":** dictation often hears "dock" as "doc"; the app handles both, and "Doc Finder", "Docks Finder" and "Dog Finder" work as the app name.
-- **Without "Hey Siri":** hold the side button (or long-press an AirPods stem) and say the phrase. It works with the phone locked. The Action Button can't start a Siri conversation: a Dock Finder action assigned to it shows a text box for anything it needs to ask, because iOS only asks out loud when Siri runs the action.
+- **Without "Hey Siri":** hold the side button (or long-press an AirPods stem) and say the phrase. It works with the phone locked. The Action Button can't start a Siri conversation: a Siri action assigned to it (through a shortcut) shows its answer on screen instead of saying it, and a text box for anything it needs to ask, because iOS only talks when Siri runs the action. That's why the Action Button has its own action, **Speak Nearest Dock**, which says the answer in Dock Finder's voice and never asks anything (see [One press: the Action Button](#one-press-the-action-button)).
 - **A new saved place** can take a moment before Siri recognizes it in a phrase; the app refreshes Siri's list whenever saved places change.
 - **Ride alerts and directions with the phone locked** need **Always** location access (Settings → Dock Finder → Location). With only *While Using*, Siri's answer tells you so.
 - **The app's voice:** Siri's replies use your Siri voice, but iOS doesn't let apps borrow it for their own speech (ride alerts and turn-by-turn directions). Dock Finder picks the closest male voice on the phone and speaks a little slower than normal. For a better-sounding voice, download an "Enhanced" or "Premium" male English voice in Settings → Accessibility → Spoken Content → Voices.
@@ -95,7 +106,7 @@ The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about lo
 - **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out you're alerted (300 m, 500 m, 800 m or 1.2 km; shown as 0.2–0.7 miles in US settings). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
 - **Savings**: how much time and money Dock Finder has saved you this month (see [Savings](#savings)). Tap it for all-time totals, recent full docks avoided, and how it's calculated.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask a Question (type anything in your own words, or tap an example).
-- **How to Use with Siri**: the phrase cheat sheet again.
+- **How to Use with Siri**: the phrase cheat sheet again, and how to set up the Action Button.
 - **Privacy**: turn usage sharing on or off, and see exactly what's shared.
 
 ### Savings
@@ -154,8 +165,8 @@ flowchart LR
 ios/
   biker-app.xcodeproj                            # the Dock Finder app; see ios/README.md
   biker-app/                                     # app source (Intents, Models, Services, State, Views)
-  DockFinderWidgets/                             # Lock Screen / Dynamic Island Live Activity
-  Shared/                                        # code shared by the app and the widget
+  DockFinderWidgets/                             # Lock Screen / Dynamic Island Live Activity, Action Button control
+  Shared/                                        # code shared by the app and the widget (incl. the Action Button intent)
   Config/                                        # build settings; your Local.xcconfig goes here (gitignored)
   Tools/make_app_icon.py                         # draws the app icon variants
   DockFinderTests/                               # unit tests
@@ -219,7 +230,7 @@ Already set up: the team's Google Sheet URL is in `ios/Config/DockFinder.xcconfi
 
 ## Limitations and next steps
 
-- **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch, background speech, Siri's yes/no follow-ups, turn-by-turn directions and the Live Activity. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
+- **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch, background speech, Siri's yes/no follow-ups, turn-by-turn directions, the Live Activity and the Action Button control. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
 - Turn-by-turn directions use Apple's cycling routes and match your GPS position to them (fixes worse than 65 m are ignored). Among tall buildings, GPS drifts, so a turn can be announced a little early or late.
 - Distances are straight-line, not riding distance.
 - The closest dock with ≥2 spaces wins, even if a much roomier one is only slightly farther. Next: prefer stations with a bigger buffer when they're nearly as close.
