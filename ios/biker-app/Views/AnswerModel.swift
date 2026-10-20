@@ -40,7 +40,7 @@ final class AnswerModel {
                 "app_answer",
                 station: answer.station?.name,
                 avoidedStation: answer.avoided?.name,
-                details: ["answer": answer.text]
+                details: ["answer": answer.text, "answered_by": answer.answeredBy.rawValue]
             )
         } catch let error as DockFinderError {
             phase = .failed(error)

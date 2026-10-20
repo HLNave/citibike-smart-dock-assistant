@@ -149,8 +149,9 @@ struct StartRideView: View {
     @State private var results: [Destination] = []
     @State private var error: DockFinderError?
     @State private var outcome: AnswerModel = AnswerModel()
-    /// Remembered between rides.
-    @AppStorage("guideRidesToDock") private var guidesToDock = true
+    /// Starts where the Directions setting says (with Ask Me, as it was
+    /// left last time).
+    @State private var guidesToDock = DirectionsPreference.rideSwitchDefault()
 
     var body: some View {
         NavigationStack {
@@ -194,6 +195,8 @@ struct StartRideView: View {
                     }
                     ForEach(results, id: \.self) { result in
                         Button {
+                            // The rider's own words: the router rewrites the search
+                            // again if it needs to, and names the ride as typed.
                             Task { await start(query) }
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
@@ -208,6 +211,7 @@ struct StartRideView: View {
                 }
                 Section {
                     Toggle("Guide me to the dock when I'm close", isOn: $guidesToDock)
+                        .onChange(of: guidesToDock) { _, isOn in DirectionsPreference.rememberRideSwitch(isOn) }
                     AlwaysLocationNotice()
                 } footer: {
                     Text("Hands-free: “Hey Siri, ask Dock Finder to start a ride to school” (any saved place), or “…to start a ride” and then say where you're heading.")
@@ -225,7 +229,8 @@ struct StartRideView: View {
 
     private func search() async {
         do {
-            results = Array(try await MapKitPlaceSearch().search(query).prefix(5))
+            let found = try await MapKitPlaceSearch().search(query, rewritingWith: OnDeviceModelPlaceRewriter())
+            results = Array(found.places.prefix(5))
             error = nil
         } catch let failure as DockFinderError {
             results = []

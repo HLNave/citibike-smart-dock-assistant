@@ -11,8 +11,10 @@ import AppIntents
 
 struct DockFinderShortcutsProvider: AppShortcutsProvider {
     /// Every phrase is "Ask Dock Finder to/for/if/how …" and says the whole
-    /// request in one go. There's deliberately no bare "Ask Dock Finder":
-    /// Siri could match it on the shared opening and drop the rest.
+    /// request in one go, except Ask a Question ("Ask Dock Finder a
+    /// question"), which then asks "What do you need?". There's
+    /// deliberately no bare "Ask Dock Finder": Siri could match it on the
+    /// shared opening and drop the rest.
     ///
     /// **Never reorder or remove these; only append.** iOS remembers which
     /// phrase belongs to which position in this list and doesn't always
@@ -157,6 +159,18 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Stop Directions",
             systemImageName: "location.slash"
+        )
+        // iOS allows at most 10 App Shortcuts per app; this is the 10th.
+        AppShortcut(
+            intent: AskDockFinderIntent(),
+            phrases: [
+                "Ask \(.applicationName) a question",
+                "Ask \(.applicationName) for help with a dock",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) for help with a doc",
+            ],
+            shortTitle: "Ask a Question",
+            systemImageName: "bubble.left"
         )
     }
 
