@@ -35,6 +35,20 @@ nonisolated struct Destination: Codable, Sendable, Equatable, Hashable {
     var address: String? = nil
 
     var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
+
+    /// What a spot picked on the map is called until its address is found.
+    static let droppedPinName = "Dropped Pin"
+    /// What "Use My Current Location" is called when no address is found.
+    static let currentLocationName = "Current Location"
+
+    /// The address to save for a place picked here: its street address, or
+    /// a search result's own name ("NYU Stern") when it has none. Nil for a
+    /// dropped pin or current location whose address wasn't found, rather
+    /// than keeping "Dropped Pin" as the place's address for good.
+    var savedAddress: String? {
+        if let address { return address }
+        return [Self.droppedPinName, Self.currentLocationName].contains(name) ? nil : name
+    }
 }
 
 /// What every feature hands to Siri and the UI.

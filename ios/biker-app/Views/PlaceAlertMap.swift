@@ -2,10 +2,11 @@
 //  PlaceAlertMap.swift
 //  Dock Finder
 //
-//  A saved place on a map: its pin, which the rider can drag or drop with
-//  a tap, and its alert radius drawn to scale as a circle, with a slider
-//  to change it. Nearby Citi Bike stations show as dots, with the usual
-//  and backup docks labeled. The place's screen shows it read-only.
+//  A saved place on a map: its pin, which the rider can press and drag or
+//  drop with a tap, and its alert radius drawn to scale as a circle, with
+//  a slider to change it. Nearby Citi Bike stations show as dots, with the
+//  usual and backup docks labeled. The place's screen shows a smaller,
+//  read-only copy with just the pin, circle and docks.
 //
 
 import CoreLocation
@@ -26,11 +27,11 @@ struct PlaceAlertMap: View {
 
     @State private var position: MapCameraPosition
     @State private var visibleRegion: MKCoordinateRegion?
-    /// Where the pin is while it's being dragged. The place only moves
-    /// (and its address is looked up) when the drag ends.
-    @State private var draggedCoordinate: CLLocationCoordinate2D?
-    /// From the finger to the pin's tip, so the pin doesn't jump under the finger.
-    @State private var dragOffset: CGSize?
+    /// Set while the rider holds the pin, which also stops the map from
+    /// panning so the two don't fight over the finger. The place only moves
+    /// (and its address is looked up) when the pin is let go. Gesture state,
+    /// so it clears itself if iOS cancels the touch.
+    @GestureState private var pinHold: PinHold?
     /// The last spot this view moved the pin to itself, to tell a tap or
     /// drag apart from a search or "Use My Current Location".
     @State private var ownMove: CLLocationCoordinate2D?
@@ -72,11 +73,24 @@ struct PlaceAlertMap: View {
 
     // MARK: - Map
 
-    private var pinCoordinate: CLLocationCoordinate2D? { draggedCoordinate ?? coordinate }
+    /// How long the rider holds the pin before it lifts and can be dragged.
+    /// Moving sooner pans the map instead, so a drag is never both.
+    static let pinHoldDuration = 0.2
+
+    private struct PinHold {
+        /// Where the pin is being dragged; nil until the finger moves.
+        var coordinate: CLLocationCoordinate2D?
+    }
+
+    private var pinCoordinate: CLLocationCoordinate2D? { pinHold?.coordinate ?? coordinate }
+
+    private var interactionModes: MapInteractionModes {
+        isEditable && pinHold == nil ? [.pan, .zoom, .rotate] : []
+    }
 
     private var map: some View {
         MapReader { proxy in
-            Map(position: $position, interactionModes: isEditable ? [.pan, .zoom, .rotate] : []) {
+            Map(position: $position, interactionModes: interactionModes) {
                 if let center = pinCoordinate {
                     // A fixed blue rather than the accent color, which
                     // iOS dims while a sheet covers the map, and MapKit
@@ -118,7 +132,12 @@ struct PlaceAlertMap: View {
                 }
             }
             .onTapGesture { point in
-                guard isEditable, let tapped = proxy.convert(point, from: .local) else { return }
+                guard isEditable else { return }
+                // A tap on the pin itself reaches the map too; it isn't a
+                // new spot, and moving there would walk the pin north.
+                if let coordinate, let tip = proxy.convert(coordinate, to: .local),
+                   AlertMapGeometry.pinHitArea(tip: tip).contains(point) { return }
+                guard let tapped = proxy.convert(point, from: .local) else { return }
                 move(to: tapped)
             }
             .onMapCameraChange(frequency: .continuous) { context in
@@ -141,18 +160,10 @@ struct PlaceAlertMap: View {
         .onChange(of: coordinateKey) { old, _ in
             guard let coordinate else { return }
             let isOwnMove = ownMove.map { $0.latitude == coordinate.latitude && $0.longitude == coordinate.longitude } ?? false
-            // Fine-tuning by tap or drag leaves the camera alone unless the
-            // circle no longer fits; a new search result is always framed.
-            if isOwnMove && !old.isEmpty {
-                fitIfOverflowing()
-            } else {
-                fit()
-            }
+            reframe(after: old.isEmpty ? .firstPin : isOwnMove ? .pinMoved : .placeChanged)
         }
         .onChange(of: alertDistance) {
-            // While sliding, the circle grows over the streets and the map
-            // only zooms out when it would spill off; letting go frames it.
-            if isSliding { fitIfOverflowing() } else { fit() }
+            reframe(after: isSliding ? .radiusChanging : .radiusSet)
         }
     }
 
@@ -166,13 +177,18 @@ struct PlaceAlertMap: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.red)
         }
-        .shadow(radius: draggedCoordinate == nil ? 2 : 6, y: draggedCoordinate == nil ? 1 : 4)
-        .scaleEffect(draggedCoordinate == nil ? 1 : 1.15, anchor: .bottom)
-        .animation(.snappy, value: draggedCoordinate == nil)
-        .highPriorityGesture(isEditable ? pinDrag(proxy) : nil)
+        .frame(width: AlertMapGeometry.pinSize.width, height: AlertMapGeometry.pinSize.height, alignment: .bottom)
+        .contentShape(.rect)
+        .shadow(radius: pinHold == nil ? 2 : 6, y: pinHold == nil ? 1 : 4)
+        .scaleEffect(pinHold == nil ? 1 : 1.15, anchor: .bottom)
+        .animation(.snappy, value: pinHold == nil)
+        .sensoryFeedback(trigger: pinHold == nil) { _, released in released ? nil : .impact(weight: .medium) }
+        // Its own tap, so a tap on the pin is never taken as one on the map.
+        .onTapGesture {}
+        .highPriorityGesture(isEditable ? pinGesture(proxy) : nil)
         .accessibilityElement()
         .accessibilityLabel("Pin for \(pinLabel)")
-        .accessibilityHint(isEditable ? "Drag to move it, or tap the map where it should go." : "")
+        .accessibilityHint(isEditable ? "Touch and hold, then drag to move it, or tap the map where it should go." : "")
         .accessibilityActions {
             if isEditable {
                 Button("Move north") { nudge(north: 25) }
@@ -183,24 +199,32 @@ struct PlaceAlertMap: View {
         }
     }
 
-    private func pinDrag(_ proxy: MapProxy) -> some Gesture {
-        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-            .onChanged { value in
-                guard let start = coordinate else { return }
-                if dragOffset == nil, let tip = proxy.convert(start, to: .global) {
-                    dragOffset = CGSize(width: tip.x - value.startLocation.x, height: tip.y - value.startLocation.y)
-                }
-                let offset = dragOffset ?? .zero
-                let point = CGPoint(x: value.location.x + offset.width, y: value.location.y + offset.height)
-                if let moved = proxy.convert(point, from: .global) {
-                    draggedCoordinate = moved
-                }
+    /// Touch and hold, then drag. MapKit's own pan isn't a SwiftUI gesture,
+    /// so no gesture priority can stop it; instead a quick move pans the
+    /// map (the press fails), and once the pin lifts the map's panning and
+    /// zooming are switched off until it's let go.
+    private func pinGesture(_ proxy: MapProxy) -> some Gesture {
+        LongPressGesture(minimumDuration: Self.pinHoldDuration)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
+            .updating($pinHold) { value, hold, _ in
+                guard case .second(true, let drag) = value else { return }
+                hold = PinHold(coordinate: drag.flatMap { draggedCoordinate($0, proxy) } ?? hold?.coordinate)
             }
-            .onEnded { _ in
-                if let draggedCoordinate { move(to: draggedCoordinate) }
-                draggedCoordinate = nil
-                dragOffset = nil
+            .onEnded { value in
+                guard case .second(true, let drag?) = value,
+                      AlertMapGeometry.isDrag(drag.translation),
+                      let moved = draggedCoordinate(drag, proxy)
+                else { return }
+                move(to: moved)
             }
+    }
+
+    /// Where the pin's tip is under a drag, keeping the gap between finger
+    /// and tip so the pin doesn't jump. The map can't move during the drag,
+    /// so the tip's starting point is still where the place is now.
+    private func draggedCoordinate(_ drag: DragGesture.Value, _ proxy: MapProxy) -> CLLocationCoordinate2D? {
+        guard let coordinate, let tip = proxy.convert(coordinate, to: .global) else { return nil }
+        return proxy.convert(AlertMapGeometry.draggedTip(tip, from: drag.startLocation, to: drag.location), from: .global)
     }
 
     private func move(to newCoordinate: CLLocationCoordinate2D) {
@@ -220,20 +244,19 @@ struct PlaceAlertMap: View {
 
     // MARK: - Camera
 
-    /// The rider panned or zoomed in the last moment, so leave the camera be.
-    private var isPanning: Bool { Date.now.timeIntervalSince(userMovedCameraAt) < 0.6 }
+    private func reframe(after change: AlertMapCamera.Change) {
+        guard let coordinate else { return }
+        let fits = visibleRegion.map { AlertMapGeometry.circle(center: coordinate, radius: alertDistance, fitsIn: $0) } ?? false
+        let riderMovedMap = Date.now.timeIntervalSince(userMovedCameraAt) < AlertMapCamera.recentMoveInterval
+        guard AlertMapCamera.shouldReframe(after: change, circleFits: fits, riderMovedMapRecently: riderMovedMap) else { return }
+        fit()
+    }
 
     private func fit() {
-        guard let coordinate, !isPanning else { return }
+        guard let coordinate else { return }
         withAnimation(.smooth) {
             position = .region(AlertMapGeometry.region(center: coordinate, radius: alertDistance))
         }
-    }
-
-    private func fitIfOverflowing() {
-        guard let coordinate else { return }
-        if let visibleRegion, AlertMapGeometry.circle(center: coordinate, radius: alertDistance, fitsIn: visibleRegion) { return }
-        fit()
     }
 
     // MARK: - Stations
@@ -286,8 +309,20 @@ struct PlaceAlertMap: View {
                 isSliding = editing
                 if !editing { fit() }
             }
+            // No `step:`, which on iOS 26 draws a tick for each of the 27
+            // steps. Without one, VoiceOver would move it by a tenth of the
+            // range and the snapping would round that off unevenly, so it
+            // gets its own element that steps by 50 m.
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel("Alert radius")
             .accessibilityValue(Speech.length(alertDistance))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: alertDistance = SavedPlace.steppedAlertDistance(alertDistance, by: 1)
+                case .decrement: alertDistance = SavedPlace.steppedAlertDistance(alertDistance, by: -1)
+                @unknown default: break
+                }
+            }
             .sensoryFeedback(.selection, trigger: alertDistance)
             Text("\(Speech.sentence(Speech.bikeTime(alertDistance))) from the pin")
                 .font(.caption)
@@ -316,6 +351,38 @@ private struct DockBadge: View {
     }
 }
 
+/// When the editor moves the camera to show the whole circle.
+nonisolated enum AlertMapCamera {
+    enum Change {
+        /// The place got its first spot.
+        case firstPin
+        /// The rider tapped, dragged or nudged the pin.
+        case pinMoved
+        /// A search result or "Use My Current Location" moved the place.
+        case placeChanged
+        /// The slider is moving.
+        case radiusChanging
+        /// The radius settled: the slider was let go, or VoiceOver adjusted it.
+        case radiusSet
+    }
+
+    /// How long after the rider pans or zooms the map counts as theirs.
+    static let recentMoveInterval: TimeInterval = 0.6
+
+    /// Fine-tuning (a pin moved by the rider, a sliding radius) only moves
+    /// the camera when the circle no longer fits, even right after a pan,
+    /// so a circle pushed off-screen always comes back. A new place found
+    /// some other way is framed, unless the rider just moved the map and it
+    /// already shows the whole circle.
+    static func shouldReframe(after change: Change, circleFits: Bool, riderMovedMapRecently: Bool) -> Bool {
+        switch change {
+        case .firstPin, .radiusSet: true
+        case .pinMoved, .radiusChanging: !circleFits
+        case .placeChanged: !(circleFits && riderMovedMapRecently)
+        }
+    }
+}
+
 /// The plain geometry behind the map's camera, kept apart so it can be tested.
 nonisolated enum AlertMapGeometry {
     /// Meters per degree of latitude (and of longitude at the equator).
@@ -335,6 +402,33 @@ nonisolated enum AlertMapGeometry {
         let longitudeRadius = radius / (metersPerDegree * cos(center.latitude * .pi / 180))
         return abs(center.latitude - region.center.latitude) + latitudeRadius <= region.span.latitudeDelta / 2
             && abs(center.longitude - region.center.longitude) + longitudeRadius <= region.span.longitudeDelta / 2
+    }
+
+    /// The pin's frame, with its tip at the bottom center.
+    static let pinSize = CGSize(width: 44, height: 52)
+    /// Extra room around the pin that still counts as touching it.
+    static let pinTouchSlop: CGFloat = 8
+
+    /// Where a touch counts as on the pin whose tip is at `tip`.
+    static func pinHitArea(tip: CGPoint) -> CGRect {
+        CGRect(
+            x: tip.x - pinSize.width / 2,
+            y: tip.y - pinSize.height,
+            width: pinSize.width,
+            height: pinSize.height
+        ).insetBy(dx: -pinTouchSlop, dy: -pinTouchSlop)
+    }
+
+    /// The pin's tip after a drag from `start` to `location`: it moves with
+    /// the finger, keeping the gap it started with.
+    static func draggedTip(_ tip: CGPoint, from start: CGPoint, to location: CGPoint) -> CGPoint {
+        CGPoint(x: tip.x + location.x - start.x, y: tip.y + location.y - start.y)
+    }
+
+    /// A press that barely moved isn't a drag, so holding and letting go
+    /// leaves the place (and its address) alone.
+    static func isDrag(_ translation: CGSize) -> Bool {
+        hypot(translation.width, translation.height) >= 3
     }
 
     /// `coordinate` moved a few meters, for VoiceOver's "Move north" and friends.

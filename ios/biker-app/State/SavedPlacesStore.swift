@@ -108,6 +108,12 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         return min(max(snapped, alertDistanceRange.lowerBound), alertDistanceRange.upperBound)
     }
 
+    /// One `alertDistanceStep` up or down from `distance` (snapped first),
+    /// within `alertDistanceRange`, for VoiceOver's swipe up and down.
+    static func steppedAlertDistance(_ distance: CLLocationDistance, by steps: Int) -> CLLocationDistance {
+        snappedAlertDistance(snappedAlertDistance(distance) + Double(steps) * alertDistanceStep)
+    }
+
     var destination: Destination {
         Destination(name: name, latitude: latitude, longitude: longitude, address: address)
     }
@@ -121,7 +127,7 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         if location.latitude != latitude || location.longitude != longitude {
             place.latitude = location.latitude
             place.longitude = location.longitude
-            place.address = location.address ?? location.name
+            place.address = location.savedAddress
         }
         return place
     }
