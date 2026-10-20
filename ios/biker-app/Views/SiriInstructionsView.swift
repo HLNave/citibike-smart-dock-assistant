@@ -59,6 +59,21 @@ struct SiriInstructionsView: View {
                 .padding()
                 .background(.background.secondary, in: .rect(cornerRadius: 16))
 
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Got an Action Button?")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    PhraseRow(text: "Press and hold it to hear the nearest dock with room.", systemImage: "button.vertical.left.press.fill")
+                        .font(.title3.weight(.semibold))
+                    Text("Set it up once in Settings › Action Button › Controls › Choose a Control › Speak Nearest Dock. Dock Finder answers through your headphones, even with your phone locked, and never asks anything. For directions, then say “Hey Siri, ask Dock Finder to direct me.”")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.background.secondary, in: .rect(cornerRadius: 16))
+
                 VStack(alignment: .leading, spacing: 10) {
                     Text("More")
                         .font(.headline)

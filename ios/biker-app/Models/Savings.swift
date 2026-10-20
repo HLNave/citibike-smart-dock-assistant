@@ -105,7 +105,7 @@ nonisolated struct SavingsEvent: Codable, Sendable, Equatable, Identifiable {
     let chosenID: String
     let chosenName: String
     let minutes: Double
-    /// Where it happened: "siri", "ride_arrival", "place_arrival", "directions", "app".
+    /// Where it happened: "siri", "action_button", "ride_arrival", "place_arrival", "directions", "app".
     let context: String
 
     var dollars: Double { SavingsModel.dollars(forMinutes: minutes) }
@@ -115,7 +115,7 @@ nonisolated struct SavingsEvent: Codable, Sendable, Equatable, Identifiable {
 nonisolated struct HandsFreeCheck: Codable, Sendable, Equatable, Identifiable {
     let id: UUID
     let date: Date
-    /// "siri", "ride_arrival", "place_arrival" or "directions".
+    /// "siri", "action_button", "ride_arrival", "place_arrival" or "directions".
     let context: String
 }
 

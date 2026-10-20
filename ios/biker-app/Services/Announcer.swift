@@ -6,78 +6,168 @@
 //  music or navigation the way Maps does) and posts it as a notification,
 //  so it still reaches the rider if speech can't play. With AirPods and
 //  Announce Notifications on, Siri also reads the notification aloud.
+//  Also speaks the Action Button's answer (speakAnswer), one answer at a
+//  time: a second press cuts the first answer short.
 //
 
 import AVFoundation
 import Foundation
 import UserNotifications
 
-final class Announcer: NSObject {
-    /// Longest a spoken answer is waited for, in case speech never reports finishing.
-    private static let speechTimeout: Duration = .seconds(30)
+final class Announcer {
+    /// Notification identifier for ride and place arrival alerts.
+    nonisolated static let arrivalNotificationID = "ride-arrival"
 
-    /// Created on first use: setting one up loads the speech engine, which
-    /// is slow and would otherwise hold up the first screen at launch.
-    private lazy var synthesizer: AVSpeechSynthesizer = {
-        let synthesizer = AVSpeechSynthesizer()
-        synthesizer.delegate = self
-        return synthesizer
-    }()
-    private var speechFinished: CheckedContinuation<Void, Never>?
-    /// Identifies the current utterance, so a stale timeout can't end a newer one.
-    private var utteranceID = 0
+    private let synthesizer: any SpeechSynthesizing
+    private let audio: SpeechAudio
+    /// Longest a spoken answer is waited for, in case speech never reports finishing.
+    private let speechTimeout: Duration
+    private let postRequest: (UNNotificationRequest) async -> Void
+
+    /// What's being said now, and the caller waiting for it to finish.
+    private var current: (ticket: Int, finished: CheckedContinuation<Void, Never>)?
+    /// Bumped by every request to speak, so the newest one wins.
+    private var latestTicket = 0
+
+    init(
+        synthesizer: any SpeechSynthesizing = SystemSpeechSynthesizer(),
+        audio: SpeechAudio = .shared,
+        speechTimeout: Duration = .seconds(30),
+        postRequest: @escaping (UNNotificationRequest) async -> Void = { request in
+            try? await UNUserNotificationCenter.current().add(request)
+        }
+    ) {
+        self.synthesizer = synthesizer
+        self.audio = audio
+        self.speechTimeout = speechTimeout
+        self.postRequest = postRequest
+    }
 
     /// Returns once the answer has been spoken (or speech failed), so the
     /// caller can keep the app awake until then.
-    func announce(_ text: String, title: String) async {
-        await Self.postNotification(text, title: title)
+    func announce(_ text: String, title: String, notificationID: String = arrivalNotificationID) async {
+        await postNotification(text, title: title, identifier: notificationID)
         await speak(text)
     }
 
-    private func speak(_ text: String) async {
-        // The notification still carries the answer if audio can't start.
-        guard await SpeechAudio.activate() else { return }
-        utteranceID += 1
-        let id = utteranceID
-        await withCheckedContinuation { continuation in
-            speechFinished = continuation
-            synthesizer.speak(SpokenVoice.utterance(text))
-            Task { [weak self] in
-                try? await Task.sleep(for: Self.speechTimeout)
-                if self?.utteranceID == id { self?.finishSpeaking() }
-            }
+    /// Speaks an answer the rider just asked for (the Action Button). The
+    /// notification is only a fallback here, posted if audio can't start,
+    /// so AirPods with Announce Notifications on don't say it twice.
+    func speakAnswer(_ text: String, title: String, notificationID: String) async {
+        if await !speak(text) {
+            await postNotification(text, title: title, identifier: notificationID)
         }
-        SpeechAudio.deactivate()
     }
 
-    private func finishSpeaking() {
-        speechFinished?.resume()
-        speechFinished = nil
+    /// One answer at a time, and the newest wins: asking again (a second
+    /// press of the Action Button) stops what's being said straight away
+    /// and lets its caller return, then says the new answer. Returns
+    /// `false` if audio couldn't start, so nothing was said.
+    @discardableResult
+    private func speak(_ text: String) async -> Bool {
+        latestTicket += 1
+        let ticket = latestTicket
+        interrupt()
+        // The notification still carries the answer if audio can't start.
+        guard await audio.acquire() else { return false }
+        defer { audio.release() }
+        // A newer answer arrived while audio was starting; it speaks instead.
+        guard ticket == latestTicket else { return true }
+        await withCheckedContinuation { continuation in
+            current = (ticket, continuation)
+            synthesizer.speak(text) { [weak self] in self?.finish(ticket) }
+            let timeout = speechTimeout
+            Task { [weak self] in
+                try? await Task.sleep(for: timeout)
+                self?.finish(ticket)
+            }
+        }
+        return true
+    }
+
+    /// Ends the wait for `ticket`, if it's still the one being said.
+    private func finish(_ ticket: Int) {
+        guard let current, current.ticket == ticket else { return }
+        self.current = nil
+        current.finished.resume()
+    }
+
+    /// Stops what's being said now and lets its caller return.
+    private func interrupt() {
+        guard let current else { return }
+        self.current = nil
+        synthesizer.stopSpeaking()
+        current.finished.resume()
     }
 
     static func requestNotificationPermission() async {
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
     }
 
-    private static func postNotification(_ text: String, title: String) async {
+    private func postNotification(_ text: String, title: String, identifier: String) async {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = text
         // Breaks through Focus when the app has the Time Sensitive entitlement;
         // otherwise iOS treats it as a normal notification.
         content.interruptionLevel = .timeSensitive
-        let request = UNNotificationRequest(identifier: "ride-arrival", content: content, trigger: nil)
-        try? await UNUserNotificationCenter.current().add(request)
+        await postRequest(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
 }
 
-extension Announcer: AVSpeechSynthesizerDelegate {
+/// Speaks text in the app's voice (SpokenVoice). Abstracted for testing.
+protocol SpeechSynthesizing: AnyObject {
+    var isSpeaking: Bool { get }
+    /// Queues `text` after anything already being said, and calls `done`
+    /// once when it has been said or stopped.
+    func speak(_ text: String, done: @escaping () -> Void)
+    /// Stops at once; everything queued reports done.
+    func stopSpeaking()
+}
+
+/// An AVSpeechSynthesizer speaking SpokenVoice utterances.
+final class SystemSpeechSynthesizer: NSObject, SpeechSynthesizing {
+    /// Created on first use: setting one up loads the speech engine, which
+    /// is slow and would otherwise hold up the first screen at launch.
+    private var created: AVSpeechSynthesizer?
+    /// Who to tell when each queued utterance is done. Holding the
+    /// utterance keeps its identifier from being reused meanwhile.
+    private var pending: [ObjectIdentifier: (utterance: AVSpeechUtterance, done: () -> Void)] = [:]
+
+    private var synthesizer: AVSpeechSynthesizer {
+        if let created { return created }
+        let synthesizer = AVSpeechSynthesizer()
+        synthesizer.delegate = self
+        created = synthesizer
+        return synthesizer
+    }
+
+    var isSpeaking: Bool { created?.isSpeaking ?? false }
+
+    func speak(_ text: String, done: @escaping () -> Void) {
+        let utterance = SpokenVoice.utterance(text)
+        pending[ObjectIdentifier(utterance)] = (utterance, done)
+        synthesizer.speak(utterance)
+    }
+
+    func stopSpeaking() {
+        created?.stopSpeaking(at: .immediate)
+    }
+
+    private func finished(_ id: ObjectIdentifier) {
+        pending.removeValue(forKey: id)?.done()
+    }
+}
+
+extension SystemSpeechSynthesizer: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finishSpeaking() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.finished(id) }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.finishSpeaking() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.finished(id) }
     }
 }
 
@@ -139,17 +229,60 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
 }
 
 /// Turns audio on for spoken prompts (lowering music or navigation the way
-/// Maps does) and back off afterwards. Done on a background queue: iOS
-/// warns that the audio session can block for a while, freezing the
-/// screen if it's called on the main thread. The queue is serial, so an
-/// "off" and a following "on" always happen in order.
-nonisolated enum SpeechAudio {
+/// Maps does) and back off once nobody is speaking. The ride alerts, the
+/// Action Button's answer and directions each speak with their own
+/// synthesizer on the one shared audio session, so each holds a claim
+/// while it talks: audio goes off only when the last claim is released,
+/// and one voice going quiet can't cut another off mid-sentence.
+final class SpeechAudio {
+    static let shared = SpeechAudio(session: SystemAudioSession())
+
+    private let session: any AudioSessionSwitching
+    /// Claims not yet released, including ones still waiting for audio to start.
+    private(set) var claims = 0
+
+    init(session: any AudioSessionSwitching) {
+        self.session = session
+    }
+
+    /// Claims audio for speaking; `false` if it couldn't start (e.g.
+    /// during a phone call), and then there's nothing to release. Each
+    /// claim asks for audio again: that's harmless when it's already on,
+    /// and picks it back up after an interruption.
+    func acquire() async -> Bool {
+        // Counted before waiting, so a release meanwhile can't turn audio
+        // off underneath this claim.
+        claims += 1
+        if await session.activate() { return true }
+        release()
+        return false
+    }
+
+    /// Gives up a claim; the last one lets other audio come back to full volume.
+    func release() {
+        guard claims > 0 else { return }
+        claims -= 1
+        if claims == 0 { session.deactivate() }
+    }
+}
+
+/// The phone's audio session. Abstracted for testing.
+protocol AudioSessionSwitching {
+    /// `false` if audio couldn't start.
+    func activate() async -> Bool
+    func deactivate()
+}
+
+/// Done on a background queue: iOS warns that the audio session can block
+/// for a while, freezing the screen if it's called on the main thread.
+/// The queue is serial, so an "off" and a following "on" always happen in
+/// order.
+nonisolated struct SystemAudioSession: AudioSessionSwitching {
     private static let queue = DispatchQueue(label: "DockFinder.speechAudio", qos: .userInitiated)
 
-    /// `false` if audio couldn't start (e.g. during a phone call).
-    static func activate() async -> Bool {
+    func activate() async -> Bool {
         await withCheckedContinuation { continuation in
-            queue.async {
+            Self.queue.async {
                 let session = AVAudioSession.sharedInstance()
                 do {
                     try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
@@ -162,9 +295,8 @@ nonisolated enum SpeechAudio {
         }
     }
 
-    /// Lets other audio come back to full volume.
-    static func deactivate() {
-        queue.async {
+    func deactivate() {
+        Self.queue.async {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }

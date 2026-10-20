@@ -105,6 +105,8 @@ final class GuidanceSpy: GuidanceControlling {
     private(set) var started: [DockStation] = []
     private(set) var siriLines: [String?] = []
     private(set) var stopCount = 0
+    /// What was said in the directions voice.
+    private(set) var said: [String] = []
 
     init(isActive: Bool = false, offered: DockStation? = nil, guidingTo station: DockStation? = nil) {
         self.isActive = isActive || station != nil
@@ -133,6 +135,10 @@ final class GuidanceSpy: GuidanceControlling {
         stopCount += 1
         isActive = false
         station = nil
+    }
+
+    func say(_ text: String) async {
+        said.append(text)
     }
 }
 
@@ -189,5 +195,16 @@ final class TemporaryDefaults {
 
     deinit {
         defaults.removePersistentDomain(forName: name)
+    }
+}
+
+@MainActor
+final class SpeakerSpy: AnswerSpeaking {
+    private(set) var spoken: [String] = []
+    private(set) var notificationIDs: [String] = []
+
+    func speakAnswer(_ text: String, title: String, notificationID: String) async {
+        spoken.append(text)
+        notificationIDs.append(notificationID)
     }
 }

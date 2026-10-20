@@ -38,6 +38,10 @@ protocol GuidanceControlling: AnyObject {
     /// What Siri says when directions start: just a confirmation.
     func siriConfirmation(for station: DockStation) -> String
     func stop() async
+    /// Says `text` in the directions voice, after any prompt already
+    /// queued, and returns once it has been said. For answers given while
+    /// guiding (the Action Button), so they never talk over a turn.
+    func say(_ text: String) async
 }
 
 /// Cycling directions. Abstracted for testing.
@@ -105,7 +109,7 @@ final class GuidanceSession: GuidanceControlling {
     var station: DockStation? { progress?.route.station }
 
     private let routes: any RouteProviding
-    private let prompter = VoicePrompter()
+    private let prompter: VoicePrompter
     @ObservationIgnored private var offered: (station: DockStation, date: Date)?
     @ObservationIgnored private var startedAt = Date.distantPast
     @ObservationIgnored private var lastDockCheck = Date.distantPast
@@ -118,8 +122,9 @@ final class GuidanceSession: GuidanceControlling {
     /// whether newer directions took over.
     @ObservationIgnored private var trackingGeneration = 0
 
-    init(routes: any RouteProviding = MapKitRouteProvider()) {
+    init(routes: any RouteProviding = MapKitRouteProvider(), prompter: VoicePrompter = VoicePrompter()) {
         self.routes = routes
+        self.prompter = prompter
     }
 
     // MARK: - Offering
@@ -190,6 +195,11 @@ final class GuidanceSession: GuidanceControlling {
         prompter.dropHeld()
         await stopTracking()
         await Self.handActivityBack()
+    }
+
+    func say(_ text: String) async {
+        prompter.say(text)
+        await prompter.waitUntilDone()
     }
 
     /// When directions end mid-ride, the Live Activity goes back to showing
@@ -367,20 +377,27 @@ final class GuidanceSession: GuidanceControlling {
 
 /// Speaks guidance prompts without blocking, one after another, lowering
 /// music or other audio while it talks (the way Maps does).
-final class VoicePrompter: NSObject {
-    /// Created on first use: setting one up loads the speech engine, which
-    /// is slow and would otherwise hold up the first screen at launch.
-    private lazy var synthesizer: AVSpeechSynthesizer = {
-        let synthesizer = AVSpeechSynthesizer()
-        synthesizer.delegate = self
-        return synthesizer
-    }()
+final class VoicePrompter {
+    private let synthesizer: any SpeechSynthesizing
+    private let audio: SpeechAudio
+    /// Whether this prompter holds a claim on audio (SpeechAudio); it
+    /// holds one from its first prompt until it has nothing left to say.
+    private var audioClaim = AudioClaim.none
+
+    private enum AudioClaim {
+        case none, claiming, held
+    }
 
     private var heldUntil: ContinuousClock.Instant?
     private var held: [String] = []
     /// The latest prompt waiting for audio to start; each waits for the one
     /// before, so prompts are spoken in the order they were said.
     private var starting: Task<Void, Never>?
+
+    init(synthesizer: any SpeechSynthesizing = SystemSpeechSynthesizer(), audio: SpeechAudio = .shared) {
+        self.synthesizer = synthesizer
+        self.audio = audio
+    }
 
     /// Roughly how long Siri takes to say `text`, including the moment
     /// before it starts talking.
@@ -428,8 +445,8 @@ final class VoicePrompter: NSObject {
         let previous = starting
         starting = Task { [weak self] in
             await previous?.value
-            guard await SpeechAudio.activate(), let self else { return }
-            self.synthesizer.speak(SpokenVoice.utterance(text))
+            guard let self, await self.claimAudio() else { return }
+            self.synthesizer.speak(text) { [weak self] in self?.releaseAudioIfIdle() }
         }
     }
 
@@ -444,18 +461,18 @@ final class VoicePrompter: NSObject {
         }
     }
 
-    private func deactivateIfIdle() {
-        guard !synthesizer.isSpeaking else { return }
-        SpeechAudio.deactivate()
-    }
-}
-
-extension VoicePrompter: AVSpeechSynthesizerDelegate {
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.deactivateIfIdle() }
+    /// `false` if audio couldn't start, so the prompt is dropped.
+    private func claimAudio() async -> Bool {
+        if case .held = audioClaim { return true }
+        audioClaim = .claiming
+        let claimed = await audio.acquire()
+        audioClaim = claimed ? .held : .none
+        return claimed
     }
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.deactivateIfIdle() }
+    private func releaseAudioIfIdle() {
+        guard case .held = audioClaim, !synthesizer.isSpeaking else { return }
+        audioClaim = .none
+        audio.release()
     }
 }
