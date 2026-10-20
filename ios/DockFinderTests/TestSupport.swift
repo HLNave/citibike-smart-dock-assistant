@@ -101,6 +101,8 @@ final class GuidanceSpy: GuidanceControlling {
     var offered: DockStation?
     private(set) var started: [DockStation] = []
     private(set) var stopCount = 0
+    /// What was said in the directions voice.
+    private(set) var said: [String] = []
 
     init(isActive: Bool = false, offered: DockStation? = nil) {
         self.isActive = isActive
@@ -127,13 +129,19 @@ final class GuidanceSpy: GuidanceControlling {
         stopCount += 1
         isActive = false
     }
+
+    func say(_ text: String) async {
+        said.append(text)
+    }
 }
 
 @MainActor
 final class SpeakerSpy: AnswerSpeaking {
     private(set) var spoken: [String] = []
+    private(set) var notificationIDs: [String] = []
 
-    func speakAnswer(_ text: String, title: String) async {
+    func speakAnswer(_ text: String, title: String, notificationID: String) async {
         spoken.append(text)
+        notificationIDs.append(notificationID)
     }
 }

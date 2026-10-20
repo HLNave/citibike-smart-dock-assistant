@@ -71,6 +71,31 @@ struct ActionButtonTests {
         #expect(!said.contains("?"))
     }
 
+    @Test func itsFallbackNotificationHasItsOwnIdentifier() async {
+        let h = harness()
+        _ = await h.announcement.run()
+        #expect(h.speaker.notificationIDs == ["action-button"])
+    }
+
+    /// While directions are being given, the answer waits its turn in the
+    /// directions voice instead of talking over a turn prompt.
+    @Test func duringDirectionsTheAnswerJoinsTheDirectionsVoice() async {
+        let h = harness()
+        h.guidance.isActive = true
+        let said = await h.announcement.run()
+        #expect(h.guidance.said == [said])
+        #expect(h.speaker.spoken.isEmpty)
+    }
+
+    @Test func duringDirectionsAnErrorJoinsTheDirectionsVoiceToo() async {
+        let h = harness(status: .failure(.networkUnavailable))
+        h.guidance.isActive = true
+        let said = await h.announcement.run()
+        #expect(said == DockFinderError.networkUnavailable.errorDescription)
+        #expect(h.guidance.said == [said])
+        #expect(h.speaker.spoken.isEmpty)
+    }
+
     @Test func offersTheDockForDirectMe() async {
         let h = harness()
         _ = await h.announcement.run()

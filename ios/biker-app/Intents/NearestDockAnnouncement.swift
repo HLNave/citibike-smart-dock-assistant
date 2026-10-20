@@ -15,7 +15,7 @@ import Foundation
 
 /// Says an answer out loud. Abstracted for testing.
 protocol AnswerSpeaking: AnyObject {
-    func speakAnswer(_ text: String, title: String) async
+    func speakAnswer(_ text: String, title: String, notificationID: String) async
 }
 
 extension Announcer: AnswerSpeaking {}
@@ -23,6 +23,8 @@ extension Announcer: AnswerSpeaking {}
 struct NearestDockAnnouncement {
     /// Title of the notification posted if the answer can't be spoken.
     static let title = "Nearest dock"
+    /// That notification's identifier, so it never replaces a ride arrival alert.
+    static let notificationID = "action-button"
     /// Said when a search fails with something other than a DockFinderError.
     static let fallbackError = "Dock Finder couldn't find a dock right now. Try again in a moment."
 
@@ -59,7 +61,7 @@ struct NearestDockAnnouncement {
         } catch {
             // The messages are written to be spoken (DockFinderError).
             let message = (error as? DockFinderError)?.errorDescription ?? Self.fallbackError
-            await speaker.speakAnswer(message, title: Self.title)
+            await say(message)
             return message
         }
 
@@ -79,7 +81,17 @@ struct NearestDockAnnouncement {
             savings.recordHandsFree(context: "action_button")
             guidance.offer(station, now: .now)
         }
-        await speaker.speakAnswer(answer.text, title: Self.title)
+        await say(answer.text)
         return answer.text
+    }
+
+    /// While directions are being given, the answer joins their voice's
+    /// queue, so it waits for a turn prompt instead of talking over it.
+    private func say(_ text: String) async {
+        if guidance.isActive {
+            await guidance.say(text)
+        } else {
+            await speaker.speakAnswer(text, title: Self.title, notificationID: Self.notificationID)
+        }
     }
 }
