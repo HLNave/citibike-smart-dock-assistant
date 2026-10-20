@@ -9,9 +9,14 @@ import Foundation
 import Testing
 @testable import DockFinder
 
-struct DirectionsPreferenceTests {
+/// A class, so each test's defaults are deleted when it ends.
+final class DirectionsPreferenceTests {
+    private var suites: [TemporaryDefaults] = []
+
     private func defaults() -> UserDefaults {
-        UserDefaults(suiteName: "test-\(UUID())")!
+        let suite = TemporaryDefaults()
+        suites.append(suite)
+        return suite.defaults
     }
 
     @Test func asksUntilChangedAndIsKept() {
@@ -89,6 +94,12 @@ struct SiriFollowUpTests {
         #expect(SiriFollowUp.after(started, startedRide: true, guidingToStationID: nil, preference: .ask) == .askToGuideRide)
         #expect(SiriFollowUp.after(started, startedRide: true, guidingToStationID: nil, preference: .always) == .guideRide(true))
         #expect(SiriFollowUp.after(started, startedRide: true, guidingToStationID: nil, preference: .never) == .guideRide(false))
+    }
+
+    @Test func startRightAwayAsksWhenGuidingToAnotherDock() {
+        #expect(SiriFollowUp.after(dockAnswer, startedRide: false, guidingToStationID: "other", preference: .always) == .offerDirections(station))
+        #expect(SiriFollowUp.after(dockAnswer, startedRide: false, guidingToStationID: "other", preference: .ask) == .offerDirections(station))
+        #expect(SiriFollowUp.after(dockAnswer, startedRide: false, guidingToStationID: "other", preference: .never) == .none)
     }
 
     @Test func rideRequestsAnsweredRightAwayAreDockAnswers() {

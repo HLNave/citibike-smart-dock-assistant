@@ -101,7 +101,10 @@ nonisolated enum SiriFollowUp: Equatable, Sendable {
         }
         guard let station = answer.station, station.id != guidingToStationID else { return .none }
         switch preference {
-        case .always: return .startDirections(station)
+        case .always:
+            // Already guiding somewhere else (say, checking a station on the
+            // way): ask rather than switch docks without a word.
+            return guidingToStationID == nil ? .startDirections(station) : .offerDirections(station)
         case .ask: return .offerDirections(station)
         case .never: return .none
         }
