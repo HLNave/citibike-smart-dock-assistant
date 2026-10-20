@@ -37,8 +37,20 @@ nonisolated enum ParsedRequest: Sendable, Equatable {
 nonisolated protocol RequestParsing: Sendable {
     /// How an answer built from this parser's result is labeled.
     var answerSource: DockAnswer.Source { get }
+    /// Which step this parser is, for usage data. By default, from `answerSource`.
+    var answeredBy: DockAnswer.Step { get }
     /// `nil` when the request isn't understood.
     func parse(_ text: String) async -> ParsedRequest?
+}
+
+extension RequestParsing {
+    nonisolated var answeredBy: DockAnswer.Step {
+        switch answerSource {
+        case .onDevice: .phraseRules
+        case .onDeviceModel: .appleIntelligence
+        case .server: .server
+        }
+    }
 }
 
 // MARK: - Phrase rules
@@ -254,6 +266,7 @@ nonisolated struct ShortAnswerParser: RequestParsing {
     var service: DockFinderService
 
     var answerSource: DockAnswer.Source { .onDevice }
+    var answeredBy: DockAnswer.Step { .shortAnswer }
 
     func parse(_ text: String) async -> ParsedRequest? {
         let request = KeywordRequestParser.normalize(text)

@@ -21,7 +21,9 @@ import UIKit
 /// What the assistant needs from guidance. Abstracted for testing.
 protocol GuidanceControlling: AnyObject {
     var isActive: Bool { get }
-    /// Remembers a dock the rider was just told about, for "direct me".
+    /// The dock being guided to, while guiding.
+    var station: DockStation? { get }
+    /// Remembers a dock the rider was just told about, for "take me there".
     func offer(_ station: DockStation, now: Date)
     /// The dock the rider was last offered directions to, if recently.
     func recentOffer(now: Date) -> DockStation?

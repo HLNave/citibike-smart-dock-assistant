@@ -6,7 +6,7 @@ A hands-free helper for Citi Bike riders in NYC. Tell Siri where you're riding, 
 > Siri: "Got it. I'll tell you where to dock when you're about 0.3 miles from school."
 > *…as you get close:* "Your usual dock is full. Go to Washington and Greene, 8 docks, 350 feet from school."
 
-Built as a group capstone project. The main product is **Dock Finder**, a native iPhone app (SwiftUI, Siri, App Intents) that reads Citi Bike's public live feed directly. An [n8n](https://n8n.io) workflow answers questions typed into the app's **Ask a Question** screen that the phone can't understand; Siri requests never reach it. (Before the app, an iPhone Shortcuts version proved the idea. It still works and is how to use Dock Finder without installing the app from Xcode; see [The Shortcuts version](#the-shortcuts-version).)
+Built as a group capstone project. The product is **Dock Finder**, a native iPhone app (SwiftUI, Siri, App Intents) that reads Citi Bike's public live feed directly and works out every answer on the phone, with Apple's on-device model (where Apple Intelligence is available) helping with wording, places and stations it doesn't recognize. There's no Dock Finder server by default; an optional [n8n](https://n8n.io) workflow can be set up for free-form questions the phone can't understand. (Before the app, an iPhone Shortcuts version proved the idea; the app replaces it, and it's kept only for reference. See [The Shortcuts version (legacy MVP)](#the-shortcuts-version-legacy-mvp).)
 
 ## The problem
 
@@ -42,7 +42,7 @@ Bike up to a saved place (school, work, home) and Dock Finder tells you where to
 
 - It only speaks up when you're **biking**, using the iPhone's motion sensor (allow **Motion & Fitness** when asked). Walking, driving or the subway don't trigger it. Without that permission it can't tell, so every arrival alerts. If Motion & Fitness is on but iOS has no recent cycling reading, the alert is skipped too.
 - At most once an hour per place, and not while a ride or directions are already running.
-- Uses each place's alert distance, and needs location access set to **Always**.
+- Triggers at each place's alert radius (the circle on its map, see Saved Places below), and needs location access set to **Always**.
 - Turn it off per place with **Alert Me When I Arrive** on the place's screen.
 
 ### Directions to the dock
@@ -59,6 +59,16 @@ Whenever a Siri answer names a dock (finding a dock, checking a station, your sa
 - **"Hey Siri, ask Dock Finder to stop directions"** stops directions; **"…to end my ride"** ends the ride and its directions. Directions also stop on their own at the dock, or after 45 minutes.
 - Said "no" by mistake? **"Hey Siri, ask Dock Finder to direct me"** guides you to the dock you were told about in the last 10 minutes (or else the nearest one with room).
 - On a ride, say "yes" to "Want me to guide you to the dock when you're close?" and the arrival alert turns straight into directions.
+- **Directions setting** (home screen → **Directions**), "When Siri finds a dock": **Ask Me** (the default) asks as described above; **Start Right Away** skips the question, and Siri says the answer and "Okay, directing you to …" and directions start; **Don't Offer** just gives the answer ("…direct me" still works). If directions to a different dock are already running (say you check a station on the way), Start Right Away asks instead of switching docks. Rides started with Siri follow it too: Start Right Away guides you to the dock without asking, Don't Offer never does. The **Guide me to the dock** switch on the Start a Ride screen starts where the setting says (with Ask Me, where you left it). The setting also applies when a Shortcuts automation runs a Dock Finder action: with Start Right Away, an automation that runs Find Dock or Check Station starts directions too.
+
+### Unclear requests, places and stations
+
+Everything below runs on the iPhone; no server is involved unless a build sets one up (none does by default).
+
+- **Free-form requests** ("Ask Dock Finder a question", or typed under **Ask a Question**) go through three steps in order: phrase rules ("is Mercer and Bleecker full", "find a dock near Union Square"), then a saved place or station name said on its own ("school", "Mercer and Bleecker"), then Apple's on-device model where Apple Intelligence is available and on, which sorts other wording into the same requests. If none understands it, you get a short help message.
+- **A place the map can't find** ("that bagel place by Stern"): Apple's on-device model turns the description into a short Apple Maps search (an official name or a street address) and the map is searched once more. This covers "…find a dock somewhere else", "…start a ride to …", typed questions (unless the place was already worded by Apple's model), and the app's place search boxes. Only if that also finds nothing do you hear "Dock Finder couldn't find … on the map", still in your words.
+- **A station name that doesn't match** (from "…check a station" or a question): the model is shown up to 8 of the closest station names, by a looser version of the same fuzzy matching (words up to two letters apart, so "mercy and bleaker" still finds Mercer and Bleecker), and picks the one you meant, or none, and that station is checked. If no name is even loosely similar, it's shown your saved places' usual and backup docks and the stations nearest you instead. Otherwise: "Dock Finder couldn't find a Citi Bike station called …".
+- Each second try gives up after 3 seconds, so a slow model never holds up Siri. Without Apple Intelligence (or with it off), they're skipped and you get the same messages as before. Answers found this way show "Understood by Apple Intelligence on your iPhone" in the app.
 
 ### All phrases
 
@@ -77,10 +87,11 @@ Say "Hey Siri, …". *school* stands for any saved place's name or nickname; *Me
 | **Ask Dock Finder for Citi Bike status**<br>also: *Ask Dock Finder how many bikes are out*, *…to check Citi Bike citywide* | Citywide bikes, open docks and full stations |
 | **Ask Dock Finder to direct me**<br>also: *…to direct me there*, *…to take me there*, *…to guide me to a dock*, *Ask Dock Finder for directions* | Turn-by-turn directions to the dock you were just told about, or the nearest dock with room |
 | **Ask Dock Finder to stop directions**<br>also: *…to cancel directions*, *…to stop guiding me* | Stops turn-by-turn directions (during a ride, before you arrive, it turns off guidance for that ride) |
+| **Ask Dock Finder a question**<br>also: *Ask Dock Finder for help with a dock* | Asks "What do you need?", then answers whatever you say in your own words ("is the one on Mercer full?", "find a dock near the bagel place on Houston"), on the iPhone (see [Unclear requests](#unclear-requests-places-and-stations)). If nothing understands it, Siri says what you can ask |
 
 Every phrase with "dock" also works with **"doc"** ("Ask Dock Finder to find a doc"), since Siri often hears it that way.
 
-Siri can only fill in names the app gives it ahead of time (saved places and those stations), so an address or a station Siri doesn't know needs the "…somewhere else" or "…check a station" phrase, which asks for it. There's no bare "Ask Dock Finder": Siri could stop listening after those three words. Setting a usual dock or saving a spot is done in the app (or by typing it under **Ask a Question**).
+Siri can only fill in names the app gives it ahead of time (saved places and those stations), so an address or a station Siri doesn't know needs the "…somewhere else" or "…check a station" phrase, which asks for it (or "…a question", which takes anything). There's no bare "Ask Dock Finder": Siri could stop listening after those three words. Setting a usual dock or saving a spot is done in the app (or by typing it under **Ask a Question**).
 
 ### Tips
 
@@ -103,10 +114,11 @@ The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about lo
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
 - **Ride card**: **Start a Ride** (pick a saved place or search an address, and choose whether to be guided to the dock). During a ride it shows the distance left, a **Guide me to the dock** switch and an **End Ride** button, and afterwards what was said on arrival.
-- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then name it (that's what you say to Siri), add nicknames, and pick how far out you're alerted (300 m, 500 m, 800 m or 1.2 km; shown as 0.2–0.7 miles in US settings). Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
+- **Saved Places** (they survive deleting and reinstalling the app): **Add a Place** by searching an address or using your current location, then drag the pin (or tap the map) to put it exactly where you're going. Name it (that's what you say to Siri), add nicknames, and set how far out you're alerted with a slider: the alert radius is drawn on the map as a circle, from 150 m to 1.5 km in 50 m steps (500 ft to 0.9 miles in US settings), so you can see where it'll trigger. Open a place to pick its **Usual Dock** and **Backup Dock**, see its live status and its map, tap the map to move the pin or change the radius, turn **Alert Me When I Arrive** on or off, start a ride there, edit or delete it.
 - **Savings**: how much time and money Dock Finder has saved you this month (see [Savings](#savings)). Tap it for all-time totals, recent full docks avoided, and how it's calculated.
 - **More**: Dock Near a Place, Check a Station, Citywide Status, and Ask a Question (type anything in your own words, or tap an example).
 - **How to Use with Siri**: the phrase cheat sheet again, and how to set up the Action Button.
+- **Directions**: what Siri does after it names a dock (see [Directions to the dock](#directions-to-the-dock)).
 - **Privacy**: turn usage sharing on or off, and see exactly what's shared.
 
 ### Savings
@@ -144,9 +156,11 @@ Station names are rewritten the way New Yorkers say them ("W 15 St & 6 Ave" beco
 ```mermaid
 flowchart LR
   S["Siri phrase or app button"] --> D["on-device features<br/>(nearest dock, dock near a place,<br/>station check, citywide, rides, directions)"]
-  A["typed in Ask a Question"] --> P{"understood on the iPhone?<br/>phrase rules → saved places & station names<br/>→ Apple Intelligence (if available)"}
+  A["typed in Ask a Question,<br/>or Siri: Ask Dock Finder a question"] --> P{"understood on the iPhone?<br/>phrase rules → saved places & station names<br/>→ Apple Intelligence (if available)"}
   P -- yes --> D
-  P -- "no, or place/station not found" --> W2["n8n siri webhook<br/>(only if a server is set)"]
+  D -. "place or station not found" .-> AI["Apple Intelligence (if available):<br/>rewrite the place search,<br/>or pick from the closest station names"]
+  AI -. found .-> D
+  P -- "no, or still not found" --> W2["n8n siri webhook<br/>(only if a server is set; none by default)"]
   D --> F["Citi Bike live feed<br/>+ Apple map search"]
   W2 --> F2["Citi Bike feed + OpenStreetMap"]
   F & F2 --> V["one sentence, spoken"]
@@ -155,7 +169,7 @@ flowchart LR
 
 - **On the iPhone first.** Every feature runs on the phone, reading Citi Bike's public [GBFS feed](https://gbfs.citibikenyc.com/gbfs/en/) (no API key) and Apple's map search. Saved places are stored only on the phone.
 - **Rides** track location in the background the way navigation apps do, plus a geofence around the destination that relaunches the app if iOS closed it. At the alert distance it speaks the answer (ducking music) and posts it as a notification, then the ride ends. Rides stop after 60 minutes if you never arrive.
-- **The n8n server is only a fallback for the Ask a Question screen**: typed questions the phone can't understand, or places and stations it can't find. Siri phrases and app buttons never use it; if Siri can't find a place or station, it says so. A chat model classifies the request into a fixed JSON schema; **it never writes the answer**. Plain JavaScript does, so every number comes from the live feed. OpenStreetMap Nominatim looks up places, and the model rewrites nicknames ("that bagel place by Stern") into addresses when the lookup fails.
+- **No server by default.** `DOCKFINDER_BACKEND_HOST` is empty in `ios/Config/DockFinder.xcconfig`, so the app never contacts the n8n workflow; unclear requests, places and stations are handled on the phone (see [Unclear requests, places and stations](#unclear-requests-places-and-stations)). Only in a build that sets a host do free-form questions (typed, or through "Ask Dock Finder a question") that nothing on the phone understands, or whose place or station still isn't found, go to the workflow. The fixed Siri phrases and app buttons never use it. There, a chat model classifies the request into a fixed JSON schema; **it never writes the answer**. Plain JavaScript does, so every number comes from the live feed. OpenStreetMap Nominatim looks up places, and the model rewrites nicknames ("that bagel place by Stern") into addresses when the lookup fails.
 - **The server and the app read different copies of the Citi Bike feed** (`gbfs.lyft.com/gbfs/2.3/bkn` vs `gbfs.citibikenyc.com`), and the server doesn't check how old the feed is, so their answers can differ slightly.
 
 ## Repo layout
@@ -179,7 +193,7 @@ shortcuts/
   build_shortcuts.py                             # builds the signed Shortcuts-version files
   generate_docs.py                               # regenerates docs/shortcuts.md from the code
 docs/
-  onboarding.md                                  # setting up the Shortcuts version
+  onboarding.md                                  # setting up the legacy Shortcuts version
   shortcuts.md                                   # how each shortcut works (auto-generated sections)
   iphone-setup-handoff.md                        # older AI-guided Shortcuts setup
   project-summary.pdf                            # project overview
@@ -218,7 +232,7 @@ Already set up: the team's Google Sheet URL is in `ios/Config/DockFinder.xcconfi
 - **Siri instead of a Telegram bot.** Our first voice prototype used Telegram, but voice notes need the phone unlocked and a button held, and replies don't auto-play. Siri is truly hands-free, and the phone does speech recognition and text-to-speech for free.
 - **One pattern, one breath.** Every phrase is "Ask Dock Finder to …" with the whole request in it, so there's one thing to remember and no waiting for a follow-up question. Siri can only fill in names the app lists ahead of time, so saved places and known stations go straight in the phrase; anything else (an address, another station) is asked for once and reaches the app as plain text, so Siri can't turn it into a Maps search (or a search for doctors).
 - **Spoken-first answers.** Anything spoken is one sentence: where to go, how many docks, how far.
-- **AI only where it helps.** Fixed requests are plain code on the phone; only free-form questions typed in the app go through a model, on device first.
+- **AI only where it helps, and on the phone.** Fixed requests are plain code. Apple's on-device model is only used for free-form questions (typed, or "Ask Dock Finder a question") that the phrase rules don't cover, and for a second try at a place or station that wasn't found. Nothing goes to a server by default.
 
 ## Costs
 
@@ -230,6 +244,7 @@ Already set up: the team's Google Sheet URL is in `ios/Config/DockFinder.xcconfi
 
 ## Limitations and next steps
 
+- **Apple Intelligence second tries** (rewriting a place search, picking a station) are unit-tested with stand-ins for the model, not yet against the real model on an iPhone, so how often they help is unmeasured. The usage data's `answered_by` field (`phrase_rules`, `short_answer`, `apple_intelligence`, `on_device` for fixed Siri actions and buttons, `server`) is there to measure it.
 - **Not yet verified end to end on a physical iPhone**: locked-phone rides, geofence relaunch, background speech, Siri's yes/no follow-ups, turn-by-turn directions, the Live Activity and the Action Button control. See the [manual checklist](ios/README.md#manual-verification-checklist-physical-iphone).
 - Turn-by-turn directions use Apple's cycling routes and match your GPS position to them (fixes worse than 65 m are ignored). Among tall buildings, GPS drifts, so a turn can be announced a little early or late.
 - Distances are straight-line, not riding distance.
@@ -237,17 +252,15 @@ Already set up: the team's Google Sheet URL is in `ios/Config/DockFinder.xcconfi
 - Server conversation memory is in n8n's in-memory store and resets on restart.
 - No TestFlight build yet, so the app is installed from Xcode; with a free Apple ID, Apple makes those installs expire after 7 days.
 
-## The Shortcuts version
+## The Shortcuts version (legacy MVP)
 
-Before the app, Dock Finder was a set of iPhone shortcuts that send your words or location to the n8n workflow and read the answer aloud. It's still the way to use Dock Finder without installing the app from Xcode (until there's a TestFlight build).
+Before the app, Dock Finder was a set of iPhone shortcuts that send your words or location to the n8n workflow and read the answer aloud. It was the minimum viable product that proved the idea; **the app replaces it**, and the files are kept in the repo for reference only.
 
-What it includes:
-
-- **Dock Finder**: "Hey Siri, run Dock Finder", then ask anything. It uses the server's chat model for every question.
+- **Dock Finder**: "Hey Siri, run Dock Finder", then ask anything, answered by the server's chat model.
 - **Nearest Dock**: one press (for example, the Action Button).
-- **Dock Arrival - School / Work / Home**: run by an iPhone Arrive automation. The server looks up the address you typed, with an AI fallback for nicknames, and remembers it.
+- **Dock Arrival - School / Work / Home**: run by an iPhone Arrive automation; the server looks up the address you typed.
 
-Setup is in [docs/onboarding.md](docs/onboarding.md). How each shortcut works, step by step, is in [docs/shortcuts.md](docs/shortcuts.md) (regenerated from the code on every push). The files are built with `shortcuts/build_shortcuts.py` and use the workflow's **siri webhook** and **arrival webhook** (`/webhook/citibike-arrival`, which only the shortcuts call).
+It needs the n8n workflow running (its **siri webhook**, and the **arrival webhook**, `/webhook/citibike-arrival`, which only the shortcuts call). The files are built with `shortcuts/build_shortcuts.py`; old setup notes are in [docs/onboarding.md](docs/onboarding.md) and how each shortcut works in [docs/shortcuts.md](docs/shortcuts.md).
 
 The Dock Finder shortcut sends your first name as the conversation ID, so two riders with the same first name share the server's short-term memory.
 

@@ -27,6 +27,8 @@ struct ActionButtonTests {
         let guidance: GuidanceSpy
         let savings: SavingsStore
         let metrics: Metrics
+        /// Keeps the defaults suite alive for the test; deleted afterwards.
+        let defaults: TemporaryDefaults
     }
 
     private func harness(
@@ -34,7 +36,8 @@ struct ActionButtonTests {
         statuses: [StationStatus] = [status("near", docks: 4), status("mid", docks: 2)],
         status statusResult: Result<GBFSFeed<StationStatusPayload>, DockFinderError>? = nil
     ) -> Harness {
-        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        let temporary = TemporaryDefaults()
+        let defaults = temporary.defaults
         UsageSharing.set(.granted, in: defaults)
         let service = DockFinderService(
             location: StubLocation(result: location ?? .success(here)),
@@ -56,7 +59,14 @@ struct ActionButtonTests {
             metrics: metrics,
             lastKnownLocation: { userLocation }
         )
-        return Harness(announcement: announcement, speaker: speaker, guidance: guidance, savings: savings, metrics: metrics)
+        return Harness(
+            announcement: announcement,
+            speaker: speaker,
+            guidance: guidance,
+            savings: savings,
+            metrics: metrics,
+            defaults: temporary
+        )
     }
 
     @Test func speaksExactlyTheNearestDockAnswer() async throws {

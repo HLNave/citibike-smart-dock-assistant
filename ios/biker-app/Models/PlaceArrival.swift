@@ -7,6 +7,7 @@
 //  rules to geofence events; they're plain logic so they can be tested.
 //
 
+import CoreLocation
 import Foundation
 
 nonisolated enum PlaceArrivalRules {
@@ -33,6 +34,13 @@ nonisolated enum PlaceArrivalRules {
         let confident = samples.filter(\.confident).sorted { $0.start < $1.start }
         if confident.last?.cycling == true { return true }
         return confident.contains { $0.cycling && now.timeIntervalSince($0.start) <= recentCyclingWindow }
+    }
+
+    /// True when iOS is already watching this exact circle for `place`, so
+    /// `PlaceArrivalMonitor.sync` can leave it alone. A place moved on the
+    /// map or given a new alert radius gets its geofence replaced.
+    static func geofenceIsCurrent(center: CLLocationCoordinate2D, radius: CLLocationDistance, for place: SavedPlace) -> Bool {
+        center.latitude == place.latitude && center.longitude == place.longitude && radius == place.alertDistance
     }
 
     /// - Parameter wasCycling: `nil` when iOS can't tell (no motion

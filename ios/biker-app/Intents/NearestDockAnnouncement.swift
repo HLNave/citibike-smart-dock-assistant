@@ -73,7 +73,11 @@ struct NearestDockAnnouncement {
             station: answer.station?.name,
             avoidedStation: answer.avoided?.name,
             location: here,
-            details: ["intent": String(describing: SpeakNearestDockIntent.self), "answer": answer.text]
+            details: [
+                "intent": String(describing: SpeakNearestDockIntent.self),
+                "answer": answer.text,
+                "answered_by": answer.answeredBy.rawValue,
+            ]
         )
         savings.record(answer, from: here, context: "action_button")
         if let station = answer.station {

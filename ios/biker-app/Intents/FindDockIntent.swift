@@ -9,9 +9,10 @@
 //  Answers that name a dock end with "Want me to direct you there?", and
 //  a new ride asks "Want me to guide you to the dock when you're close?".
 //  Siri is already in the conversation, so the rider can answer by voice
-//  with the phone locked. Intents that can start guidance or a ride are
-//  LiveActivityIntents, which lets them start the Lock Screen activity
-//  from the background.
+//  with the phone locked. The Directions setting (DirectionsPreference)
+//  can skip both questions: always start directions, or never offer them.
+//  Intents that can start guidance or a ride are LiveActivityIntents,
+//  which lets them start the Lock Screen activity from the background.
 //
 
 import AppIntents
@@ -31,25 +32,32 @@ extension DockAnswer {
 }
 
 extension AppIntent {
-    /// Speaks `answer`, then follows up:
+    /// Speaks `answer`, then follows up (see `SiriReplier` and `SiriFollowUp`):
     /// - When `answer` started a ride (it's not the ride from before), asks
-    ///   whether to guide the rider to the dock on arrival.
+    ///   whether to guide the rider to the dock on arrival, unless the
+    ///   Directions setting already says.
     /// - When it names a dock, asks "Want me to direct you there?" and, on
     ///   yes, confirms and starts turn-by-turn guidance in the app's voice.
+    ///   With the setting on Start Right Away it starts without asking
+    ///   (but still asks when directions to another dock are running);
+    ///   with Don't Offer it doesn't ask.
     @MainActor
     func reply(
         with answer: DockAnswer,
         rideBefore: Ride? = nil,
         checksForNewRide: Bool = false
     ) async throws -> some SpokenAnswerResult {
-        let guidance = GuidanceSession.shared
         let here = LocationService.shared.lastKnownLocation
         Metrics.shared.log(
             "siri_answer",
             station: answer.station?.name,
             avoidedStation: answer.avoided?.name,
             location: here,
-            details: ["intent": String(describing: Self.self), "answer": answer.text]
+            details: [
+                "intent": String(describing: Self.self),
+                "answer": answer.text,
+                "answered_by": answer.answeredBy.rawValue,
+            ]
         )
         SavingsStore.shared.record(answer, from: here, context: "siri")
         if answer.station != nil {
@@ -57,39 +65,15 @@ extension AppIntent {
             SavingsStore.shared.recordHandsFree(context: "siri")
         }
 
-        if checksForNewRide, let ride = RideTracker.shared.currentRide, ride != rideBefore {
-            do {
-                try await requestConfirmation(
-                    conditions: [],
-                    actionName: .go,
-                    dialog: "\(answer.text) \(GuidanceSession.rideQuestion)"
-                )
-            } catch {
-                return spokenResult(answer.text, dialog: "Okay. I'll just tell you where to dock.")
-            }
-            RideTracker.shared.setGuidesToDock(true)
-            return spokenResult(answer.text, dialog: "Okay. When you're close, I'll guide you to the dock.")
+        let replier = SiriReplier(
+            guidance: GuidanceSession.shared,
+            rides: RideTracker.shared,
+            preference: DirectionsPreference.current()
+        ) { question in
+            try await requestConfirmation(conditions: [], actionName: .go, dialog: "\(question)")
         }
-
-        guard let station = answer.station else { return spokenResult(answer.text) }
-        guidance.offer(station)
-        guard guidance.station?.id != station.id else { return spokenResult(answer.text) }
-        do {
-            try await requestConfirmation(
-                conditions: [],
-                actionName: .go,
-                dialog: "\(answer.text) \(GuidanceSession.offerQuestion)"
-            )
-        } catch {
-            // "No", or Siri couldn't ask. The answer was already spoken with
-            // the question, so don't repeat it.
-            return spokenResult(answer.text, dialog: "Okay.")
-        }
-        // Siri only confirms; the app's voice gives the directions once Siri
-        // has finished, so the two don't talk over each other.
-        let siriLine = guidance.siriConfirmation(for: station)
-        let reply = try await guidance.start(to: station, siriWillSay: siriLine)
-        return spokenResult(guidance.isActive ? siriLine : reply)
+        let reply = try await replier.reply(to: answer, rideBefore: rideBefore, checksForNewRide: checksForNewRide)
+        return spokenResult(reply.value, dialog: reply.dialog)
     }
 }
 
@@ -366,5 +350,50 @@ struct StopDirectionsIntent: AppIntent {
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
         try await AssistantRouter.live().handle(.stopDirections).intentResult
+    }
+}
+
+/// "Hey Siri, ask Dock Finder a question": Siri asks "What do you need?",
+/// and the answer goes through the same steps as the Ask a Question
+/// screen, all on the iPhone: phrase rules, then saved places and station
+/// names, then Apple Intelligence where it's available. A server is only
+/// asked if a build sets one up (none does by default). The reply follows
+/// the Directions setting like any other answer.
+struct AskDockFinderIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Ask Dock Finder a Question"
+    static let description = IntentDescription(
+        "Answers a request in your own words, like is Mercer and Bleecker full, or find a dock near Union Square."
+    )
+    static let supportedModes: IntentModes = .background
+
+    /// Optional, so Siri asks once and never re-asks.
+    @Parameter(title: "Request")
+    var request: String?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Ask \(\.$request)")
+    }
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        let rideBefore = RideTracker.shared.currentRide
+        let spoken: String
+        if let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            spoken = request
+        } else {
+            spoken = try await $request.requestValue("What do you need?")
+        }
+        let answer = try await Self.answer(spoken, with: AssistantRouter.live())
+        // "Start a ride to school" works here too, so check for a new ride.
+        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
+    }
+
+    /// The help message when nothing was said or nothing understands it.
+    @MainActor
+    static func answer(_ spoken: String, with router: AssistantRouter) async throws -> DockAnswer {
+        guard !spoken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return DockAnswer(text: AssistantRouter.helpText)
+        }
+        return try await router.answer(spoken)
     }
 }
