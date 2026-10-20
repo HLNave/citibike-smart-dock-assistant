@@ -10,7 +10,8 @@ import SwiftUI
 struct PlaceSearchView: View {
     @State private var query = ""
     @State private var results: [Destination] = []
-    @State private var searchError: DockFinderError?
+    /// `results` came from Apple's model rewriting the search.
+    @State private var resultsWereRewritten = false
     @State private var model = AnswerModel()
 
     var body: some View {
@@ -18,13 +19,6 @@ struct PlaceSearchView: View {
             if model.phase != .idle {
                 Section {
                     AnswerView(phase: model.phase)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                }
-            }
-            if let searchError {
-                Section {
-                    ErrorCard(error: searchError)
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                 }
@@ -48,7 +42,7 @@ struct PlaceSearchView: View {
             }
         }
         .overlay {
-            if results.isEmpty, searchError == nil, model.phase == .idle {
+            if results.isEmpty, model.phase == .idle {
                 ContentUnavailableView(
                     "Find a Dock Near a Place",
                     systemImage: "mappin.and.ellipse",
@@ -61,23 +55,31 @@ struct PlaceSearchView: View {
         .onSubmit(of: .search) { Task { await search() } }
     }
 
+    /// Shows the progress spinner from the start, since Apple's model may
+    /// take a moment to rewrite a search the map doesn't understand.
     private func search() async {
         model.reset()
-        do {
-            results = Array(try await MapKitPlaceSearch().search(query, rewritingWith: OnDeviceModelPlaceRewriter()).places.prefix(8))
-            searchError = nil
+        results = []
+        await model.run {
+            let found = try await MapKitPlaceSearch().search(query, rewritingWith: OnDeviceModelPlaceRewriter())
+            results = Array(found.places.prefix(8))
+            resultsWereRewritten = found.rewrittenQuery != nil
             // The best match is usually right, so answer for it straight away.
-            if let first = results.first { await findDock(near: first) }
-        } catch let error as DockFinderError {
-            results = []
-            searchError = error
-        } catch {}
+            guard let first = results.first else { throw DockFinderError.placeNotFound(query) }
+            return try await answer(near: first)
+        }
     }
 
     private func findDock(near destination: Destination) async {
         await model.run {
-            try await DockFinderService.live.findDock(near: destination).answer
+            try await answer(near: destination)
         }
+    }
+
+    private func answer(near destination: Destination) async throws -> DockAnswer {
+        var answer = try await DockFinderService.live.findDock(near: destination).answer
+        if resultsWereRewritten { answer.markAnswered(by: .appleIntelligence) }
+        return answer
     }
 }
 

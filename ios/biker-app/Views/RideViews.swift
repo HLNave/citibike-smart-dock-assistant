@@ -147,9 +147,6 @@ struct StartRideView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var results: [Destination] = []
-    /// What `results` were found for: the typed query, or Apple's model's
-    /// rewrite of it, so starting the ride searches the same thing.
-    @State private var resultsQuery = ""
     @State private var error: DockFinderError?
     @State private var outcome: AnswerModel = AnswerModel()
     /// Starts where the Directions setting says (with Ask Me, as it was
@@ -198,7 +195,9 @@ struct StartRideView: View {
                     }
                     ForEach(results, id: \.self) { result in
                         Button {
-                            Task { await start(resultsQuery) }
+                            // The rider's own words: the router rewrites the search
+                            // again if it needs to, and names the ride as typed.
+                            Task { await start(query) }
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(result.name)
@@ -232,7 +231,6 @@ struct StartRideView: View {
         do {
             let found = try await MapKitPlaceSearch().search(query, rewritingWith: OnDeviceModelPlaceRewriter())
             results = Array(found.places.prefix(5))
-            resultsQuery = found.rewrittenQuery ?? query
             error = nil
         } catch let failure as DockFinderError {
             results = []
