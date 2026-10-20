@@ -44,12 +44,11 @@ final class PlaceArrivalMonitor {
             let identifier = place.id.uuidString
             if let record = await monitor.record(for: identifier),
                let existing = record.condition as? CLMonitor.CircularGeographicCondition,
-               existing.center.latitude == place.latitude,
-               existing.center.longitude == place.longitude,
-               existing.radius == place.alertDistance {
+               PlaceArrivalRules.geofenceIsCurrent(center: existing.center, radius: existing.radius, for: place) {
                 continue
             }
-            // A new or moved place. Assume "outside" so arriving triggers it.
+            // A new or moved place, or a new radius. Assume "outside" so
+            // arriving triggers it.
             await monitor.add(
                 CLMonitor.CircularGeographicCondition(center: place.location.coordinate, radius: place.alertDistance),
                 identifier: identifier,

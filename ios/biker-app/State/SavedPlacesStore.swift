@@ -16,6 +16,13 @@ import Observation
 nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hashable {
     /// How far out a ride announces the best dock, unless the place says otherwise.
     static let defaultAlertDistance: CLLocationDistance = 500
+    /// The alert radius the rider can pick on the map. iOS geofences can
+    /// fire late or not at all when they're smaller than about 150 m, and
+    /// from farther than 1.5 km (about 8 minutes by bike) the dock answer
+    /// is stale by the time the rider gets there.
+    static let alertDistanceRange: ClosedRange<CLLocationDistance> = 150...1_500
+    /// The slider moves in steps this size, so radii read as round numbers.
+    static let alertDistanceStep: CLLocationDistance = 50
     static let alertDistanceOptions: [CLLocationDistance] = [300, 500, 800, 1_200]
 
     var id: UUID
@@ -83,12 +90,54 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
         backupStationID = try container.decodeIfPresent(String.self, forKey: .backupStationID)
         backupStationName = try container.decodeIfPresent(String.self, forKey: .backupStationName)
         let distance = try container.decodeIfPresent(Double.self, forKey: .alertDistance) ?? Self.defaultAlertDistance
-        alertDistance = distance > 0 ? distance : Self.defaultAlertDistance
+        alertDistance = Self.clampedAlertDistance(distance)
         arrivalAlerts = try container.decodeIfPresent(Bool.self, forKey: .arrivalAlerts) ?? true
+    }
+
+    /// Keeps an alert radius within `alertDistanceRange`. A missing or
+    /// nonsense value (zero, negative) falls back to the default instead.
+    static func clampedAlertDistance(_ distance: CLLocationDistance) -> CLLocationDistance {
+        guard distance.isFinite, distance > 0 else { return defaultAlertDistance }
+        return min(max(distance, alertDistanceRange.lowerBound), alertDistanceRange.upperBound)
+    }
+
+    /// Rounds a slider position to the nearest `alertDistanceStep` within
+    /// `alertDistanceRange`: 512 → 500, 20 → 150.
+    static func snappedAlertDistance(_ distance: CLLocationDistance) -> CLLocationDistance {
+        guard !distance.isNaN else { return defaultAlertDistance }
+        let snapped = (distance / alertDistanceStep).rounded() * alertDistanceStep
+        return min(max(snapped, alertDistanceRange.lowerBound), alertDistanceRange.upperBound)
     }
 
     var destination: Destination {
         Destination(name: name, latitude: latitude, longitude: longitude, address: address)
+    }
+
+    /// This place set to `location` with a new alert radius. The address
+    /// only changes if the pin actually moved, so saving without moving it
+    /// keeps the address the rider originally picked.
+    func relocated(to location: Destination, alertDistance: CLLocationDistance) -> SavedPlace {
+        var place = self
+        place.alertDistance = alertDistance
+        if location.latitude != latitude || location.longitude != longitude {
+            place.latitude = location.latitude
+            place.longitude = location.longitude
+            place.address = location.address ?? location.name
+        }
+        return place
+    }
+
+    /// The usual and backup docks that are farther than the dock search
+    /// covers from `location`, e.g. after the place was moved on the map.
+    /// Dock Finder still checks them first, so the rider is warned rather
+    /// than having them cleared.
+    func distantDocks(from location: CLLocation, in stations: [StationInformation]) -> [(name: String, distance: CLLocationDistance)] {
+        [(usualStationID, usualStationName), (backupStationID, backupStationName)].compactMap { id, name in
+            guard let id, let station = stations.first(where: { $0.stationID == id }) else { return nil }
+            let distance = location.distance(from: CLLocation(latitude: station.latitude, longitude: station.longitude))
+            guard distance > StationNetwork.nearbyRadius else { return nil }
+            return (name ?? station.name, distance)
+        }
     }
 
     var location: CLLocation { destination.location }
@@ -255,10 +304,12 @@ final class SavedPlacesStore {
         update(place)
     }
 
-    /// Trims whitespace and drops empty or duplicate aliases.
+    /// Trims whitespace, drops empty or duplicate aliases and keeps the
+    /// alert radius in range.
     private static func cleaned(_ place: SavedPlace) -> SavedPlace {
         var place = place
         place.name = place.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        place.alertDistance = SavedPlace.clampedAlertDistance(place.alertDistance)
         var seen: Set<String> = [SavedPlace.normalizedName(place.name)]
         place.aliases = place.aliases
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
