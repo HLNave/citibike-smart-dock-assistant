@@ -181,6 +181,10 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     /// moved: enough for GPS jitter, not enough to land on a later street
     /// that loops back past the start.
     static let initialLookahead: CLLocationDistance = 60
+    /// A fix this close to the route sits on the street it matched. When
+    /// nothing within the lookahead is this close but a later street is,
+    /// the rider is already past a turn.
+    static let onStreetDistance: CLLocationDistance = 30
 
     enum Event: Sendable, Equatable {
         case say(String)
@@ -298,7 +302,14 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
         // later street skipped every turn but the last.
         let moved = lastFix.map { location.distance(from: $0.location) }
         let lookahead = moved.map { max($0 * 2 + 40, Self.initialLookahead) } ?? Self.initialLookahead
-        let match = route.locate(location, from: segment, along: along, lookahead: lookahead)
+        var match = route.locate(location, from: segment, along: along, lookahead: lookahead)
+        if match.distance > Self.onStreetDistance {
+            // Nothing within reach fits well, but a later street might: a
+            // GPS gap, a turn taken early, or guidance started past the
+            // first turn.
+            let ahead = route.locate(location, from: segment, along: along)
+            if ahead.distance <= Self.onStreetDistance { match = ahead }
+        }
         guard match.distance <= Self.offRouteDistance else {
             offRouteCount += 1
             if offRouteCount >= Self.offRouteFixes {
