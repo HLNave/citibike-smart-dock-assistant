@@ -44,7 +44,7 @@ nonisolated protocol RequestParsing: Sendable {
 }
 
 extension RequestParsing {
-    var answeredBy: DockAnswer.Step {
+    nonisolated var answeredBy: DockAnswer.Step {
         switch answerSource {
         case .onDevice: .phraseRules
         case .onDeviceModel: .appleIntelligence
