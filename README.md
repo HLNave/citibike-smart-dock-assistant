@@ -48,16 +48,16 @@ Whenever a Siri answer names a dock (finding a dock, checking a station, your sa
 - **"Hey Siri, ask Dock Finder to stop directions"** stops directions; **"…to end my ride"** ends the ride and its directions. Directions also stop on their own at the dock, or after 45 minutes.
 - Said "no" by mistake? **"Hey Siri, ask Dock Finder to direct me"** guides you to the dock you were told about in the last 10 minutes (or else the nearest one with room).
 - On a ride, say "yes" to "Want me to guide you to the dock when you're close?" and the arrival alert turns straight into directions.
-- **Directions setting** (home screen → **Directions**), "When Siri finds a dock": **Ask Me** (the default) asks as described above; **Start Right Away** skips the question, and Siri says the answer and "Okay, directing you to …" and directions start; **Don't Offer** just gives the answer ("…direct me" still works). Rides started with Siri follow it too: Start Right Away guides you to the dock without asking, Don't Offer never does. The **Guide me to the dock** switch on the Start a Ride screen starts where the setting says (with Ask Me, where you left it).
+- **Directions setting** (home screen → **Directions**), "When Siri finds a dock": **Ask Me** (the default) asks as described above; **Start Right Away** skips the question, and Siri says the answer and "Okay, directing you to …" and directions start; **Don't Offer** just gives the answer ("…direct me" still works). If directions to a different dock are already running (say you check a station on the way), Start Right Away asks instead of switching docks. Rides started with Siri follow it too: Start Right Away guides you to the dock without asking, Don't Offer never does. The **Guide me to the dock** switch on the Start a Ride screen starts where the setting says (with Ask Me, where you left it). The setting also applies when a Shortcuts automation runs a Dock Finder action: with Start Right Away, an automation that runs Find Dock or Check Station starts directions too.
 
 ### Unclear requests, places and stations
 
 Everything below runs on the iPhone; no server is involved unless a build sets one up (none does by default).
 
 - **Free-form requests** ("Ask Dock Finder a question", or typed under **Ask a Question**) go through three steps in order: phrase rules ("is Mercer and Bleecker full", "find a dock near Union Square"), then a saved place or station name said on its own ("school", "Mercer and Bleecker"), then Apple's on-device model where Apple Intelligence is available and on, which sorts other wording into the same requests. If none understands it, you get a short help message.
-- **A place the map can't find** ("that bagel place by Stern"): Apple's on-device model turns the description into a short Apple Maps search (an official name or a street address) and the map is searched once more. This covers "…find a dock somewhere else", "…start a ride to …", typed questions, and the app's place search boxes. Only if that also finds nothing do you hear "Dock Finder couldn't find … on the map", still in your words.
-- **A station name that doesn't match** (from "…check a station" or a question): the model is shown up to 8 of the closest station names by the same fuzzy matching (names with nothing in common with what you said are left out) and picks the one you meant, or none, and that station is checked. Otherwise: "Dock Finder couldn't find a Citi Bike station called …".
-- Without Apple Intelligence (or with it off), those second tries are skipped and you get the same messages as before. Answers found this way show "Understood by Apple Intelligence on your iPhone" in the app.
+- **A place the map can't find** ("that bagel place by Stern"): Apple's on-device model turns the description into a short Apple Maps search (an official name or a street address) and the map is searched once more. This covers "…find a dock somewhere else", "…start a ride to …", typed questions (unless the place was already worded by Apple's model), and the app's place search boxes. Only if that also finds nothing do you hear "Dock Finder couldn't find … on the map", still in your words.
+- **A station name that doesn't match** (from "…check a station" or a question): the model is shown up to 8 of the closest station names, by a looser version of the same fuzzy matching (words up to two letters apart, so "mercy and bleaker" still finds Mercer and Bleecker), and picks the one you meant, or none, and that station is checked. If no name is even loosely similar, it's shown your saved places' usual and backup docks and the stations nearest you instead. Otherwise: "Dock Finder couldn't find a Citi Bike station called …".
+- Each second try gives up after 3 seconds, so a slow model never holds up Siri. Without Apple Intelligence (or with it off), they're skipped and you get the same messages as before. Answers found this way show "Understood by Apple Intelligence on your iPhone" in the app.
 
 ### All phrases
 
@@ -76,7 +76,7 @@ Say "Hey Siri, …". *school* stands for any saved place's name or nickname; *Me
 | **Ask Dock Finder for Citi Bike status**<br>also: *Ask Dock Finder how many bikes are out*, *…to check Citi Bike citywide* | Citywide bikes, open docks and full stations |
 | **Ask Dock Finder to direct me**<br>also: *…to direct me there*, *…to take me there*, *…to guide me to a dock*, *Ask Dock Finder for directions* | Turn-by-turn directions to the dock you were just told about, or the nearest dock with room |
 | **Ask Dock Finder to stop directions**<br>also: *…to cancel directions*, *…to stop guiding me* | Stops turn-by-turn directions (during a ride, before you arrive, it turns off guidance for that ride) |
-| **Ask Dock Finder a question**<br>also: *Ask Dock Finder something*, *…for help with a dock* | Asks "What do you need?", then answers whatever you say in your own words ("is the one on Mercer full?", "find a dock near the bagel place on Houston"), on the iPhone (see [Unclear requests](#unclear-requests-places-and-stations)). If nothing understands it, Siri says what you can ask |
+| **Ask Dock Finder a question**<br>also: *Ask Dock Finder for help with a dock* | Asks "What do you need?", then answers whatever you say in your own words ("is the one on Mercer full?", "find a dock near the bagel place on Houston"), on the iPhone (see [Unclear requests](#unclear-requests-places-and-stations)). If nothing understands it, Siri says what you can ask |
 
 Every phrase with "dock" also works with **"doc"** ("Ask Dock Finder to find a doc"), since Siri often hears it that way.
 
@@ -250,6 +250,8 @@ Before the app, Dock Finder was a set of iPhone shortcuts that send your words o
 - **Dock Arrival - School / Work / Home**: run by an iPhone Arrive automation; the server looks up the address you typed.
 
 It needs the n8n workflow running (its **siri webhook**, and the **arrival webhook**, `/webhook/citibike-arrival`, which only the shortcuts call). The files are built with `shortcuts/build_shortcuts.py`; old setup notes are in [docs/onboarding.md](docs/onboarding.md) and how each shortcut works in [docs/shortcuts.md](docs/shortcuts.md).
+
+The Dock Finder shortcut sends your first name as the conversation ID, so two riders with the same first name share the server's short-term memory.
 
 ## Credits
 
