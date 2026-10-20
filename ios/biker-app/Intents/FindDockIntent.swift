@@ -409,3 +409,48 @@ struct StopDirectionsIntent: AppIntent {
         try await AssistantRouter.live().handle(.stopDirections).intentResult
     }
 }
+
+/// "Hey Siri, ask Dock Finder a question": Siri asks "What do you need?",
+/// and the answer goes through the same steps as the Ask a Question
+/// screen, all on the iPhone: phrase rules, then saved places and station
+/// names, then Apple Intelligence where it's available. A server is only
+/// asked if a build sets one up (none does by default). The reply follows
+/// the Directions setting like any other answer.
+struct AskDockFinderIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Ask Dock Finder a Question"
+    static let description = IntentDescription(
+        "Answers a request in your own words, like is Mercer and Bleecker full, or find a dock near Union Square."
+    )
+    static let supportedModes: IntentModes = .background
+
+    /// Optional, so Siri asks once and never re-asks.
+    @Parameter(title: "Request")
+    var request: String?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Ask \(\.$request)")
+    }
+
+    @MainActor
+    func perform() async throws -> some SpokenAnswerResult {
+        let rideBefore = RideTracker.shared.currentRide
+        let spoken: String
+        if let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            spoken = request
+        } else {
+            spoken = try await $request.requestValue("What do you need?")
+        }
+        let answer = try await Self.answer(spoken, with: AssistantRouter.live())
+        // "Start a ride to school" works here too, so check for a new ride.
+        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
+    }
+
+    /// The help message when nothing was said or nothing understands it.
+    @MainActor
+    static func answer(_ spoken: String, with router: AssistantRouter) async throws -> DockAnswer {
+        guard !spoken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return DockAnswer(text: AssistantRouter.helpText)
+        }
+        return try await router.answer(spoken)
+    }
+}
