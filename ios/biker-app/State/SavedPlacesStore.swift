@@ -23,7 +23,6 @@ nonisolated struct SavedPlace: Codable, Sendable, Identifiable, Equatable, Hasha
     static let alertDistanceRange: ClosedRange<CLLocationDistance> = 150...1_500
     /// The slider moves in steps this size, so radii read as round numbers.
     static let alertDistanceStep: CLLocationDistance = 50
-    static let alertDistanceOptions: [CLLocationDistance] = [300, 500, 800, 1_200]
 
     var id: UUID
     var name: String

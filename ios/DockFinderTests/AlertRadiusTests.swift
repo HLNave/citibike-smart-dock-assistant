@@ -9,6 +9,7 @@
 
 import CoreLocation
 import Foundation
+import MapKit
 import Testing
 @testable import DockFinder
 
@@ -148,5 +149,45 @@ struct AlertRadiusTests {
         #expect(Speech.bikeTime(300) == "about 2 minutes by bike")
         #expect(Speech.bikeTime(500) == "about 3 minutes by bike")
         #expect(Speech.bikeTime(1_500) == "about 8 minutes by bike")
+    }
+}
+
+// MARK: - The map editor's camera
+
+struct AlertMapGeometryTests {
+    let stern = CLLocationCoordinate2D(latitude: 40.7291, longitude: -73.9965)
+
+    @Test(arguments: [150.0, 500.0, 1_500.0])
+    func theFramedRegionShowsTheWholeCircle(radius: Double) {
+        let region = AlertMapGeometry.region(center: stern, radius: radius)
+        #expect(AlertMapGeometry.circle(center: stern, radius: radius, fitsIn: region))
+        #expect(!AlertMapGeometry.circle(center: stern, radius: radius * 1.5, fitsIn: region), "and isn't zoomed far out")
+    }
+
+    @Test func aCircleNudgedOffScreenNoLongerFits() {
+        let region = AlertMapGeometry.region(center: stern, radius: 500)
+        let moved = AlertMapGeometry.coordinate(stern, movedNorth: 300, east: 0)
+        #expect(!AlertMapGeometry.circle(center: moved, radius: 500, fitsIn: region))
+        let nudged = AlertMapGeometry.coordinate(stern, movedNorth: 25, east: -25)
+        #expect(AlertMapGeometry.circle(center: nudged, radius: 500, fitsIn: region))
+    }
+
+    @Test func nudgesMoveAboutTheRightDistance() {
+        let here = CLLocation(latitude: stern.latitude, longitude: stern.longitude)
+        for (north, east) in [(25.0, 0.0), (0.0, 25.0), (-25.0, 0.0), (0.0, -25.0)] {
+            let moved = AlertMapGeometry.coordinate(stern, movedNorth: north, east: east)
+            let distance = here.distance(from: CLLocation(latitude: moved.latitude, longitude: moved.longitude))
+            #expect(abs(distance - 25) < 0.5)
+        }
+    }
+
+    @Test func onlyNearbyStationsAreShown() {
+        let stations = [
+            info("near", "Washington Pl & Greene St", 40.7299, -73.9955),
+            info("edge", "W 13 St & 5 Ave", 40.7350, -73.9940),
+            info("far", "Smith St & Bergen St", 40.6861, -73.9906),
+        ]
+        #expect(AlertMapGeometry.stations(stations, within: 1_200, of: stern).map(\.stationID) == ["near", "edge"])
+        #expect(AlertMapGeometry.stations(stations, within: 300, of: stern).map(\.stationID) == ["near"])
     }
 }
