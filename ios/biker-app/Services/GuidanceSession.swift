@@ -400,10 +400,11 @@ final class VoicePrompter {
     }
 
     /// Roughly how long Siri takes to say `text`, including the moment
-    /// before it starts talking.
+    /// before it starts talking, with room to spare: starting early talks
+    /// over the end of Siri's sentence.
     static func speakingTime(of text: String) -> Duration {
         let words = text.split(whereSeparator: \.isWhitespace).count
-        return .seconds(1.5 + Double(words) * 0.4)
+        return .seconds(2.5 + Double(words) * 0.45)
     }
 
     /// Queues everything said for `duration`, then speaks it in order.

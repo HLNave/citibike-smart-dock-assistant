@@ -182,6 +182,20 @@ struct AnnouncerTests {
         #expect(synthesizer.said.isEmpty)
     }
 
+    @Test func aSpokenArrivalPostsAQuietNotification() async {
+        let synthesizer = SynthesizerSpy()
+        var levels: [UNNotificationInterruptionLevel] = []
+        let announcer = announcer(synthesizer, AudioSessionSpy()) { levels.append($0.content.interruptionLevel) }
+        let arrival = Task { await announcer.announce("Arrival answer", title: "Docking near school") }
+        #expect(await eventually { synthesizer.isSpeaking })
+        // Nothing posted while it's being said, so Siri doesn't read it over the voice.
+        #expect(levels.isEmpty)
+        synthesizer.finishCurrent()
+        await arrival.value
+        #expect(synthesizer.said == ["Arrival answer"])
+        #expect(levels == [.passive])
+    }
+
     /// The bug this guards against: each voice used to turn audio off when
     /// it went quiet, cutting off whatever the other was still saying.
     @Test func anAnswerEndingDoesntCutOffDirections() async {

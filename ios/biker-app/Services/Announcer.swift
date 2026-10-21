@@ -46,9 +46,12 @@ final class Announcer {
 
     /// Returns once the answer has been spoken (or speech failed), so the
     /// caller can keep the app awake until then.
+    /// Speaks first, then posts the notification: quietly when it was
+    /// spoken (so Siri's Announce Notifications doesn't read it out over
+    /// the app's voice, or get cut off by it), as an alert when it wasn't.
     func announce(_ text: String, title: String, notificationID: String = arrivalNotificationID) async {
-        await postNotification(text, title: title, identifier: notificationID)
-        await speak(text)
+        let spoken = await speak(text)
+        await postNotification(text, title: title, identifier: notificationID, quietly: spoken)
     }
 
     /// Speaks an answer the rider just asked for (the Action Button). The
@@ -112,13 +115,14 @@ final class Announcer {
         _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 
-    private func postNotification(_ text: String, title: String, identifier: String) async {
+    private func postNotification(_ text: String, title: String, identifier: String, quietly: Bool = false) async {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = text
-        // Breaks through Focus when the app has the Time Sensitive entitlement;
-        // otherwise iOS treats it as a normal notification.
-        content.interruptionLevel = .timeSensitive
+        // Already heard: shown without a sound, and not announced by Siri.
+        // Otherwise it breaks through Focus when the app has the Time
+        // Sensitive entitlement (else iOS treats it as a normal one).
+        content.interruptionLevel = quietly ? .passive : .timeSensitive
         await postRequest(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
 }
@@ -293,7 +297,9 @@ nonisolated struct SystemAudioSession: AudioSessionSwitching {
             Self.queue.async {
                 let session = AVAudioSession.sharedInstance()
                 do {
-                    try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+                    // Ducks other audio, but doesn't interrupt other spoken
+                    // audio: that option also cut Siri off mid-sentence.
+                    try session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers])
                     try session.setActive(true)
                     continuation.resume(returning: true)
                 } catch {

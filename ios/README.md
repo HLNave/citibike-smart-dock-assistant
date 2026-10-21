@@ -129,7 +129,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 
 - The destination can be a saved place (uses its usual and backup docks and its own alert distance) or anywhere Apple Maps finds.
 - While a ride is active, the app tracks location in the background, the way navigation apps do, and also sets a geofence around the destination. If iOS closes the app mid-ride, the geofence relaunches it on arrival.
-- At the alert distance it **speaks** the best dock (lowering music or Maps while it talks) and posts the same sentence as a **notification**. With AirPods and *Announce Notifications* on, Siri reads the notification too.
+- At the alert distance it **speaks** the best dock (lowering music or Maps while it talks), then posts the same sentence as a quiet **notification** (`.passive`, so Siri's *Announce Notifications* doesn't read it over the voice). If it couldn't be spoken, the notification is a normal alert instead. The app's voice ducks other audio but never interrupts spoken audio, which used to cut Siri off mid-sentence, and it waits a little longer for Siri to finish before starting directions.
 - It fires once, then the ride ends. A ride that never arrives stops after **60 minutes**. Say "Ask Dock Finder to end my bike ride" to stop early, or tap **End Ride** in the app.
 - If you start a ride while already within the alert distance, it answers right away.
 - **Guidance to the dock:** Siri asks "Want me to guide you to the dock when you're close?" when the ride starts (the app has a **Guide me to the dock** switch instead). With "yes", the arrival alert is followed by [turn-by-turn directions](#directions-to-the-dock) to the dock it named. "Stop directions" before you arrive turns this off for the ride.
