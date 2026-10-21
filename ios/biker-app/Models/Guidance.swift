@@ -113,6 +113,13 @@ nonisolated struct GuidanceRoute: Sendable, Equatable {
         self.cumulative = cumulative
     }
 
+    /// The index of the path segment that `distance` along the route falls in.
+    func segment(containing distance: CLLocationDistance) -> Int {
+        guard path.count >= 2 else { return 0 }
+        let index = cumulative.lastIndex { $0 <= distance } ?? 0
+        return min(index, path.count - 2)
+    }
+
     /// The closest point on the route to `location`, searching from
     /// `segment` onward and no more than `lookahead` past `along`, so a
     /// route that doubles back on itself can't make the rider jump ahead.
@@ -181,6 +188,16 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     /// moved: enough for GPS jitter, not enough to land on a later street
     /// that loops back past the start.
     static let initialLookahead: CLLocationDistance = 60
+    /// The fastest a rider can plausibly move along the route (a fast
+    /// e-bike, about 32 km/h)…
+    static let maxSpeed: CLLocationSpeed = 9
+    /// …plus this, per fix. A fix further ahead than that is GPS error
+    /// (common between Manhattan's tall buildings), and believing it made
+    /// turns get announced a block early.
+    static let advanceSlack: CLLocationDistance = 15
+    /// A maneuver is only skipped silently (missed, or taken early) on a
+    /// fix at least this accurate; otherwise it's said, late.
+    static let skipAccuracy: CLLocationAccuracy = 25
     /// A fix this close to the route sits on the street it matched. When
     /// nothing within the lookahead is this close but a later street is,
     /// the rider is already past a turn.
@@ -200,8 +217,9 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     private(set) var nextStep = 0
     private var preparedSteps: Set<Int> = []
     private var offRouteCount = 0
-    /// The last fix that matched the route.
+    /// The last fix that matched the route, and when it was taken.
     private var lastFix: GuidanceCoordinate?
+    private var lastFixTime: Date?
 
     init(route: GuidanceRoute) {
         self.route = route
@@ -319,14 +337,26 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
             return []
         }
         offRouteCount = 0
+        var reached = match.along
+        // No further along than the rider could have ridden since the last
+        // fix. (Fixes with no time between them, as in tests, aren't capped.)
+        if let lastFixTime, location.timestamp > lastFixTime {
+            let elapsed = location.timestamp.timeIntervalSince(lastFixTime)
+            reached = min(reached, along + Self.maxSpeed * elapsed + Self.advanceSlack)
+        }
         lastFix = GuidanceCoordinate(location.coordinate)
-        segment = match.segment
-        along = max(along, match.along)
+        lastFixTime = location.timestamp
+        if reached > along {
+            along = reached
+            segment = reached < match.along ? route.segment(containing: reached) : match.segment
+        }
 
-        // Skip maneuvers the rider is already past (a GPS gap, or a turn
-        // taken early).
-        while let step = nextManeuver, step.offset < along - Self.passedSlack {
-            nextStep += 1
+        // Skip maneuvers the rider is clearly past (a GPS gap, or a turn
+        // taken early). On a rough fix, the turn is said instead, below.
+        if location.horizontalAccuracy <= Self.skipAccuracy {
+            while let step = nextManeuver, step.offset < along - Self.passedSlack {
+                nextStep += 1
+            }
         }
         guard let step = nextManeuver, let distance = distanceToNextManeuver else { return [] }
 

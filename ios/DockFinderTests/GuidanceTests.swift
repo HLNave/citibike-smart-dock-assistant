@@ -32,10 +32,10 @@ private func testRoute(firstInstruction: String = "") -> GuidanceRoute {
     ])
 }
 
-private func fix(_ latitude: Double, _ longitude: Double, accuracy: CLLocationAccuracy = 5) -> CLLocation {
+private func fix(_ latitude: Double, _ longitude: Double, accuracy: CLLocationAccuracy = 5, after seconds: TimeInterval = 0) -> CLLocation {
     CLLocation(
         coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude),
-        altitude: 0, horizontalAccuracy: accuracy, verticalAccuracy: 5, timestamp: referenceNow
+        altitude: 0, horizontalAccuracy: accuracy, verticalAccuracy: 5, timestamp: referenceNow.addingTimeInterval(seconds)
     )
 }
 
@@ -140,6 +140,28 @@ struct GuidanceProgressTests {
     ])
     func streetAfterATurn(instruction: String, expected: String) {
         #expect(GuidanceProgress.street(after: instruction) == expected)
+    }
+
+    @Test func aFixTooFarAheadDoesntAnnounceTheTurnEarly() {
+        var progress = GuidanceProgress(route: testRoute())
+        _ = progress.opening()
+        #expect(progress.update(at: fix(40.7300, -73.9950)).isEmpty)                         // 300 m from the corner
+        // One second later, a rough fix right at the corner: GPS error, not 280 m of riding.
+        #expect(progress.update(at: fix(40.7325, -73.9950, accuracy: 40, after: 1)).isEmpty)
+        #expect(progress.along < 30)
+        #expect(progress.nextManeuver?.instruction == "Turn right onto Bleecker St")
+        // Riding on normally, the turn still comes at the corner.
+        #expect(spoken(progress.update(at: fix(40.7315, -73.9950, after: 20)))?.hasPrefix("In ") == true)
+        #expect(progress.update(at: fix(40.7325, -73.9950, after: 35)) == [.say("Turn right onto Bleecker Street.")])
+    }
+
+    @Test func aRoughFixPastATurnSaysItInsteadOfSkippingIt() {
+        var progress = GuidanceProgress(route: testRoute())
+        _ = progress.opening()
+        _ = progress.update(at: fix(40.7300, -73.9950))
+        _ = progress.update(at: fix(40.7315, -73.9950, after: 20))                         // "In 400 feet…"
+        // 30 m past the corner, on a 40 m-accurate fix.
+        #expect(progress.update(at: fix(40.7327, -73.99465, accuracy: 40, after: 40)) == [.say("Turn right onto Bleecker Street.")])
     }
 
     @Test func inaccurateFixesAreIgnored() {
