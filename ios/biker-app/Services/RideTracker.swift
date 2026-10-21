@@ -76,6 +76,7 @@ final class RideTracker: RideControlling {
         distanceRemaining = nil
         lastArrival = nil
         save()
+        // Only asks when started from the app; never waits on Siri.
         await Announcer.requestNotificationPermission()
         await beginTracking(ride)
         await DockFinderLiveActivity.shared.show(

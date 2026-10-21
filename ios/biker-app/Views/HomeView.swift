@@ -141,6 +141,9 @@ struct HomeView: View {
             // For riders who finished onboarding before arrival alerts
             // existed. iOS only ever shows this once.
             await MotionCheck.requestPermission()
+            // Arrival alerts also arrive as notifications. Asked here, on
+            // screen, since a ride started with Siri can't show the prompt.
+            await Announcer.requestNotificationPermission()
         }
     }
 }

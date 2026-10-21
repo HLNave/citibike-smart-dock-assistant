@@ -12,6 +12,7 @@
 
 import AVFoundation
 import Foundation
+import UIKit
 import UserNotifications
 
 final class Announcer {
@@ -100,8 +101,15 @@ final class Announcer {
         current.finished.resume()
     }
 
+    /// Asks to send notifications, once, and only while the app is on
+    /// screen. From Siri or the background iOS can't show the prompt, and
+    /// waiting for it held up "start a ride" until Siri gave up ("Something
+    /// went wrong") even though the ride had started.
     static func requestNotificationPermission() async {
-        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        guard UIApplication.shared.applicationState == .active else { return }
+        let center = UNUserNotificationCenter.current()
+        guard await center.notificationSettings().authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .sound])
     }
 
     private func postNotification(_ text: String, title: String, identifier: String) async {
