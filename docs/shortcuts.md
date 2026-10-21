@@ -338,7 +338,7 @@ Not needed for the shared shortcuts above. Listed so everyone knows which phrase
 | Check Station | “Ask Dock Finder to check <station>”; “Ask Dock Finder if <station> is full”; “Ask Dock Finder about <station>”; “Ask Dock Finder to check a station”; “Ask Dock Finder if a station is full” |
 | Citywide Status | “Ask Dock Finder for Citi Bike status”; “Ask Dock Finder how many bikes are out”; “Ask Dock Finder to check Citi Bike citywide” |
 | Direct Me to a Dock | “Ask Dock Finder to direct me”; “Ask Dock Finder to direct me there”; “Ask Dock Finder to take me there”; “Ask Dock Finder to guide me to a dock”; “Ask Dock Finder for directions”; “dock”; “doc”; “Ask Dock Finder to guide me to a doc” |
-| Stop Directions | “Ask Dock Finder to stop directions”; “Ask Dock Finder to cancel directions”; “Ask Dock Finder to stop guiding me” |
+| Stop Directions | “stop/cancel directions”; “Dock Finder or Maps?”; “Ask Dock Finder to stop guiding me”; “Ask Dock Finder to stop guiding”; “Ask Dock Finder to stop guidance”; “Ask Dock Finder to cancel guidance” |
 | Ask Dock Finder a Question | “Ask Dock Finder a question”; “Ask Dock Finder for help with a dock”; “dock”; “doc”; “Ask Dock Finder for help with a doc” |
 
 <!-- generated:end -->

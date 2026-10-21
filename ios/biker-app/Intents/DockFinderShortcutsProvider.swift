@@ -153,9 +153,12 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: StopDirectionsIntent(),
             phrases: [
-                "Ask \(.applicationName) to stop directions",
-                "Ask \(.applicationName) to cancel directions",
+                // Not "stop/cancel directions": Maps answers to that too, so
+                // Siri asked "Dock Finder or Maps?" every time.
                 "Ask \(.applicationName) to stop guiding me",
+                "Ask \(.applicationName) to stop guiding",
+                "Ask \(.applicationName) to stop guidance",
+                "Ask \(.applicationName) to cancel guidance",
             ],
             shortTitle: "Stop Directions",
             systemImageName: "location.slash"

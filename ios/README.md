@@ -22,7 +22,7 @@ More phrases:
 - "Ask Dock Finder to find a dock somewhere else" → "Where are you headed?" → an address, landmark or neighborhood
 - "Ask Dock Finder for Citi Bike status" (also "…how many bikes are out") for citywide totals
 - "Ask Dock Finder to direct me": directions to the dock just mentioned, or the nearest one with room
-- "Ask Dock Finder to stop directions"; "Ask Dock Finder to end my ride" (also stops directions)
+- "Ask Dock Finder to stop guiding me" (not "stop directions", which Maps also claims); "Ask Dock Finder to end my ride" (also stops directions)
 - "Ask Dock Finder a question" (also "…for help with a dock") → "What do you need?" → anything, answered the same way as **Ask a Question** in the app
 
 The [root README](../README.md#what-to-say-to-siri) has the complete phrase list. Keep it in sync when phrases change; `shortcuts/generate_docs.py` also writes the list into `docs/shortcuts.md`.
@@ -236,7 +236,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] The Lock Screen and Dynamic Island show the next turn, the distance and the dock's open docks, and update to each following turn as you ride (also on a short route around a block); the activity ends a couple of minutes after arrival.
 - [ ] During directions, about every minute you hear the dock's status ("… still has 8 docks open").
 - [ ] The ⓘ buttons (Savings: after money and time saved, and next to Safety; a saved place: Docks, Alert Me When I Arrive) open a small popover, and tapping the rest of the row does nothing.
-- [ ] "Hey Siri, ask Dock Finder to stop directions" stops directions and removes the Live Activity. "Hey Siri, ask Dock Finder to direct me" after saying "no" starts directions to the same dock.
+- [ ] "Hey Siri, ask Dock Finder to stop guiding me" stops directions, without Siri asking "Dock Finder or Maps?", and removes the Live Activity. "Hey Siri, ask Dock Finder to direct me" after saying "no" starts directions to the same dock.
 - [ ] "Ask Dock Finder to start a ride to school" asks "Want me to guide you to the dock when you're close?" With "yes", the arrival alert is followed by directions to the dock it named.
 - [ ] A ride shows a "Riding to school" Live Activity with the distance to go.
 - [ ] **Direct Me** under an answer in the app starts directions; the directions card shows the next turn and **Stop Directions** works.
