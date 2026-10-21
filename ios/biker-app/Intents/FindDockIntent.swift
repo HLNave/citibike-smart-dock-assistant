@@ -340,6 +340,12 @@ struct DirectMeIntent: LiveActivityIntent {
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
         let request: ParsedRequest = place.map { .directionsTo($0.name) } ?? .directions
+        // Shows in the team's sheet whether Siri passed the place along.
+        Metrics.shared.log("request_understood", details: [
+            "intent": String(describing: Self.self),
+            "place": place?.name ?? "",
+            "request": String(describing: request),
+        ])
         let answer = try await AssistantRouter.live().handle(request)
         if GuidanceSession.shared.isActive {
             SavingsStore.shared.recordHandsFree(context: "directions")

@@ -326,7 +326,12 @@ struct GuidanceRouterTests {
 
     // `rides` defaults to nil rather than `RideSpy()`: default arguments
     // aren't evaluated on the main actor, and RideSpy's init is.
-    private func router(_ guidance: GuidanceSpy, rides: RideSpy? = nil, store: SavedPlacesStore? = nil) -> AssistantRouter {
+    private func router(
+        _ guidance: GuidanceSpy,
+        rides: RideSpy? = nil,
+        store: SavedPlacesStore? = nil,
+        parsers: [any RequestParsing] = [KeywordRequestParser()]
+    ) -> AssistantRouter {
         let rides = rides ?? RideSpy()
         let store = store ?? testStore()
         let fix = LocationFix(location: userLocation, isApproximate: false)
@@ -339,7 +344,7 @@ struct GuidanceRouterTests {
             placeSearch: StubPlaces(),
             store: store,
             rides: rides,
-            parsers: [KeywordRequestParser()],
+            parsers: parsers,
             backend: nil,
             location: StubLocation(result: .success(fix)),
             sessionID: "app-test",
@@ -368,6 +373,25 @@ struct GuidanceRouterTests {
         // Not the dock offered earlier, and not the nearest to the rider: school's.
         #expect(guidance.started.map(\.id) == ["near"])
         #expect(answer.text == "Okay, directing you to Smith and Bergen.")
+    }
+
+    @Test func aVagueModelReadingDoesntOverrideAClearRule() async throws {
+        let guidance = GuidanceSpy(offered: dock)
+        let school = SavedPlace(name: "School", latitude: near.latitude, longitude: near.longitude)
+        // The model heard only "direct me"; the rules caught "to school".
+        let model = ModelReadingStub(reading: .directions)
+        _ = try await router(guidance, store: testStore([school]), parsers: [model, KeywordRequestParser()])
+            .answer("direct me to school")
+        #expect(guidance.started.map(\.id) == ["near"])
+    }
+
+    @Test func aSpecificModelReadingIsUsed() async throws {
+        let guidance = GuidanceSpy(offered: dock)
+        let school = SavedPlace(name: "School", latitude: near.latitude, longitude: near.longitude)
+        let model = ModelReadingStub(reading: .directionsTo("school"))
+        _ = try await router(guidance, store: testStore([school]), parsers: [model, KeywordRequestParser()])
+            .answer("how do I get to a dock by class")
+        #expect(guidance.started.map(\.id) == ["near"])
     }
 
     @Test func stopDirections() async throws {
@@ -402,4 +426,11 @@ struct RideGuidanceTests {
         #expect(decoded == ride)
         #expect(!decoded.guidesToDock)
     }
+}
+
+/// Stands in for Apple's model: always reads the request as `reading`.
+private struct ModelReadingStub: RequestParsing {
+    let reading: ParsedRequest?
+    var answerSource: DockAnswer.Source { .onDeviceModel }
+    func parse(_ text: String) async -> ParsedRequest? { reading }
 }

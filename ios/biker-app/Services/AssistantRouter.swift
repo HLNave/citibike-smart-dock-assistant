@@ -68,8 +68,24 @@ struct AssistantRouter {
     var savedPlaces: [SavedPlace] { store.places }
 
     func answer(_ text: String) async throws -> DockAnswer {
-        for parser in parsers {
-            guard let request = await parser.parse(text) else { continue }
+        for candidate in parsers {
+            guard var request = await candidate.parse(text) else { continue }
+            var parser: any RequestParsing = candidate
+            // Apple's model sometimes reads "direct me to school" as plain
+            // "direct me" or "near me", which ends at the nearest dock.
+            // When the phrase rules found something more specific, they win.
+            if parser.answeredBy == .appleIntelligence, request.isGeneric,
+               let rule = KeywordRequestParser.parse(text), !rule.isGeneric {
+                request = rule
+                parser = KeywordRequestParser()
+            }
+            // What was heard and what it became, so a wrong answer can be
+            // traced in the team's sheet.
+            Metrics.shared.log("request_understood", details: [
+                "text": text,
+                "answered_by": parser.answeredBy.rawValue,
+                "request": String(describing: request),
+            ])
             // A place Apple's model already wrote isn't worth asking it to rewrite.
             var router = self
             if parser.answeredBy == .appleIntelligence {

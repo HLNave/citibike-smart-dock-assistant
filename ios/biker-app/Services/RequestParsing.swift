@@ -38,6 +38,17 @@ nonisolated enum ParsedRequest: Sendable, Equatable {
     case stopDirections
 }
 
+extension ParsedRequest {
+    /// Says nothing about where: the nearest dock, or the one just mentioned.
+    nonisolated var isGeneric: Bool {
+        switch self {
+        case .nearMe, .directions: true
+        case .startRide(let destination): destination.isEmpty
+        default: false
+        }
+    }
+}
+
 nonisolated protocol RequestParsing: Sendable {
     /// How an answer built from this parser's result is labeled.
     var answerSource: DockAnswer.Source { get }
