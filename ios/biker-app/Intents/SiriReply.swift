@@ -19,6 +19,8 @@ struct SiriReply: Equatable {
 
 @MainActor
 struct SiriReplier {
+    static let alreadyGuidingLine = "You're already getting directions there. To stop them, say: ask Dock Finder to stop guiding me."
+
     var guidance: any GuidanceControlling
     var rides: any RideControlling
     var preference: DirectionsPreference
@@ -41,6 +43,11 @@ struct SiriReplier {
         switch followUp {
         case .none:
             return SiriReply(value: answer.text, dialog: answer.text)
+
+        case .alreadyGuiding:
+            // Otherwise it sounds like Siri stopped mid-answer, and the
+            // directions voice carrying on seems like a glitch.
+            return SiriReply(value: answer.text, dialog: "\(answer.text) \(Self.alreadyGuidingLine)")
 
         case .guideRide(let guides):
             rides.setGuidesToDock(guides)

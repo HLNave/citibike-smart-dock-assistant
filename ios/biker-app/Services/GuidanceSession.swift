@@ -93,6 +93,9 @@ final class GuidanceSession: GuidanceControlling {
     /// How often the target dock's availability is re-checked (and said
     /// out loud) on the way.
     static let dockCheckInterval: TimeInterval = 60
+    /// The minute's dock status is only said once the rider has moved this
+    /// far since the last one (or when the dock is filling up).
+    static let statusMinimumMove: CLLocationDistance = 100
     /// The dock is also checked once more when the rider gets this close.
     static let finalDockCheckDistance: CLLocationDistance = 400
     /// Minimum time between re-routes, so a bad GPS patch can't cause a storm.
@@ -113,6 +116,8 @@ final class GuidanceSession: GuidanceControlling {
     @ObservationIgnored private var offered: (station: DockStation, date: Date)?
     @ObservationIgnored private var startedAt = Date.distantPast
     @ObservationIgnored private var lastDockCheck = Date.distantPast
+    /// Where the rider was at the last spoken dock status.
+    @ObservationIgnored private var lastStatusLocation: CLLocation?
     @ObservationIgnored private var checkedNearEnd = false
     @ObservationIgnored private var lastReroute = Date.distantPast
     @ObservationIgnored private var serviceSession: CLServiceSession?
@@ -166,6 +171,7 @@ final class GuidanceSession: GuidanceControlling {
         offered = nil
         startedAt = .now
         lastDockCheck = .now
+        lastStatusLocation = here
         lastReroute = .now
         checkedNearEnd = false
         beginTracking()
@@ -346,7 +352,14 @@ final class GuidanceSession: GuidanceControlling {
 
         switch DockCheckOutcome.check(target.id, in: network) {
         case .fine(let docks):
-            prompter.say(DockCheckOutcome.statusLine(for: target.spokenName, docksOpen: docks, previously: docksOpen))
+            // Said while riding, or when the dock is filling up; standing
+            // still, "still has 8 docks open" every minute is just noise.
+            let line = DockCheckOutcome.statusLine(for: target.spokenName, docksOpen: docks, previously: docksOpen)
+            let moved = lastStatusLocation.map { location.distance(from: $0) } ?? .infinity
+            if moved >= Self.statusMinimumMove || DockCheckOutcome.isFillingUp(docksOpen: docks, previously: docksOpen) {
+                prompter.say(line)
+                lastStatusLocation = location
+            }
             docksOpen = docks
         case .switchTo(let alternative, let problem):
             let switched = await reroute(
