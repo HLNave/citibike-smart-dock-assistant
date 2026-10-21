@@ -22,7 +22,7 @@ More phrases:
 - "Ask Dock Finder to find a dock somewhere else" → "Where are you headed?" → an address, landmark or neighborhood
 - "Ask Dock Finder for Citi Bike status" (also "…how many bikes are out") for citywide totals
 - "Ask Dock Finder to direct me": directions to the dock just mentioned, or the nearest one with room
-- "Ask Dock Finder to stop guiding me" (not "stop directions", which Maps also claims); "Ask Dock Finder to end my ride" (also stops directions)
+- "Ask Dock Finder to stop guiding me" (not "stop directions", which Maps also claims); "Ask Dock Finder to end my bike ride" (also stops directions; plain "end my ride" goes to Maps)
 - "Ask Dock Finder a question" (also "…for help with a dock") → "What do you need?" → anything, answered the same way as **Ask a Question** in the app
 
 The [root README](../README.md#what-to-say-to-siri) has the complete phrase list. Keep it in sync when phrases change; `shortcuts/generate_docs.py` also writes the list into `docs/shortcuts.md`.
@@ -130,7 +130,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 - The destination can be a saved place (uses its usual and backup docks and its own alert distance) or anywhere Apple Maps finds.
 - While a ride is active, the app tracks location in the background, the way navigation apps do, and also sets a geofence around the destination. If iOS closes the app mid-ride, the geofence relaunches it on arrival.
 - At the alert distance it **speaks** the best dock (lowering music or Maps while it talks) and posts the same sentence as a **notification**. With AirPods and *Announce Notifications* on, Siri reads the notification too.
-- It fires once, then the ride ends. A ride that never arrives stops after **60 minutes**. Say "end my ride" to stop early, or tap **End Ride** in the app.
+- It fires once, then the ride ends. A ride that never arrives stops after **60 minutes**. Say "Ask Dock Finder to end my bike ride" to stop early, or tap **End Ride** in the app.
 - If you start a ride while already within the alert distance, it answers right away.
 - **Guidance to the dock:** Siri asks "Want me to guide you to the dock when you're close?" when the ride starts (the app has a **Guide me to the dock** switch instead). With "yes", the arrival alert is followed by [turn-by-turn directions](#directions-to-the-dock) to the dock it named. "Stop directions" before you arrive turns this off for the ride.
 - A **Live Activity** shows "Riding to school" and the distance to go on the Lock Screen and in the Dynamic Island, and switches to the next turn once directions start.
@@ -149,7 +149,7 @@ TEST_RUNNER_DOCKFINDER_LIVE_TESTS=1 xcodebuild -project biker-app.xcodeproj -sch
 - **Off route:** two fixes in a row more than 45 m from the route → "Rerouting." and the new next turn (at most every 20 s).
 - **Dock re-checks:** every minute and once more 400 m out, each followed by a spoken status ("West 4th and Mercer still has 8 docks open", or "…is filling up, 3 docks open" at 5 or fewer and dropping; `DockCheckOutcome.statusLine`). If the dock has filled up or closed, it says so and re-routes to the nearest station with room; if nothing nearby has room, it says that and keeps going.
 - **Following the route:** each fix only matches as far ahead as the rider could have ridden since the last one (twice the distance moved, plus 40 m; 60 m before moving), so a route that loops back near its start can't jump to its last turn. A fix also can't move the rider further along than a fast e-bike could ride since the last one (9 m/s, plus 15 m), so a GPS error between tall buildings can't announce a turn a block early, and a turn is only skipped silently on a fix accurate to 25 m; on a rougher one it's said, late. The Live Activity shows the current step (`GuidanceProgress.currentInstruction`: "Head north on 6th Avenue" before the first turn, "On Bleecker Street" after it) above the next turn, and updates with each new turn and right after a re-route.
-- **Ends** at the dock, on "stop directions" / "end my ride" / **Stop Directions** in the app, or after 45 minutes.
+- **Ends** at the dock, on "stop guiding me" / "end my bike ride" / **Stop Directions** in the app, or after 45 minutes.
 - **Locked phone:** like rides, needs **Always** location access; with only *While Using*, it works while Dock Finder is open, and Siri's answer says how to fix it.
 - **Live Activity:** next-turn arrow, instruction, distance, dock name and open docks on the Lock Screen and Dynamic Island. iOS only lets apps *start* one while on screen or running a Live Activity intent, so every intent that can start directions or a ride is a `LiveActivityIntent`.
 
@@ -245,7 +245,7 @@ These can't be automated and **have not yet been verified on a device**. The Sim
 - [ ] "Ask Dock Finder to start a ride to school", lock the phone, ride: about 500 m out, the answer is spoken through headphones (music ducks) and shows as a notification. Then the ride card is gone.
 - [ ] The Always location prompt appears when starting a ride from the app, and the ride card's notice goes away once it's allowed.
 - [ ] If iOS closes the app mid-ride (after using lots of other apps), the geofence still alerts on arrival. Also try swiping the app away during a ride, to learn whether iOS relaunches a force-quit app for it.
-- [ ] "Ask Dock Finder to end my ride" stops it. Typed under **Ask a Question**, "my school dock is Mercer and Bleecker" and "save this spot as gym" update saved places.
+- [ ] "Ask Dock Finder to end my bike ride" stops it, without going to Maps. Typed under **Ask a Question**, "my school dock is Mercer and Bleecker" and "save this spot as gym" update saved places.
 - [ ] Location permission never granted → Siri says to open Dock Finder.
 - [ ] Location revoked in Settings → Siri reports permission denied, and the app shows the Settings notice.
 - [ ] Airplane mode → "couldn't reach Citi Bike".

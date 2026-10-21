@@ -45,9 +45,12 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: EndRideIntent(),
             phrases: [
-                "Ask \(.applicationName) to end my ride",
-                "Ask \(.applicationName) to cancel my ride",
-                "Ask \(.applicationName) to stop my ride",
+                // "Bike" or "Citi Bike" in each: Maps answers to plain "end
+                // my ride" (ending navigation), so Siri sent it there.
+                "Ask \(.applicationName) to end my bike ride",
+                "Ask \(.applicationName) to stop my bike ride",
+                "Ask \(.applicationName) to cancel my bike ride",
+                "Ask \(.applicationName) to end my Citi Bike ride",
             ],
             shortTitle: "End Ride",
             systemImageName: "flag.checkered"
@@ -156,9 +159,12 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
                 // Not "stop/cancel directions": Maps answers to that too, so
                 // Siri asked "Dock Finder or Maps?" every time.
                 "Ask \(.applicationName) to stop guiding me",
+                "Ask \(.applicationName) to stop guiding me to the dock",
                 "Ask \(.applicationName) to stop guiding",
                 "Ask \(.applicationName) to stop guidance",
                 "Ask \(.applicationName) to cancel guidance",
+                // Siri often hears "dock" as "doc".
+                "Ask \(.applicationName) to stop guiding me to the doc",
             ],
             shortTitle: "Stop Directions",
             systemImageName: "location.slash"
