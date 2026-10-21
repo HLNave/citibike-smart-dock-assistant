@@ -86,8 +86,6 @@ nonisolated enum SiriFollowUp: Equatable, Sendable {
     case offerDirections(DockStation)
     /// Start directions without asking.
     case startDirections(DockStation)
-    /// Directions to this dock are already running: say so, and how to stop.
-    case alreadyGuiding
 
     /// - Parameters:
     ///   - startedRide: The answer started a new ride.
@@ -101,8 +99,7 @@ nonisolated enum SiriFollowUp: Equatable, Sendable {
         if startedRide {
             return preference.guidesNewRides.map(SiriFollowUp.guideRide) ?? .askToGuideRide
         }
-        guard let station = answer.station else { return .none }
-        if station.id == guidingToStationID { return .alreadyGuiding }
+        guard let station = answer.station, station.id != guidingToStationID else { return .none }
         switch preference {
         case .always:
             // Already guiding somewhere else (say, checking a station on the

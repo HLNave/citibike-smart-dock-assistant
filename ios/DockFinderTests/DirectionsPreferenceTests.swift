@@ -86,7 +86,7 @@ struct SiriFollowUpTests {
 
     @Test(arguments: DirectionsPreference.allCases)
     func alreadyGuidingThereIsntOfferedAgain(preference: DirectionsPreference) {
-        #expect(SiriFollowUp.after(dockAnswer, startedRide: false, guidingToStationID: "dock", preference: preference) == .alreadyGuiding)
+        #expect(SiriFollowUp.after(dockAnswer, startedRide: false, guidingToStationID: "dock", preference: preference) == .none)
     }
 
     @Test func newRides() {

@@ -381,14 +381,9 @@ nonisolated enum DockCheckOutcome: Sendable, Equatable {
 
     /// Said after each check that found room: "West 4th and Mercer still
     /// has 8 docks open." / "West 4th and Mercer is filling up, 3 docks open."
-    static func isFillingUp(docksOpen: Int, previously: Int?) -> Bool {
-        guard let previously else { return false }
-        return docksOpen <= fillingUpDocks && docksOpen < previously
-    }
-
     static func statusLine(for dockName: String, docksOpen: Int, previously: Int?) -> String {
         let name = Speech.sentence(dockName)
-        if isFillingUp(docksOpen: docksOpen, previously: previously) {
+        if docksOpen <= fillingUpDocks, let previously, docksOpen < previously {
             return "\(name) is filling up, \(Speech.docksOpen(docksOpen))."
         }
         return "\(name) still has \(Speech.docksOpen(docksOpen))."
