@@ -29,35 +29,37 @@ struct UsageSharingExplanation: View {
     }
 }
 
-/// Lets riders be told apart in the team's records. Optional.
+/// Lets riders be told apart in the team's records. Required to share
+/// usage data.
 struct UsageNameField: View {
     @Binding var name: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            TextField("Your name (optional)", text: $name)
-                .textContentType(.givenName)
+            // No name autofill (`textContentType`): its contact suggestions
+            // made typing lag.
+            TextField("Your name", text: $name)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .submitLabel(.done)
-            Text("Shown next to your usage in the team's records, so we know who's riding with Dock Finder. Leave it blank to stay anonymous.")
+            Text("Needed to share usage data, so we know who's riding with Dock Finder. Shown next to your usage in the team's records.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
+
+    static func isFilled(_ name: String) -> Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
-/// On the home screen for riders who agreed to share before names existed
-/// (so never saw the name field), until they add one or tap Not Now.
+/// On the home screen for riders who agreed to share before names were
+/// required, until they add one.
 struct UsageNameCard: View {
-    static let dismissedKey = "usageNameCardDismissed"
-
-    /// Sharing, no name yet, and not dismissed.
+    /// Sharing, but no name yet.
     static var shouldShow: Bool {
-        UsageSharing.current() == .granted
-            && UsageSharing.name() == nil
-            && !UserDefaults.standard.bool(forKey: dismissedKey)
+        UsageSharing.current() == .granted && UsageSharing.name() == nil
     }
 
     let onDone: () -> Void
@@ -69,17 +71,10 @@ struct UsageNameCard: View {
                 .font(.headline)
             UsageNameField(name: $name)
                 .onSubmit(save)
-            HStack(spacing: 12) {
-                Button("Save", action: save)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Not Now") {
-                    UserDefaults.standard.set(true, forKey: Self.dismissedKey)
-                    onDone()
-                }
-                .buttonStyle(.bordered)
-            }
-            .controlSize(.small)
+            Button("Save", action: save)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(!UsageNameField.isFilled(name))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -94,7 +89,8 @@ struct UsageNameCard: View {
     }
 }
 
-/// The one-time question. `onDone` runs after either answer.
+/// The one-time question. `onDone` runs after either answer. Sharing needs
+/// a name; not sharing doesn't.
 struct UsageSharingPrompt: View {
     let onDone: () -> Void
     @State private var name = UsageSharing.name() ?? ""
@@ -124,6 +120,7 @@ struct UsageSharingPrompt: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .disabled(!UsageNameField.isFilled(name))
 
                     Button {
                         choose(.declined)
@@ -144,6 +141,7 @@ struct UsageSharingPrompt: View {
             .frame(maxWidth: 500)
             .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
         .interactiveDismissDisabled()
     }
 
@@ -151,8 +149,6 @@ struct UsageSharingPrompt: View {
         UsageSharing.set(choice)
         // Only kept if they share; a name alone is never sent.
         UsageSharing.setName(choice == .granted ? name : "")
-        // They've seen the name field, so the home screen doesn't ask again.
-        UserDefaults.standard.set(true, forKey: UsageNameCard.dismissedKey)
         if choice == .granted {
             Metrics.shared.log("sharing_turned_on")
         }
@@ -160,7 +156,8 @@ struct UsageSharingPrompt: View {
     }
 }
 
-/// Lets the rider see what's shared and turn it on or off.
+/// Lets the rider see what's shared and turn it on or off. Sharing needs
+/// a name, so the name comes first and can't be emptied while sharing.
 struct PrivacyView: View {
     @State private var isSharing = UsageSharing.current() == .granted
     @State private var name = UsageSharing.name() ?? ""
@@ -169,19 +166,30 @@ struct PrivacyView: View {
     var body: some View {
         List {
             Section {
+                UsageNameField(name: $name)
+                    .onSubmit(saveName)
+                    // Kept as typed (never blank), so the home screen's
+                    // Add your name card is gone by the time they're back.
+                    .onChange(of: name) { _, typed in
+                        if UsageNameField.isFilled(typed) { UsageSharing.setName(typed) }
+                    }
+            } header: {
+                Text("Your Name")
+            } footer: {
+                if isSharing, !UsageNameField.isFilled(name) {
+                    Text("Your name is needed while you share usage data.")
+                        .foregroundStyle(.red)
+                }
+            }
+            Section {
                 Toggle("Share Usage Data", isOn: $isSharing)
+                    .disabled(!isSharing && !UsageNameField.isFilled(name))
             } footer: {
                 Text(isSharing
                      ? "Thanks. Events are sent to the Dock Finder team as you use the app."
-                     : "Nothing is sent. Turning this off also deletes anything not yet sent.")
-            }
-            if isSharing {
-                Section("Your Name") {
-                    UsageNameField(name: $name)
-                        .onSubmit(saveName)
-                        // Kept as typed, so the home screen knows straight away.
-                        .onChange(of: name) { _, typed in UsageSharing.setName(typed) }
-                }
+                     : UsageNameField.isFilled(name)
+                        ? "Nothing is sent. Turning this off also deletes anything not yet sent."
+                        : "Nothing is sent. Add your name above to turn sharing on.")
             }
             Section("What's Shared") {
                 UsageSharingExplanation()
@@ -194,8 +202,10 @@ struct PrivacyView: View {
             }
         }
         .navigationTitle("Privacy")
+        .scrollDismissesKeyboard(.interactively)
         .onDisappear(perform: saveName)
         .onChange(of: isSharing) { _, sharing in
+            if sharing { saveName() }
             UsageSharing.set(sharing ? .granted : .declined)
             if sharing {
                 Metrics.shared.log("sharing_turned_on")
@@ -205,9 +215,14 @@ struct PrivacyView: View {
         }
     }
 
-    /// Logged when they press Done or leave the screen, so the sheet shows
-    /// the new name even before they next use the app.
+    /// Logged when they press Done, turn sharing on, or leave the screen,
+    /// so the sheet shows the new name before they next use the app. A
+    /// blank name is never saved over one already set.
     private func saveName() {
+        guard UsageNameField.isFilled(name) else {
+            name = savedName
+            return
+        }
         UsageSharing.setName(name)
         let current = UsageSharing.name() ?? ""
         guard current != savedName else { return }
