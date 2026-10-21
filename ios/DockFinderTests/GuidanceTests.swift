@@ -310,6 +310,10 @@ struct GuidanceParsingTests {
         ("Cancel directions please", .stopDirections),
         ("stop guiding me", .stopDirections),
         ("take me to union square", .startRide("union square")),
+        ("direct me to school", .directionsTo("school")),
+        ("Guide me to Union Square", .directionsTo("union square")),
+        ("give me directions to the flatiron", .directionsTo("the flatiron")),
+        ("directions to my office", .directionsTo("my office")),
     ])
     func directionRequests(text: String, expected: ParsedRequest) {
         #expect(KeywordRequestParser.parse(text) == expected)
@@ -322,8 +326,9 @@ struct GuidanceRouterTests {
 
     // `rides` defaults to nil rather than `RideSpy()`: default arguments
     // aren't evaluated on the main actor, and RideSpy's init is.
-    private func router(_ guidance: GuidanceSpy, rides: RideSpy? = nil) -> AssistantRouter {
+    private func router(_ guidance: GuidanceSpy, rides: RideSpy? = nil, store: SavedPlacesStore? = nil) -> AssistantRouter {
         let rides = rides ?? RideSpy()
+        let store = store ?? testStore()
         let fix = LocationFix(location: userLocation, isApproximate: false)
         return AssistantRouter(
             service: DockFinderService(
@@ -332,7 +337,7 @@ struct GuidanceRouterTests {
                 now: { referenceNow }
             ),
             placeSearch: StubPlaces(),
-            store: testStore(),
+            store: store,
             rides: rides,
             parsers: [KeywordRequestParser()],
             backend: nil,
@@ -354,6 +359,15 @@ struct GuidanceRouterTests {
         let guidance = GuidanceSpy()
         _ = try await router(guidance).answer("direct me")
         #expect(guidance.started.map(\.id) == ["near"])
+    }
+
+    @Test func directMeToASavedPlaceGoesToItsDock() async throws {
+        let guidance = GuidanceSpy(offered: dock)
+        let school = SavedPlace(name: "School", latitude: near.latitude, longitude: near.longitude)
+        let answer = try await router(guidance, store: testStore([school])).answer("direct me to school")
+        // Not the dock offered earlier, and not the nearest to the rider: school's.
+        #expect(guidance.started.map(\.id) == ["near"])
+        #expect(answer.text == "Okay, directing you to Smith and Bergen.")
     }
 
     @Test func stopDirections() async throws {

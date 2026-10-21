@@ -49,10 +49,13 @@ struct AssistantRouter {
             placeSearch: MapKitPlaceSearch(),
             store: store,
             rides: RideTracker.shared,
+            // Apple's model first, so a request is understood however it's
+            // worded; the phrase rules catch what it can't (or every
+            // request, on iPhones without Apple Intelligence).
             parsers: [
+                OnDeviceModelParser(savedPlaceNames: store.places.flatMap(\.spokenNames)),
                 KeywordRequestParser(),
                 ShortAnswerParser(savedPlaces: store.places, service: service),
-                OnDeviceModelParser(),
             ],
             backend: N8NAssistantClient.configured(),
             location: LocationService.shared,
@@ -138,9 +141,25 @@ struct AssistantRouter {
             } else {
                 station = try await service.findNearestDock().station
             }
-            let siriLine = guidance.siriConfirmation(for: station)
-            let reply = try await guidance.start(to: station, siriWillSay: siriLine)
-            return DockAnswer(text: guidance.isActive ? siriLine : reply)
+            return try await startDirections(to: station)
+
+        case .directionsTo(let spoken):
+            // The best dock there, the same one "check my school dock" or
+            // "find a dock near Union Square" names.
+            let result: DestinationDockResult
+            var rewritten = false
+            if let saved = store.place(matching: spoken) {
+                result = try await service.findDock(for: saved)
+            } else {
+                let found = try await searchedDestination(spoken)
+                rewritten = found.rewritten
+                result = try await service.findDock(near: found.destination)
+            }
+            // No dock with room there: the answer says so.
+            guard let station = result.selected else { return result.answer }
+            var answer = try await startDirections(to: station)
+            if rewritten { answer.markAnswered(by: .appleIntelligence) }
+            return answer
 
         case .stopDirections:
             if guidance.isActive {
@@ -167,6 +186,14 @@ struct AssistantRouter {
         case .savePlace(let name):
             return try await savePlace(named: name)
         }
+    }
+
+    // MARK: - Directions
+
+    private func startDirections(to station: DockStation) async throws -> DockAnswer {
+        let siriLine = guidance.siriConfirmation(for: station)
+        let reply = try await guidance.start(to: station, siriWillSay: siriLine)
+        return DockAnswer(text: guidance.isActive ? siriLine : reply)
     }
 
     // MARK: - Rides

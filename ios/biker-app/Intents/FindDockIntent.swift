@@ -328,13 +328,19 @@ struct EndRideIntent: AppIntent {
 struct DirectMeIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Direct Me to a Dock"
     static let description = IntentDescription(
-        "Guides you turn by turn, through your headphones, to the dock Dock Finder just told you about, or to the nearest dock with room."
+        "Guides you turn by turn, through your headphones, to the best dock at a saved place, or to the dock Dock Finder just told you about, or to the nearest dock with room."
     )
     static let supportedModes: IntentModes = .background
 
+    /// Filled straight from the phrase ("…direct me to school"). Optional,
+    /// so Siri never re-asks when it can't match a saved place.
+    @Parameter(title: "Saved Place")
+    var place: SavedPlaceEntity?
+
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let answer = try await AssistantRouter.live().handle(.directions)
+        let request: ParsedRequest = place.map { .directionsTo($0.name) } ?? .directions
+        let answer = try await AssistantRouter.live().handle(request)
         if GuidanceSession.shared.isActive {
             SavingsStore.shared.recordHandsFree(context: "directions")
         }

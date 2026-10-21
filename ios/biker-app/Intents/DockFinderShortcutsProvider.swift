@@ -142,6 +142,10 @@ struct DockFinderShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: DirectMeIntent(),
             phrases: [
+                "Ask \(.applicationName) to direct me to \(\.$place)",
+                "Ask \(.applicationName) to guide me to \(\.$place)",
+                "Ask \(.applicationName) to take me to \(\.$place)",
+                "Ask \(.applicationName) for directions to \(\.$place)",
                 "Ask \(.applicationName) to direct me",
                 "Ask \(.applicationName) to direct me there",
                 "Ask \(.applicationName) to take me there",

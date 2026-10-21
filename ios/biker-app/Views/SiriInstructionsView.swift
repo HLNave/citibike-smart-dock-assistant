@@ -126,7 +126,7 @@ struct SiriInstructionsView: View {
         "“Ask Dock Finder to find a dock near work.”",
         "“Ask Dock Finder if Mercer and Bleecker is full.”",
         "“Ask Dock Finder to find a dock somewhere else.”",
-        "“Ask Dock Finder to direct me.”",
+        "“Ask Dock Finder to direct me to school.”",
         "“Ask Dock Finder to stop guiding me.”",
         "“Ask Dock Finder to end my bike ride.”",
         "“Ask Dock Finder how many bikes are out.”",

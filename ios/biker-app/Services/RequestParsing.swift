@@ -3,10 +3,11 @@
 //  Dock Finder
 //
 //  Understands free-form requests ("find me a dock near Union Square",
-//  "is Mercer and Bleecker full?") on device. Two parsers run in order:
-//  simple phrase rules that work on every iPhone, then Apple's on-device
-//  language model where Apple Intelligence is available. Only requests
-//  neither understands go to the n8n backend.
+//  "is Mercer and Bleecker full?", "direct me to school") on device.
+//  Where Apple Intelligence is available, Apple's on-device language model
+//  reads the request first and picks the action; the simple phrase rules
+//  (which work on every iPhone) handle it otherwise, or when the model
+//  can't tell. Only requests neither understands go to the n8n backend.
 //
 
 import Foundation
@@ -30,6 +31,9 @@ nonisolated enum ParsedRequest: Sendable, Equatable {
     case savePlace(String)
     /// "Take me there": turn-by-turn guidance to the dock just mentioned.
     case directions
+    /// "Direct me to school": turn-by-turn guidance to the best dock at a
+    /// saved place, address or landmark.
+    case directionsTo(String)
     /// "Stop directions".
     case stopDirections
 }
@@ -144,6 +148,15 @@ nonisolated struct KeywordRequestParser: RequestParsing {
         }
         if directionRequests.contains(where: { request.range(of: $0, options: .regularExpression) != nil }) {
             return .directions
+        }
+        let toPlace = [
+            #"^(?:direct|guide|navigate|lead|bring) me to (.+)$"#,
+            #"^(?:get |give me |start )?(?:directions|guidance) to (.+)$"#,
+        ]
+        for pattern in toPlace {
+            if let place = capture(pattern, in: request) {
+                return .directionsTo(place)
+            }
         }
         return nil
     }
@@ -291,53 +304,86 @@ nonisolated enum ModelRequestKind {
     case citywide
     case startRide
     case endRide
+    case directions
+    case directionsToPlace
+    case stopDirections
     case unknown
 }
 
 @Generable
 nonisolated struct ModelParsedRequest {
-    @Guide(description: "nearMe: a dock near the rider's current location. place: a dock near a named place, address, landmark, business or neighborhood. station: whether one named Citi Bike station has room. citywide: totals for the whole Citi Bike system. startRide: the rider is starting a ride to a destination and wants to be told where to dock on arrival. endRide: stop or cancel the current ride. unknown: anything else.")
+    @Guide(description: "nearMe: the rider wants a dock with room near where they are now. place: the rider wants to know where to dock near a named place, saved place, address, landmark or neighborhood. station: whether one named Citi Bike station has room. citywide: totals for the whole Citi Bike system. startRide: the rider is setting off to a destination and wants to be told where to dock when they get close. endRide: stop or cancel the current ride. directions: turn-by-turn directions to the dock just mentioned, with no place named ('take me there', 'direct me'). directionsToPlace: turn-by-turn directions to a dock at a named place ('direct me to school', 'how do I get to a dock by Union Square'). stopDirections: stop the turn-by-turn directions. unknown: anything else.")
     var kind: ModelRequestKind
 
-    @Guide(description: "For place or startRide: the destination, as said or as a New York City address or landmark, such as 'Union Square' or '44 West 4th Street'. Otherwise empty.")
+    @Guide(description: "For place, startRide or directionsToPlace: the place exactly as one of the rider's saved place names if it's one of them, otherwise as said or as a New York City address or landmark, such as 'Union Square' or '44 West 4th Street'. Otherwise empty.")
     var place: String
 
     @Guide(description: "For station: the station name as said, such as 'Mercer and Bleecker'. Otherwise empty.")
     var station: String
 }
 
-/// Runs only on iPhones with Apple Intelligence turned on (iPhone 15 Pro
-/// and newer). Everywhere else it returns `nil` and the request moves on.
+/// Runs first, on iPhones with Apple Intelligence turned on (iPhone 15
+/// Pro and newer), so requests are understood however they're worded.
+/// Everywhere else, or if the model can't tell or takes too long, it
+/// returns `nil` and the phrase rules handle the request.
 nonisolated struct OnDeviceModelParser: RequestParsing {
+    /// What the rider calls their saved places, so "my office" or "Stern"
+    /// is understood as one.
+    var savedPlaceNames: [String] = []
+    /// Siri gives an action only a few seconds, and the phrase rules still
+    /// follow, so a slow model gives up.
+    var timeLimit: Duration = .seconds(4)
+
     var answerSource: DockAnswer.Source { .onDeviceModel }
 
     static var isAvailable: Bool {
         SystemLanguageModel.default.isAvailable
     }
 
-    private static let instructions = """
-        You classify a Citi Bike rider's request in New York City. Do not answer it. \
-        Choose the kind and fill in the place or station field. Use empty strings for fields that don't apply.
-        """
+    static func instructions(savedPlaceNames: [String]) -> String {
+        var text = """
+            You turn a Citi Bike rider's request in New York City into one action for the Dock Finder app. \
+            Do not answer it. Choose the kind and fill in the place or station field; use empty strings for fields that don't apply. \
+            "Dock" may be written "doc".
+            """
+        if !savedPlaceNames.isEmpty {
+            text += " The rider's saved places are: \(savedPlaceNames.joined(separator: ", ")). Treat those names, with or without \"my\", as places."
+        }
+        return text
+    }
 
     func parse(_ text: String) async -> ParsedRequest? {
         guard Self.isAvailable else { return nil }
+        let instructions = Self.instructions(savedPlaceNames: savedPlaceNames)
+        return await withTimeLimit(timeLimit) {
+            await Self.classify(text, instructions: instructions)
+        }
+    }
+
+    private static func classify(_ text: String, instructions: String) async -> ParsedRequest? {
         do {
-            let session = LanguageModelSession(instructions: Self.instructions)
+            let session = LanguageModelSession(instructions: instructions)
             let parsed = try await session.respond(to: text, generating: ModelParsedRequest.self).content
-            let place = parsed.place.trimmingCharacters(in: .whitespacesAndNewlines)
-            let station = parsed.station.trimmingCharacters(in: .whitespacesAndNewlines)
-            switch parsed.kind {
-            case .nearMe: return .nearMe
-            case .place: return place.isEmpty ? nil : .place(place)
-            case .station: return station.isEmpty ? nil : .station(station)
-            case .citywide: return .citywide
-            case .startRide: return .startRide(place)
-            case .endRide: return .endRide
-            case .unknown: return nil
-            }
+            return request(from: parsed)
         } catch {
             return nil
+        }
+    }
+
+    static func request(from parsed: ModelParsedRequest) -> ParsedRequest? {
+        let place = parsed.place.trimmingCharacters(in: .whitespacesAndNewlines)
+        let station = parsed.station.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch parsed.kind {
+        case .nearMe: return .nearMe
+        case .place: return place.isEmpty ? nil : .place(place)
+        case .station: return station.isEmpty ? nil : .station(station)
+        case .citywide: return .citywide
+        case .startRide: return .startRide(place)
+        case .endRide: return .endRide
+        case .directions: return .directions
+        case .directionsToPlace: return place.isEmpty ? .directions : .directionsTo(place)
+        case .stopDirections: return .stopDirections
+        case .unknown: return nil
         }
     }
 }
