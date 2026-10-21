@@ -159,6 +159,8 @@ struct ActionButtonTests {
     @Test func theIntentHasNoParametersToAskFor() {
         #expect(Mirror(reflecting: SpeakNearestDockIntent()).children.isEmpty)
         #expect(SpeakNearestDockIntent.supportedModes == .background)
+        // Works locked: no unlock prompt from the Action Button or Lock Screen.
+        #expect(SpeakNearestDockIntent.authenticationPolicy == .alwaysAllowed)
     }
 
     /// Listed as an action (so Shortcuts and the Action Button can run it)

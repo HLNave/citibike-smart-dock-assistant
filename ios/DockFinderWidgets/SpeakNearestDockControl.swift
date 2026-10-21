@@ -7,8 +7,9 @@
 //  a shortcut first. iOS also offers every control in Control Center and on
 //  the Lock Screen; there's no way to limit one to the Action Button.
 //
-//  Pressing it runs SpeakNearestDockIntent in the app's process (it's a
-//  LiveActivityIntent), which says the nearest dock with room out loud.
+//  Pressing it runs SpeakNearestDockIntent in the app's process (it's an
+//  AudioPlaybackIntent, so it works with the phone locked), which says
+//  the nearest dock with room out loud.
 //
 
 import AppIntents
