@@ -43,7 +43,7 @@ nonisolated enum DirectionsPreference: String, Sendable, CaseIterable, Identifia
 
     var explanation: String {
         switch self {
-        case .always: "Siri starts turn-by-turn directions as soon as it names a dock."
+        case .always: "Siri starts directions right away."
         case .ask: "Siri asks “Want me to direct you there?”"
         case .never: "Siri just tells you where to dock."
         }
