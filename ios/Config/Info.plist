@@ -2,6 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Only standard HTTPS, so App Store Connect skips the export compliance question on each upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<!-- Rides: keep tracking and speak the arrival answer with the phone locked. -->
 	<key>UIBackgroundModes</key>
 	<array>

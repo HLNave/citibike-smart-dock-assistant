@@ -33,6 +33,8 @@ final class AnswerModel {
             _ = await LocationService.shared.requestWhenInUseAuthorization()
         }
 
+        let started = Date.now
+        func seconds() -> String { String(format: "%.1f", Date.now.timeIntervalSince(started)) }
         do {
             let answer = try await operation()
             phase = .answered(answer)
@@ -40,14 +42,14 @@ final class AnswerModel {
                 "app_answer",
                 station: answer.station?.name,
                 avoidedStation: answer.avoided?.name,
-                details: ["answer": answer.text, "answered_by": answer.answeredBy.rawValue]
+                details: ["answer": answer.text, "answered_by": answer.answeredBy.rawValue, "seconds": seconds()]
             )
-        } catch let error as DockFinderError {
-            phase = .failed(error)
         } catch is CancellationError {
+            // The screen went away; nothing failed.
             phase = .idle
         } catch {
-            phase = .failed(.networkUnavailable)
+            phase = .failed(error as? DockFinderError ?? .networkUnavailable)
+            Metrics.shared.log("app_failed", details: Metrics.errorDetails(error).merging(["seconds": seconds()]) { $1 })
         }
     }
 

@@ -68,3 +68,28 @@ extension DockFinderError: CustomLocalizedStringResourceConvertible, LocalizedEr
         String(localized: localizedStringResource)
     }
 }
+
+extension DockFinderError {
+    /// For the team's sheet (`siri_failed`, `app_failed`): the case's name,
+    /// plus its value when it has one.
+    nonisolated var metricsDetails: [String: String] {
+        switch self {
+        case .locationPermissionNotDetermined: ["error": "locationPermissionNotDetermined"]
+        case .locationPermissionDenied: ["error": "locationPermissionDenied"]
+        case .locationRestricted: ["error": "locationRestricted"]
+        case .locationUnavailable: ["error": "locationUnavailable"]
+        case .networkUnavailable: ["error": "networkUnavailable"]
+        case .serviceUnavailable(let statusCode): ["error": "serviceUnavailable", "status_code": String(statusCode)]
+        case .malformedData: ["error": "malformedData"]
+        case .noStationData: ["error": "noStationData"]
+        case .staleData(let lastUpdated): ["error": "staleData", "last_updated": lastUpdated.ISO8601Format()]
+        case .noAvailableDocks: ["error": "noAvailableDocks"]
+        case .outsideServiceArea: ["error": "outsideServiceArea"]
+        case .placeNotFound(let query): ["error": "placeNotFound", "query": query]
+        case .stationNotFound(let query): ["error": "stationNotFound", "query": query]
+        case .savedPlaceNotFound: ["error": "savedPlaceNotFound"]
+        case .backendUnavailable: ["error": "backendUnavailable"]
+        case .routeUnavailable: ["error": "routeUnavailable"]
+        }
+    }
+}

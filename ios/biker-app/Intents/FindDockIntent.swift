@@ -16,6 +16,7 @@
 //
 
 import AppIntents
+import CoreLocation
 
 typealias SpokenAnswerResult = IntentResult & ReturnsValue<String> & ProvidesDialog
 
@@ -31,7 +32,87 @@ extension DockAnswer {
     }
 }
 
+/// One Siri request, for the team's sheet: which intent ran, what the
+/// rider asked for, and how long the answer took. Every intent's
+/// `perform()` runs inside `logged(_:)`, so requests that fail are logged
+/// too.
+final class SiriRequestLog {
+    let intent: String
+    let started: Date
+    /// What the rider asked for, as Siri heard it: the destination, place
+    /// or station they named, or the whole request for "Ask Dock Finder a
+    /// question". `nil` for requests that don't name anything.
+    var heard: String?
+
+    init(intent: String, started: Date = .now) {
+        self.intent = intent
+        self.started = started
+    }
+
+    /// Fields every row about this request carries.
+    func details(now: Date = .now) -> [String: String] {
+        var details = [
+            "intent": intent,
+            "seconds": String(format: "%.1f", now.timeIntervalSince(started)),
+        ]
+        if let heard { details["heard"] = heard }
+        return details
+    }
+}
+
 extension AppIntent {
+    /// Runs an intent's work. When it throws, logs `siri_failed` with the
+    /// error (Siri then speaks the error's message), so the team can see
+    /// requests that didn't get an answer, not only the ones that did.
+    @MainActor
+    func logged<Result>(_ body: (SiriRequestLog) async throws -> Result) async throws -> Result {
+        let log = SiriRequestLog(intent: String(describing: Self.self))
+        do {
+            return try await body(log)
+        } catch {
+            Metrics.shared.log(
+                "siri_failed",
+                details: log.details().merging(Metrics.errorDetails(error)) { $1 }
+            )
+            throw error
+        }
+    }
+
+    /// Logs `siri_answer` for an answer about to be spoken.
+    @MainActor
+    func logAnswer(_ answer: DockAnswer, log: SiriRequestLog, at here: CLLocation?) {
+        var details = log.details()
+        details["answer"] = answer.text
+        details["answered_by"] = answer.answeredBy.rawValue
+        details.merge(Metrics.locationAge(here)) { $1 }
+        Metrics.shared.log(
+            "siri_answer",
+            station: answer.station?.name,
+            avoidedStation: answer.avoided?.name,
+            location: here,
+            details: details
+        )
+    }
+
+    /// For intents that answer without a follow-up question.
+    @MainActor
+    func spoken(_ answer: DockAnswer, log: SiriRequestLog) -> some SpokenAnswerResult {
+        logAnswer(answer, log: log, at: LocationService.shared.lastKnownLocation)
+        return answer.intentResult
+    }
+
+    /// Logs `siri_followup`: the rider's reply to one of Siri's questions.
+    /// `declined` is what Siri threw instead of a yes: a "no", or Siri being
+    /// unable to ask, which iOS doesn't tell apart beyond the error itself.
+    @MainActor
+    func logFollowUp(_ question: SiriQuestion, station: DockStation?, log: SiriRequestLog, declined: (any Error)?) {
+        var details = log.details()
+        details["question"] = question.rawValue
+        details["reply"] = declined == nil ? "yes" : "no"
+        if let declined { details.merge(Metrics.errorDetails(declined)) { $1 } }
+        Metrics.shared.log("siri_followup", station: station?.name, details: details)
+    }
+
     /// Speaks `answer`, then follows up (see `SiriReplier` and `SiriFollowUp`):
     /// - When `answer` started a ride (it's not the ride from before), asks
     ///   whether to guide the rider to the dock on arrival, unless the
@@ -44,21 +125,12 @@ extension AppIntent {
     @MainActor
     func reply(
         with answer: DockAnswer,
+        log: SiriRequestLog,
         rideBefore: Ride? = nil,
         checksForNewRide: Bool = false
     ) async throws -> some SpokenAnswerResult {
         let here = LocationService.shared.lastKnownLocation
-        Metrics.shared.log(
-            "siri_answer",
-            station: answer.station?.name,
-            avoidedStation: answer.avoided?.name,
-            location: here,
-            details: [
-                "intent": String(describing: Self.self),
-                "answer": answer.text,
-                "answered_by": answer.answeredBy.rawValue,
-            ]
-        )
+        logAnswer(answer, log: log, at: here)
         SavingsStore.shared.record(answer, from: here, context: "siri")
         if answer.station != nil {
             // Dock information by voice: the rider didn't take out their phone.
@@ -68,10 +140,14 @@ extension AppIntent {
         let replier = SiriReplier(
             guidance: GuidanceSession.shared,
             rides: RideTracker.shared,
-            preference: DirectionsPreference.current()
-        ) { question in
-            try await requestConfirmation(conditions: [], actionName: .go, dialog: "\(question)")
-        }
+            preference: DirectionsPreference.current(),
+            confirm: { question in
+                try await requestConfirmation(conditions: [], actionName: .go, dialog: "\(question)")
+            },
+            replied: { question, declined in
+                logFollowUp(question, station: answer.station, log: log, declined: declined)
+            }
+        )
         let reply = try await replier.reply(to: answer, rideBefore: rideBefore, checksForNewRide: checksForNewRide)
         return spokenResult(reply.value, dialog: reply.dialog)
     }
@@ -92,8 +168,10 @@ struct FindDockIntent: LiveActivityIntent {
     func perform() async throws -> some SpokenAnswerResult {
         // Errors conform to CustomLocalizedStringResourceConvertible, so Siri
         // speaks their message when they propagate.
-        let answer = try await DockFinderService.live.findNearestDock().answer
-        return try await reply(with: answer)
+        try await logged { log in
+            let answer = try await DockFinderService.live.findNearestDock().answer
+            return try await reply(with: answer, log: log)
+        }
     }
 }
 
@@ -122,27 +200,31 @@ struct FindDockNearSavedPlaceIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let store = SavedPlacesStore.shared
-        let saved: SavedPlace
-        if let place {
-            guard let match = store.place(id: place.id) else {
-                throw DockFinderError.savedPlaceNotFound
+        try await logged { log in
+            let store = SavedPlacesStore.shared
+            let saved: SavedPlace
+            log.heard = place?.name
+            if let place {
+                guard let match = store.place(id: place.id) else {
+                    throw DockFinderError.savedPlaceNotFound
+                }
+                saved = match
+            } else if store.places.count == 1, let only = store.places.first {
+                saved = only
+            } else if !store.places.isEmpty {
+                let names = store.places.map(\.name).formatted(.list(type: .or))
+                let spoken: String? = try await $placeName.requestValue("Which place: \(names)?")
+                log.heard = spoken
+                guard let match = spoken.flatMap(store.place(matching:)) else {
+                    return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)), log: log)
+                }
+                saved = match
+            } else {
+                return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)), log: log)
             }
-            saved = match
-        } else if store.places.count == 1, let only = store.places.first {
-            saved = only
-        } else if !store.places.isEmpty {
-            let names = store.places.map(\.name).formatted(.list(type: .or))
-            let spoken: String? = try await $placeName.requestValue("Which place: \(names)?")
-            guard let match = spoken.flatMap(store.place(matching:)) else {
-                return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)))
-            }
-            saved = match
-        } else {
-            return try await reply(with: DockAnswer(text: Self.whichPlaceHelp(store.places)))
+            let answer = try await DockFinderService.live.findDock(for: saved).answer
+            return try await reply(with: answer, log: log)
         }
-        let answer = try await DockFinderService.live.findDock(for: saved).answer
-        return try await reply(with: answer)
     }
 }
 
@@ -172,8 +254,11 @@ struct FindDockNearPlaceIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let answer = try await AssistantRouter.live().handle(.place(place))
-        return try await reply(with: answer)
+        try await logged { log in
+            log.heard = place
+            let answer = try await AssistantRouter.live().handle(.place(place))
+            return try await reply(with: answer, log: log)
+        }
     }
 }
 
@@ -204,24 +289,27 @@ struct CheckStationIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let spoken: String
-        if let station {
-            spoken = station.name
-        } else if let stationName, !stationName.isEmpty {
-            spoken = stationName
-        } else {
-            spoken = try await $stationName.requestValue("Which station?")
+        try await logged { log in
+            let spoken: String
+            if let station {
+                spoken = station.name
+            } else if let stationName, !stationName.isEmpty {
+                spoken = stationName
+            } else {
+                spoken = try await $stationName.requestValue("Which station?")
+            }
+            log.heard = spoken
+            guard !spoken.trimmingCharacters(in: .whitespaces).isEmpty else {
+                return try await reply(with: DockAnswer(text: Self.whichStationHelp), log: log)
+            }
+            let answer = try await AssistantRouter.live().handle(.station(KeywordRequestParser.normalize(spoken)))
+            // A full station's answer names the alternative; the one asked about is `avoided`.
+            if let id = answer.avoided?.id ?? answer.station?.id,
+               let name = answer.avoided?.name ?? answer.station?.name {
+                RecentStations.shared.add(id: id, name: name)
+            }
+            return try await reply(with: answer, log: log)
         }
-        guard !spoken.trimmingCharacters(in: .whitespaces).isEmpty else {
-            return try await reply(with: DockAnswer(text: Self.whichStationHelp))
-        }
-        let answer = try await AssistantRouter.live().handle(.station(KeywordRequestParser.normalize(spoken)))
-        // A full station's answer names the alternative; the one asked about is `avoided`.
-        if let id = answer.avoided?.id ?? answer.station?.id,
-           let name = answer.avoided?.name ?? answer.station?.name {
-            RecentStations.shared.add(id: id, name: name)
-        }
-        return try await reply(with: answer)
     }
 }
 
@@ -238,7 +326,9 @@ struct CitywideStatusIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await DockFinderService.live.citywideSummary().answer.intentResult
+        try await logged { log in
+            spoken(try await DockFinderService.live.citywideSummary().answer, log: log)
+        }
     }
 }
 
@@ -261,11 +351,14 @@ struct SetUsualDockIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        guard SavedPlacesStore.shared.place(id: place.id) != nil else {
-            throw DockFinderError.savedPlaceNotFound
+        try await logged { log in
+            log.heard = "\(place.name): \(station.name)"
+            guard SavedPlacesStore.shared.place(id: place.id) != nil else {
+                throw DockFinderError.savedPlaceNotFound
+            }
+            SavedPlacesStore.shared.setUsualDock(stationID: station.id, stationName: station.name, for: place.id)
+            return spoken(DockAnswer(text: "Got it. \(Speech.stationName(station.name)) is your \(place.name) dock."), log: log)
         }
-        SavedPlacesStore.shared.setUsualDock(stationID: station.id, stationName: station.name, for: place.id)
-        return DockAnswer(text: "Got it. \(Speech.stationName(station.name)) is your \(place.name) dock.").intentResult
     }
 }
 
@@ -297,17 +390,20 @@ struct StartRideIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let rideBefore = RideTracker.shared.currentRide
-        let spoken: String
-        if let place {
-            spoken = place.name
-        } else if let destination, !destination.isEmpty {
-            spoken = destination
-        } else {
-            spoken = try await $destination.requestValue("Where are you heading?")
+        try await logged { log in
+            let rideBefore = RideTracker.shared.currentRide
+            let spoken: String
+            if let place {
+                spoken = place.name
+            } else if let destination, !destination.isEmpty {
+                spoken = destination
+            } else {
+                spoken = try await $destination.requestValue("Where are you heading?")
+            }
+            log.heard = spoken
+            let answer = try await AssistantRouter.live().handle(.startRide(spoken))
+            return try await reply(with: answer, log: log, rideBefore: rideBefore, checksForNewRide: true)
         }
-        let answer = try await AssistantRouter.live().handle(.startRide(spoken))
-        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
     }
 }
 
@@ -318,7 +414,9 @@ struct EndRideIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live().handle(.endRide).intentResult
+        try await logged { log in
+            spoken(try await AssistantRouter.live().handle(.endRide), log: log)
+        }
     }
 }
 
@@ -339,18 +437,21 @@ struct DirectMeIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let request: ParsedRequest = place.map { .directionsTo($0.name) } ?? .directions
-        // Shows in the team's sheet whether Siri passed the place along.
-        Metrics.shared.log("request_understood", details: [
-            "intent": String(describing: Self.self),
-            "place": place?.name ?? "",
-            "request": String(describing: request),
-        ])
-        let answer = try await AssistantRouter.live().handle(request)
-        if GuidanceSession.shared.isActive {
-            SavingsStore.shared.recordHandsFree(context: "directions")
+        try await logged { log in
+            log.heard = place?.name
+            let request: ParsedRequest = place.map { .directionsTo($0.name) } ?? .directions
+            // Shows in the team's sheet whether Siri passed the place along.
+            Metrics.shared.log("request_understood", details: [
+                "intent": String(describing: Self.self),
+                "place": place?.name ?? "",
+                "request": String(describing: request),
+            ])
+            let answer = try await AssistantRouter.live().handle(request)
+            if GuidanceSession.shared.isActive {
+                SavingsStore.shared.recordHandsFree(context: "directions")
+            }
+            return spoken(answer, log: log)
         }
-        return answer.intentResult
     }
 }
 
@@ -361,7 +462,9 @@ struct StopDirectionsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        try await AssistantRouter.live().handle(.stopDirections).intentResult
+        try await logged { log in
+            spoken(try await AssistantRouter.live().handle(.stopDirections), log: log)
+        }
     }
 }
 
@@ -388,16 +491,19 @@ struct AskDockFinderIntent: LiveActivityIntent {
 
     @MainActor
     func perform() async throws -> some SpokenAnswerResult {
-        let rideBefore = RideTracker.shared.currentRide
-        let spoken: String
-        if let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            spoken = request
-        } else {
-            spoken = try await $request.requestValue("What do you need?")
+        try await logged { log in
+            let rideBefore = RideTracker.shared.currentRide
+            let spoken: String
+            if let request, !request.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                spoken = request
+            } else {
+                spoken = try await $request.requestValue("What do you need?")
+            }
+            log.heard = spoken
+            let answer = try await Self.answer(spoken, with: AssistantRouter.live())
+            // "Start a ride to school" works here too, so check for a new ride.
+            return try await reply(with: answer, log: log, rideBefore: rideBefore, checksForNewRide: true)
         }
-        let answer = try await Self.answer(spoken, with: AssistantRouter.live())
-        // "Start a ride to school" works here too, so check for a new ride.
-        return try await reply(with: answer, rideBefore: rideBefore, checksForNewRide: true)
     }
 
     /// The help message when nothing was said or nothing understands it.

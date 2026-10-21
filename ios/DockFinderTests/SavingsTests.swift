@@ -187,7 +187,7 @@ struct UsageSharingTests {
         UsageSharing.set(.granted, in: defaults)
         let url = URL(string: "https://script.google.com/macros/s/test/exec")!
         let ok: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
-            (Data(), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            (Data(#"{"ok":true,"added":1}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         let failing: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { _ in throw URLError(.notConnectedToInternet) }
 
@@ -201,6 +201,28 @@ struct UsageSharingTests {
         #expect(online.queuedCount == 1)
         await online.flush()
         #expect(online.queuedCount == 0)
+    }
+
+    /// Apps Script answers 200 even when the script fails, so only an
+    /// `ok: true` reply means the sheet has the rows.
+    @Test(arguments: [
+        (200, #"{"ok":true,"added":1}"#, true),
+        (200, #"{"ok":true,"added":1,"usersError":"Exception"}"#, true),
+        (200, #"{"ok":false,"error":"Exception: Lock timeout"}"#, false),
+        (200, "<!DOCTYPE html><html><body>Script function not found: doPost</body></html>", false),
+        (200, "", false),
+        (500, #"{"ok":true}"#, false),
+    ])
+    func onlyAnOKReplyCountsAsSent(status: Int, body: String, saved: Bool) async {
+        let defaults = defaults()
+        UsageSharing.set(.granted, in: defaults)
+        let url = URL(string: "https://script.google.com/macros/s/test/exec")!
+        let metrics = Metrics(defaults: defaults, endpoint: url) { request in
+            (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+        }
+        metrics.log("ride_started", location: nil)
+        await metrics.flush()
+        #expect(metrics.queuedCount == (saved ? 0 : 1))
     }
 
     @Test func aNameIsOptionalAndTidied() {
@@ -234,5 +256,50 @@ struct UsageSharingTests {
     @Test(arguments: ["", "  ", "$(DOCKFINDER_METRICS_URL)"])
     func noSheetAddressMeansNothingIsSent(value: String) {
         #expect(Metrics.endpoint(from: value) == nil)
+    }
+}
+
+/// What `siri_failed`, `app_failed`, `siri_answer` and `siri_followup`
+/// rows say about a request.
+struct RequestLoggingTests {
+    @Test(arguments: [
+        (DockFinderError.locationPermissionDenied, ["error": "locationPermissionDenied"]),
+        (.serviceUnavailable(statusCode: 503), ["error": "serviceUnavailable", "status_code": "503"]),
+        (.placeNotFound("the bagel place"), ["error": "placeNotFound", "query": "the bagel place"]),
+        (.stationNotFound("mercer"), ["error": "stationNotFound", "query": "mercer"]),
+    ])
+    func errorsAreNamed(error: DockFinderError, expected: [String: String]) {
+        #expect(Metrics.errorDetails(error) == expected)
+    }
+
+    @Test func otherErrorsGiveTheirDomainAndCode() {
+        #expect(Metrics.errorDetails(CancellationError()) == ["error": "cancelled"])
+        let details = Metrics.errorDetails(URLError(.timedOut))
+        #expect(details["error"] == "NSURLErrorDomain -1001")
+        let long = NSError(domain: "Test", code: 7, userInfo: [NSLocalizedDescriptionKey: String(repeating: "x", count: 500)])
+        #expect(Metrics.errorDetails(long)["error_text"]?.count == 200)
+    }
+
+    @Test func staleDataSaysWhenItWasLastUpdated() {
+        let details = Metrics.errorDetails(DockFinderError.staleData(lastUpdated: referenceNow))
+        #expect(details["error"] == "staleData")
+        #expect(details["last_updated"] == referenceNow.ISO8601Format())
+    }
+
+    @MainActor
+    @Test func aRequestSaysWhatWasHeardAndHowLongItTook() {
+        let log = SiriRequestLog(intent: "StartRideIntent", started: referenceNow)
+        #expect(log.details(now: referenceNow.addingTimeInterval(2.34)) == ["intent": "StartRideIntent", "seconds": "2.3"])
+        log.heard = "school"
+        #expect(log.details(now: referenceNow)["heard"] == "school")
+    }
+
+    @Test func locationAgeIsInWholeSeconds() {
+        let fix = CLLocation(
+            coordinate: rider.coordinate, altitude: 0, horizontalAccuracy: 5, verticalAccuracy: 5,
+            timestamp: referenceNow.addingTimeInterval(-90.7)
+        )
+        #expect(Metrics.locationAge(fix, now: referenceNow) == ["location_age_seconds": "90"])
+        #expect(Metrics.locationAge(nil, now: referenceNow).isEmpty)
     }
 }

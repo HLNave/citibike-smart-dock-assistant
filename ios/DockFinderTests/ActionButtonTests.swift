@@ -136,7 +136,8 @@ struct ActionButtonTests {
         #expect(h.speaker.spoken == [said])
         #expect(h.guidance.offered == nil)
         #expect(h.savings.handsFree.isEmpty)
-        #expect(h.metrics.queuedCount == 0)
+        // Logged as a failed request (siri_failed), not an answer.
+        #expect(h.metrics.queuedCount == 1)
     }
 
     @Test func speaksTheMessageWhenOffline() async {
