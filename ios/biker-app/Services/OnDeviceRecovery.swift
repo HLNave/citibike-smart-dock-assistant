@@ -86,7 +86,7 @@ nonisolated struct OnDeviceModelPlaceRewriter: PlaceQueryRewriting {
             let response = try await session.respond(
                 to: description,
                 generating: ModelPlaceSearch.self,
-                options: GenerationOptions(samplingMode: .greedy)
+                options: .greedy
             )
             let query = response.content.query.trimmingCharacters(in: .whitespacesAndNewlines)
             return query.isEmpty ? nil : query
@@ -139,12 +139,25 @@ nonisolated struct OnDeviceModelStationPicker: StationPicking {
             let response = try await session.respond(
                 to: "The rider said: \"\(spoken)\"\nStations:\n\(list)",
                 schema: schema,
-                options: GenerationOptions(samplingMode: .greedy)
+                options: .greedy
             )
             let chosen = try response.content.value(String.self)
             return candidates.first { $0.name == chosen }?.id
         } catch {
             return nil
         }
+    }
+}
+
+private extension GenerationOptions {
+    /// Always the most likely answer. Xcode 27's SDK renamed the
+    /// initializer's `sampling:` label to `samplingMode:`; Xcode 26's
+    /// (FoundationModels 1.5.2 and earlier) only has `sampling:`.
+    nonisolated static var greedy: GenerationOptions {
+        #if canImport(FoundationModels, _version: 1.5.3)
+        GenerationOptions(samplingMode: .greedy)
+        #else
+        GenerationOptions(sampling: .greedy)
+        #endif
     }
 }
