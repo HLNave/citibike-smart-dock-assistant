@@ -10,16 +10,22 @@ import SwiftUI
 struct OnboardingFlowView: View {
     @Environment(OnboardingState.self) private var onboarding
     @State private var showsSharingQuestion = false
+    @State private var showsFirstPlace = false
     @State private var showsSiriInstructions = false
 
+    /// Welcome (location), usage sharing, a first saved place, then Siri.
     var body: some View {
         NavigationStack {
             WelcomeView(onContinue: { showsSharingQuestion = true })
                 .navigationDestination(isPresented: $showsSharingQuestion) {
-                    UsageSharingPrompt { showsSiriInstructions = true }
+                    UsageSharingPrompt { showsFirstPlace = true }
                         .navigationBarBackButtonHidden()
-                        .navigationDestination(isPresented: $showsSiriInstructions) {
-                            SiriInstructionsView(onDone: onboarding.finishOnboarding)
+                        .navigationDestination(isPresented: $showsFirstPlace) {
+                            FirstPlaceView { showsSiriInstructions = true }
+                                .navigationBarBackButtonHidden()
+                                .navigationDestination(isPresented: $showsSiriInstructions) {
+                                    SiriInstructionsView(onDone: onboarding.finishOnboarding)
+                                }
                         }
                 }
         }

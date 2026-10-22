@@ -110,7 +110,7 @@ Siri can only fill in names the app gives it ahead of time (saved places and tho
 
 ## Using the app
 
-The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about location twice: choose **Allow While Using App**, then **Change to Always Allow** (iOS never offers "Always" in the first question), so rides and directions work with the phone locked. iOS then asks for **Motion & Fitness** (so arrival alerts only fire when you're biking). Then it asks whether to **share usage data** with the Dock Finder team (see [Privacy and usage data](#privacy-and-usage-data)), and shows the Siri cheat sheet. After that, the home screen has:
+The first time it opens, tap **Enable Dock Finder with Siri**. iOS asks about location twice: choose **Allow While Using App**, then **Change to Always Allow** (iOS never offers "Always" in the first question), so rides and directions work with the phone locked. iOS then asks for **Motion & Fitness** (so arrival alerts only fire when you're biking). Then it asks whether to **share usage data** with the Dock Finder team (see [Privacy and usage data](#privacy-and-usage-data)), has you **add your first place** (school, work or home: search the address or use where you are, name it, pick how far out to be alerted; Continue stays off until one is saved, and places restored after reinstalling count), and shows the Siri cheat sheet. After that, the home screen has:
 
 - **Find Nearest Dock**: the answer, with a **Direct Me** button for spoken turn-by-turn directions. Every dock answer in the app has **Direct Me**.
 - **Directions card**: while directions run, the next turn, the dock and its open docks, and **Stop Directions**.
