@@ -21,6 +21,9 @@ nonisolated struct DockStation: Sendable, Equatable, Identifiable {
     let straightLineDistance: CLLocationDistance
     /// When the station last reported its availability, if the feed provides it.
     let observedAt: Date?
+    /// Bikes there to ride away, when known: classic (pedal) and e-bikes.
+    var classicBikes: Int? = nil
+    var ebikes: Int? = nil
 
     var spokenName: String { Speech.stationName(name) }
     var location: CLLocation { CLLocation(latitude: latitude, longitude: longitude) }
@@ -79,7 +82,7 @@ nonisolated struct DockAnswer: Sendable, Equatable {
         case server
     }
 
-    let text: String
+    var text: String
     /// The station the answer recommends, for directions. `nil` for
     /// answers that aren't about one station (citywide totals, server replies).
     var station: DockStation? = nil

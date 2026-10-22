@@ -25,9 +25,9 @@ Every phrase starts with **"Ask Dock Finder"** and says the whole request in one
 
 ### One press: the Action Button
 
-On an iPhone with an Action Button (iPhone 15 Pro and later), set it up once: **Settings → Action Button**, swipe to **Controls**, tap **Choose a Control**, and pick **Speak Nearest Dock** (search "Dock Finder"). Then press and hold the Action Button, and Dock Finder says the nearest station with room out loud, through your headphones, even with the phone locked in your pocket. Music gets quieter while it talks.
+On an iPhone with an Action Button (iPhone 15 Pro and later), set it up once: **Settings → Action Button**, swipe to **Controls**, tap **Choose a Control**, and pick **Speak Nearest Dock** (search "Dock Finder"). Then press and hold the Action Button, and Dock Finder says the nearest station with room, and how many classic bikes and e-bikes it has, out loud, through your headphones, even with the phone locked in your pocket. Music gets quieter while it talks.
 
-> "West 15th and 6th has 53 docks open, 300 feet away."
+> "West 15th and 6th has 53 docks open, 300 feet away. It has 3 classic bikes and 2 e-bikes."
 
 - It never asks anything back. For directions, say **"Hey Siri, ask Dock Finder to direct me"** within 10 minutes and it guides you to that dock.
 - If it can't answer (location access off, no internet, no dock with room nearby), it says why.

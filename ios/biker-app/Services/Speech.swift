@@ -38,6 +38,15 @@ nonisolated enum Speech {
         count == 1 ? "1 bike" : "\(count) bikes"
     }
 
+    /// "It has 3 classic bikes and 1 e-bike." / "It has no bikes right now."
+    static func bikeCounts(classic: Int, ebikes: Int) -> String {
+        func count(_ number: Int, _ kind: String) -> String {
+            number == 0 ? "no \(kind)s" : number == 1 ? "1 \(kind)" : "\(number) \(kind)s"
+        }
+        if classic == 0 && ebikes == 0 { return "It has no bikes right now." }
+        return "It has \(count(classic, "classic bike")) and \(count(ebikes, "e-bike"))."
+    }
+
     /// "right there", "500 feet away", "right at school", "0.2 miles from school".
     /// Distances are straight-line, not route distances.
     static func distance(_ meters: CLLocationDistance, from place: String? = nil, locale: Locale = .autoupdatingCurrent) -> String {

@@ -69,16 +69,26 @@ struct ActionButtonTests {
         )
     }
 
-    @Test func speaksExactlyTheNearestDockAnswer() async throws {
-        let h = harness()
-        let expected = try await h.announcement.service.findNearestDock().answer.text
+    @Test func speaksTheNearestDockAnswerThenItsBikes() async throws {
+        let h = harness(statuses: [status("near", docks: 4, bikes: 5, ebikes: 2), status("mid", docks: 2)])
+        let dock = try await h.announcement.service.findNearestDock().answer.text
 
         let said = await h.announcement.run()
 
-        #expect(said == expected)
-        #expect(h.speaker.spoken == [expected])
-        // One sentence of facts, never a question.
+        #expect(said == "\(dock) It has 3 classic bikes and 2 e-bikes.")
+        #expect(h.speaker.spoken == [said])
+        // Facts only, never a question.
         #expect(!said.contains("?"))
+    }
+
+    @Test(arguments: [
+        (0, 0, "It has no bikes right now."),
+        (1, 0, "It has 1 classic bike and no e-bikes."),
+        (0, 1, "It has no classic bikes and 1 e-bike."),
+        (12, 4, "It has 12 classic bikes and 4 e-bikes."),
+    ])
+    func bikeCounts(classic: Int, ebikes: Int, expected: String) {
+        #expect(Speech.bikeCounts(classic: classic, ebikes: ebikes) == expected)
     }
 
     @Test func itsFallbackNotificationHasItsOwnIdentifier() async {

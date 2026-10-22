@@ -177,7 +177,10 @@ extension DockStation {
             longitude: snapshot.longitude,
             availableDocks: snapshot.openDocks,
             straightLineDistance: distance,
-            observedAt: snapshot.lastReported
+            observedAt: snapshot.lastReported,
+            // The feed's bike count includes e-bikes.
+            classicBikes: max(snapshot.bikesAvailable - snapshot.ebikesAvailable, 0),
+            ebikes: snapshot.ebikesAvailable
         )
     }
 }

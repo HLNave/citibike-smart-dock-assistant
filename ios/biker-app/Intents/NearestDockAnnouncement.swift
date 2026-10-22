@@ -56,7 +56,7 @@ struct NearestDockAnnouncement {
     /// sentence that was said.
     func run() async -> String {
         let log = SiriRequestLog(intent: String(describing: SpeakNearestDockIntent.self))
-        let answer: DockAnswer
+        var answer: DockAnswer
         do {
             answer = try await service.findNearestDock().answer
         } catch {
@@ -67,6 +67,11 @@ struct NearestDockAnnouncement {
             let message = (error as? DockFinderError)?.errorDescription ?? Self.fallbackError
             await say(message)
             return message
+        }
+
+        // Also the bikes there, for picking one up as well as dropping off.
+        if let station = answer.station, let classic = station.classicBikes, let ebikes = station.ebikes {
+            answer.text += " " + Speech.bikeCounts(classic: classic, ebikes: ebikes)
         }
 
         let here = lastKnownLocation()
