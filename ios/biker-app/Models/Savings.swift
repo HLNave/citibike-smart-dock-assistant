@@ -11,8 +11,9 @@
 //  On top of that, every dock answer given by voice (Siri, ride and
 //  saved-place arrival alerts) is a time the rider didn't stop to take out
 //  their phone: a "hands-free check", worth a minute each and counted as
-//  a safety stat. Everyone is assumed to ride e-bikes, which members pay
-//  for by the minute.
+//  a safety stat. Money saved depends on the rider's plan (RiderPlan):
+//  e-bike minutes cost money, at the member or non-member rate; classic
+//  bike minutes are included in the ride, so classic riders save time only.
 //
 
 import CoreLocation
@@ -47,10 +48,62 @@ nonisolated struct AvoidedDock: Codable, Sendable, Equatable {
     var spokenName: String { Speech.stationName(name) }
 }
 
+/// How the rider uses Citi Bike, picked on the Savings screen. Until they
+/// pick, a member riding e-bikes.
+nonisolated struct RiderPlan: Equatable, Sendable {
+    enum Membership: String, CaseIterable, Sendable {
+        case member
+        case nonMember
+    }
+
+    enum Bike: String, CaseIterable, Sendable {
+        case ebike
+        case classic
+    }
+
+    var membership: Membership = .member
+    var bike: Bike = .ebike
+
+    static let membershipKey = "riderMembership"
+    static let bikeKey = "riderBike"
+
+    init(membership: Membership = .member, bike: Bike = .ebike) {
+        self.membership = membership
+        self.bike = bike
+    }
+
+    /// From stored values; anything unrecognized falls back to the default.
+    init(membershipRawValue: String?, bikeRawValue: String?) {
+        self.init(
+            membership: membershipRawValue.flatMap(Membership.init(rawValue:)) ?? .member,
+            bike: bikeRawValue.flatMap(Bike.init(rawValue:)) ?? .ebike
+        )
+    }
+
+    static func current(in defaults: UserDefaults = .standard) -> RiderPlan {
+        RiderPlan(membershipRawValue: defaults.string(forKey: membershipKey), bikeRawValue: defaults.string(forKey: bikeKey))
+    }
+
+    /// What a minute of riding costs. Classic bike rides include their
+    /// first 45 minutes (members) or 30 (non-members), so a detour on a
+    /// classic bike costs time, not money.
+    var dollarsPerMinute: Double {
+        switch (membership, bike) {
+        case (_, .classic): 0
+        case (.member, .ebike): SavingsModel.memberEbikeDollarsPerMinute
+        case (.nonMember, .ebike): SavingsModel.nonMemberEbikeDollarsPerMinute
+        }
+    }
+
+    /// Whether saved minutes are worth money on this plan.
+    var savesMoney: Bool { dollarsPerMinute > 0 }
+}
+
 nonisolated enum SavingsModel {
-    /// Citi Bike's member e-bike rate, in dollars per minute. Update it when
-    /// Citi Bike's pricing changes.
-    static let ebikeDollarsPerMinute = 0.27
+    /// Citi Bike's 2026 NYC e-bike rates, in dollars per minute. Update
+    /// them when Citi Bike's pricing changes.
+    static let memberEbikeDollarsPerMinute = 0.27
+    static let nonMemberEbikeDollarsPerMinute = 0.41
     /// Typical riding speed in the city, about 15 km/h.
     static let ridingSpeed: CLLocationSpeed = 4.2
     /// Streets are longer than the straight line between two docks.
@@ -92,8 +145,8 @@ nonisolated enum SavingsModel {
         return min(minutes, maxMinutesPerEvent)
     }
 
-    static func dollars(forMinutes minutes: Double) -> Double {
-        minutes * ebikeDollarsPerMinute
+    static func dollars(forMinutes minutes: Double, plan: RiderPlan = .current()) -> Double {
+        minutes * plan.dollarsPerMinute
     }
 }
 
@@ -109,6 +162,7 @@ nonisolated struct SavingsEvent: Codable, Sendable, Equatable, Identifiable {
     let context: String
 
     var dollars: Double { SavingsModel.dollars(forMinutes: minutes) }
+    func dollars(on plan: RiderPlan) -> Double { SavingsModel.dollars(forMinutes: minutes, plan: plan) }
 }
 
 /// One dock answer given by voice: a time the rider didn't take out their phone.
@@ -127,6 +181,7 @@ nonisolated struct SavingsSummary: Sendable, Equatable {
     var handsFreeMinutes: Double { Double(handsFreeChecks) * SavingsModel.handsFreeMinutes }
     var minutes: Double { fullDockMinutes + handsFreeMinutes }
     var dollars: Double { SavingsModel.dollars(forMinutes: minutes) }
+    func dollars(on plan: RiderPlan) -> Double { SavingsModel.dollars(forMinutes: minutes, plan: plan) }
 
     static func of(
         _ events: [SavingsEvent],

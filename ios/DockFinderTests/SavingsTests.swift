@@ -33,12 +33,33 @@ struct SavingsModelTests {
         #expect(SavingsModel.minutesSaved(from: rider, avoided: farAway, chosen: roomyDock) == SavingsModel.maxMinutesPerEvent)
     }
 
+    @Test(arguments: [
+        (RiderPlan(membership: .member, bike: .ebike), 0.27),
+        (RiderPlan(membership: .nonMember, bike: .ebike), 0.41),
+        (RiderPlan(membership: .member, bike: .classic), 0.0),
+        (RiderPlan(membership: .nonMember, bike: .classic), 0.0),
+    ])
+    func moneyFollowsThePlan(plan: RiderPlan, perMinute: Double) {
+        #expect(abs(SavingsModel.dollars(forMinutes: 10, plan: plan) - perMinute * 10) < 0.001)
+        #expect(plan.savesMoney == (perMinute > 0))
+    }
+
+    @Test func planDefaultsToAMemberOnAnEbike() {
+        let defaults = UserDefaults(suiteName: "test-\(UUID())")!
+        #expect(RiderPlan.current(in: defaults) == RiderPlan(membership: .member, bike: .ebike))
+        defaults.set("nonMember", forKey: RiderPlan.membershipKey)
+        defaults.set("classic", forKey: RiderPlan.bikeKey)
+        #expect(RiderPlan.current(in: defaults) == RiderPlan(membership: .nonMember, bike: .classic))
+        defaults.set("tandem", forKey: RiderPlan.bikeKey)
+        #expect(RiderPlan.current(in: defaults).bike == .ebike)
+    }
+
     @Test func typicalCommuterMonth() {
         // 50 rides × 1 hands-free minute, plus 5 full docks × 5 minutes.
         #expect(abs(SavingsModel.typicalFullDockMinutes - 25) < 0.001)
         #expect(abs(SavingsModel.typicalHandsFreeMinutes - 50) < 0.001)
         #expect(abs(SavingsModel.typicalMonthlyMinutes - 75) < 0.001)
-        #expect(abs(SavingsModel.dollars(forMinutes: SavingsModel.typicalMonthlyMinutes) - 20.25) < 0.001)
+        #expect(abs(SavingsModel.dollars(forMinutes: SavingsModel.typicalMonthlyMinutes, plan: RiderPlan()) - 20.25) < 0.001)
     }
 }
 
@@ -100,7 +121,7 @@ struct SavingsStoreTests {
         #expect(summary.fullDockMinutes == 3)
         #expect(summary.handsFreeMinutes == 2)
         #expect(summary.minutes == 5)
-        #expect(abs(summary.dollars - 1.35) < 0.001)
+        #expect(abs(summary.dollars(on: RiderPlan()) - 1.35) < 0.001)
     }
 
     @Test func monthlySummaryOnlyCountsThisMonth() {

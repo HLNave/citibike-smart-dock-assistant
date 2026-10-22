@@ -36,7 +36,7 @@ The app keeps each event on the phone until the script replies `{"ok": true}`, a
 | `latitude`, `longitude` | Where the rider was (blank if unknown) |
 | `station` | The dock Dock Finder sent them to |
 | `avoided_station` | The full or closed dock it steered them away from |
-| `minutes_saved`, `dollars_saved` | Estimated savings, on `full_dock_avoided` rows |
+| `minutes_saved`, `dollars_saved` | Estimated savings, on `full_dock_avoided` rows; dollars at the rider's plan when it was logged ($0 for classic bike riders) |
 | `details` | Extra fields as JSON: the spoken answer, Siri intent, destination, etc. |
 | `event_id` | Unique per event, for spotting duplicates if a send was retried |
 | `user_name` | The name the rider typed in, if any (blank otherwise, and on rows from older builds) |
@@ -60,7 +60,7 @@ One row per install, newest activity first, rewritten after every batch of event
 
 If the numbers ever look off (say, after deleting rows from Events), run **`rebuildUsers`** from the Apps Script editor (pick it in the function menu, then **▶ Run**) to rebuild the tab from Events.
 
-Events: `app_opened` (the app came on screen; `app_launch` in older builds, which also fired for background relaunches), `name_changed`, `sharing_turned_on`, `siri_answer`, `siri_failed`, `siri_followup`, `request_understood`, `app_answer`, `app_failed`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
+Events: `plan_changed` (the rider changed Your Citi Bike on the Savings screen: `membership`, `bike`), `request_understood` (a free-form request: what was heard, which step understood it, the action it became), `app_opened` (the app came on screen; `app_launch` in older builds, which also fired for background relaunches), `name_changed`, `sharing_turned_on`, `siri_answer`, `siri_failed`, `siri_followup`, `request_understood`, `app_answer`, `app_failed`, `ride_started`, `ride_arrival_alert`, `ride_ended_early`, `place_arrival_alert`, `directions_started`, `directions_rerouted`, `directions_stopped`, `directions_arrived`, `full_dock_avoided`, `hands_free_check`.
 
 ## Requests that didn't help
 

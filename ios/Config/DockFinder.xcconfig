@@ -8,7 +8,7 @@
 // iOS caches which phrase runs which action and re-reads the list when the
 // build number changes; without a bump, an update can leave phrases running
 // the wrong action.
-CURRENT_PROJECT_VERSION = 13
+CURRENT_PROJECT_VERSION = 14
 
 // Bundle IDs are unique across all Apple accounts, so each tester sets their own.
 DOCKFINDER_BUNDLE_ID = spork.biker-app

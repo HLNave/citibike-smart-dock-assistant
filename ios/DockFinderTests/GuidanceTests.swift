@@ -164,6 +164,39 @@ struct GuidanceProgressTests {
         #expect(progress.update(at: fix(40.7327, -73.99465, accuracy: 40, after: 40)) == [.say("Turn right onto Bleecker Street.")])
     }
 
+    @Test func theDockIsOnlyAnnouncedNearTheDock() {
+        // Maps' last step can start a block or more before the dock.
+        let route = GuidanceRoute(station: dock, legs: [
+            (instruction: "", points: [start, corner]),
+            (instruction: "The destination is on your left", points: [corner, dockPoint]),
+        ])
+        #expect(route.steps.last?.offset == route.length)
+        var progress = GuidanceProgress(route: route)
+        _ = progress.opening()
+        _ = progress.update(at: fix(40.7300, -73.9950))
+        // 150 m before the corner: the dock is still 350 m away.
+        #expect(progress.update(at: fix(40.7314, -73.9950, after: 20)).isEmpty)
+        // On the dock's street, 120 m out.
+        #expect(spoken(progress.update(at: fix(40.7327, -73.99403, after: 60)))?.hasSuffix(", the dock is on your left.") == true)
+    }
+
+    @Test func aTurnIsntAnnouncedWhileTheRiderIsStillFarFromIt() {
+        var progress = GuidanceProgress(route: testRoute())
+        _ = progress.opening()
+        _ = progress.update(at: fix(40.7300, -73.9950))
+        // GPS drifting ahead while the rider waits at a light (speed 0):
+        // the route position can't run ahead, so nothing is said.
+        for second in 1...20 {
+            let drifting = CLLocation(
+                coordinate: CLLocationCoordinate2D(latitude: 40.7300 + Double(second) * 0.00012, longitude: -73.9950),
+                altitude: 0, horizontalAccuracy: 30, verticalAccuracy: 5, course: 0, speed: 0,
+                timestamp: referenceNow.addingTimeInterval(Double(second))
+            )
+            #expect(progress.update(at: drifting).isEmpty)
+        }
+        #expect(progress.along < 60)
+    }
+
     @Test func inaccurateFixesAreIgnored() {
         var progress = GuidanceProgress(route: testRoute())
         #expect(progress.update(at: fix(40.7325, -73.9950, accuracy: 120)).isEmpty)

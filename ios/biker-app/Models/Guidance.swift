@@ -103,14 +103,32 @@ nonisolated struct GuidanceRoute: Sendable, Equatable {
             let instruction = leg.instruction.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !instruction.isEmpty else { return nil }
             let lowered = instruction.lowercased()
+            let isArrival = index == lastLeg && (lowered.contains("destination") || lowered.hasPrefix("arrive"))
             return GuidanceStep(
                 instruction: instruction,
-                offset: cumulative[min(legStarts[index], cumulative.count - 1)],
-                isArrival: index == lastLeg && (lowered.contains("destination") || lowered.hasPrefix("arrive"))
+                // "The dock is on your right" belongs at the dock itself, not
+                // where Maps' last step starts (which can be a block or more
+                // back), or it's said far too early.
+                offset: isArrival ? (cumulative.last ?? 0) : cumulative[min(legStarts[index], cumulative.count - 1)],
+                isArrival: isArrival
             )
         }
         self.path = path
         self.cumulative = cumulative
+    }
+
+    /// The point `distance` along the route.
+    func location(at distance: CLLocationDistance) -> CLLocation {
+        guard path.count >= 2 else { return path[0].location }
+        let index = segment(containing: distance)
+        let start = cumulative[index]
+        let length = cumulative[index + 1] - start
+        let fraction = length > 0 ? min(max((distance - start) / length, 0), 1) : 0
+        let a = path[index], b = path[index + 1]
+        return CLLocation(
+            latitude: a.latitude + (b.latitude - a.latitude) * fraction,
+            longitude: a.longitude + (b.longitude - a.longitude) * fraction
+        )
     }
 
     /// The index of the path segment that `distance` along the route falls in.
@@ -198,6 +216,12 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     /// A maneuver is only skipped silently (missed, or taken early) on a
     /// fix at least this accurate; otherwise it's said, late.
     static let skipAccuracy: CLLocationAccuracy = 25
+    /// A maneuver is only announced when the rider is really that close to
+    /// it in a straight line, give or take the fix's accuracy (at least
+    /// this) and this much more. Distance along the route can still run
+    /// ahead of the rider; this keeps the voice from following it.
+    static let minimumSlack: CLLocationDistance = 20
+    static let announceMargin: CLLocationDistance = 30
     /// A fix this close to the route sits on the street it matched. When
     /// nothing within the lookahead is this close but a later street is,
     /// the rider is already past a turn.
@@ -220,6 +244,10 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
     /// The last fix that matched the route, and when it was taken.
     private var lastFix: GuidanceCoordinate?
     private var lastFixTime: Date?
+    /// How far along the rider can be vouched for: it only advances as fast
+    /// as they're actually riding. `along` may run up to `advanceSlack`
+    /// past it, once, rather than per fix.
+    private var trustedAlong: CLLocationDistance = 0
 
     init(route: GuidanceRoute) {
         self.route = route
@@ -342,7 +370,14 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
         // fix. (Fixes with no time between them, as in tests, aren't capped.)
         if let lastFixTime, location.timestamp > lastFixTime {
             let elapsed = location.timestamp.timeIntervalSince(lastFixTime)
-            reached = min(reached, along + Self.maxSpeed * elapsed + Self.advanceSlack)
+            // The fix's own speed (from the GPS Doppler shift, reliable even
+            // when its position isn't) when it has one, so fixes drifting
+            // ahead while the rider waits at a light can't creep forward.
+            let speed = location.speed >= 0 ? min(max(location.speed * 1.5, 2), Self.maxSpeed) : Self.maxSpeed
+            trustedAlong = max(trustedAlong, min(match.along, trustedAlong + speed * elapsed))
+            reached = min(reached, trustedAlong + Self.advanceSlack)
+        } else {
+            trustedAlong = max(trustedAlong, match.along)
         }
         lastFix = GuidanceCoordinate(location.coordinate)
         lastFixTime = location.timestamp
@@ -361,13 +396,20 @@ nonisolated struct GuidanceProgress: Sendable, Equatable {
         guard let step = nextManeuver, let distance = distanceToNextManeuver else { return [] }
 
         let instruction = Speech.instruction(step.instruction)
+        let point = step.isArrival ? route.station.location : route.location(at: step.offset)
+        let straight = location.distance(from: point)
+        let slack = max(location.horizontalAccuracy, Self.minimumSlack) + Self.announceMargin
         if distance <= Self.turnNowDistance {
+            guard straight <= Self.turnNowDistance + slack else { return [] }
             nextStep += 1
             return step.isArrival ? [] : [.say(Speech.period(instruction))]
         }
         if distance <= Self.prepareDistance, !preparedSteps.contains(nextStep) {
+            guard straight <= Self.prepareDistance + slack else { return [] }
             preparedSteps.insert(nextStep)
-            return [.say(Speech.period("In \(Speech.length(distance)), \(Speech.lowercasingFirst(instruction))"))]
+            // The straight line is never longer than the way there, so it's
+            // the honest figure when the two disagree.
+            return [.say(Speech.period("In \(Speech.length(max(distance, straight))), \(Speech.lowercasingFirst(instruction))"))]
         }
         return []
     }
