@@ -3,8 +3,8 @@
 //  DockFinderTests
 //
 //  Which dock near a destination gets recommended: walking along
-//  Manhattan's street grid, and preferring a nearly tied dock on the
-//  rider's way.
+//  Manhattan's street grid or Apple Maps' walking distances, and
+//  preferring a nearly tied dock on the rider's way.
 //
 
 import CoreLocation
@@ -50,11 +50,11 @@ struct StreetGridTests {
 
 /// Riding east on 14th St from Seventh Avenue to Palladium Hall. E 12 St &
 /// 3 Ave is the closest walk (about 195 m on the grid); E 12 St & 4 Ave is
-/// about 60 m more but on the way; Union Square is the shortest ride but
+/// about 30 m more but on the way; Union Square is the shortest ride but
 /// more than a block's extra walk.
 struct OnTheWayDockTests {
     let third = info("third", "E 12 St & 3 Ave", 40.7322, -73.9880)
-    let fourth = info("fourth", "E 12 St & 4 Ave", 40.7330, -73.9905)
+    let fourth = info("fourth", "E 12 St & 4 Ave", 40.7330, -73.9902)
     let union = info("union", "Union Sq E & E 15 St", 40.7356, -73.9912)
     let palladium = Destination(name: "Palladium", latitude: 40.7334, longitude: -73.9884)
     let rider = CLLocation(latitude: 40.7377, longitude: -73.9997)
@@ -94,15 +94,77 @@ struct OnTheWayDockTests {
         #expect(result.selected?.id == "third")
     }
 
-    @Test func theServiceUsesARecentFix() async throws {
-        let service = DockFinderService(
-            location: StubLocation(result: .failure(.locationUnavailable), recent: rider),
+    // MARK: - Apple Maps walking distances
+
+    @Test func mapsWalkingDistancesReplaceTheEstimate() throws {
+        // Maps says E 12 St & 3 Ave is a long walk (say, no crossing there).
+        let result = DockFinderService.dock(
+            near: palladium, usualStationID: nil,
+            walkingDistances: ["third": 400, "fourth": 220, "union": 500],
+            in: try network()
+        )
+        #expect(result.selected?.id == "fourth")
+    }
+
+    @Test func aDockMapsDidntAnswerForKeepsItsEstimate() throws {
+        // Only E 12 St & 4 Ave came back, longer than 3 Ave's ~195 m estimate.
+        let result = DockFinderService.dock(
+            near: palladium, usualStationID: nil,
+            walkingDistances: ["fourth": 300],
+            in: try network()
+        )
+        #expect(result.selected?.id == "third")
+    }
+
+    @Test func mapsDistancesStillLetTheDockOnTheWayWin() throws {
+        let result = DockFinderService.dock(
+            near: palladium, usualStationID: nil, from: rider,
+            walkingDistances: ["third": 200, "fourth": 240, "union": 450],
+            in: try network()
+        )
+        #expect(result.selected?.id == "fourth")
+    }
+
+    // MARK: - Service
+
+    private func service(recent: CLLocation? = nil, walking: [String: CLLocationDistance] = [:]) -> DockFinderService {
+        DockFinderService(
+            location: StubLocation(result: .failure(.locationUnavailable), recent: recent),
             feeds: StubFeeds(
                 information: .success(informationFeed([third, fourth, union])),
                 status: .success(statusFeed([status("third", docks: 10), status("fourth", docks: 10), status("union", docks: 10)]))
             ),
-            now: { referenceNow }
+            now: { referenceNow },
+            walking: StubWalkingDistances(distances: walking)
         )
-        #expect(try await service.findDock(near: palladium).selected?.id == "fourth")
+    }
+
+    @Test func theServiceUsesARecentFix() async throws {
+        #expect(try await service(recent: rider).findDock(near: palladium).selected?.id == "fourth")
+    }
+
+    @Test func theServiceUsesMapsWalkingDistances() async throws {
+        let found = try await service(walking: ["third": 400, "fourth": 220]).findDock(near: palladium)
+        #expect(found.selected?.id == "fourth")
+    }
+
+    @Test func theServiceKeepsTheUsualDockWhateverMapsSays() async throws {
+        let found = try await service(walking: ["third": 400, "fourth": 220])
+            .findDock(near: palladium, usualStationID: "third")
+        #expect(found.usesUsualDock)
+        #expect(found.selected?.id == "third")
+    }
+}
+
+/// Answers with fixed walking distances, for the stations asked about.
+struct StubWalkingDistances: WalkingDistanceProviding {
+    var distances: [String: CLLocationDistance]
+
+    func walkingDistances(
+        to destination: CLLocation,
+        from stations: [DockStation],
+        timeLimit: Duration
+    ) async -> [String: CLLocationDistance] {
+        distances.filter { id, _ in stations.contains { $0.id == id } }
     }
 }

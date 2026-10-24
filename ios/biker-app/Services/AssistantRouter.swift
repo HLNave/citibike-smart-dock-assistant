@@ -168,11 +168,13 @@ struct AssistantRouter {
             var rewritten = false
             let here = await service.riderLocation()
             if let saved = store.place(matching: spoken) {
-                result = try await service.findDock(for: saved, from: here)
+                result = try await service.findDock(for: saved, from: here, mapsTimeLimit: DockFinderService.directionsMapsTimeLimit)
             } else {
                 let found = try await searchedDestination(spoken)
                 rewritten = found.rewritten
-                result = try await service.findDock(near: found.destination, from: here)
+                result = try await service.findDock(
+                    near: found.destination, from: here, mapsTimeLimit: DockFinderService.directionsMapsTimeLimit
+                )
             }
             // No dock with room there: the answer says so.
             guard let station = result.selected else { return result.answer }

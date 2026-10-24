@@ -200,11 +200,17 @@ enum SpokenVoice {
     )
 
     static func utterance(_ text: String) -> AVSpeechUtterance {
-        let utterance = AVSpeechUtterance(string: text)
+        let utterance = AVSpeechUtterance(string: spokenText(text))
         utterance.voice = voice
         utterance.rate = rate
         utterance.postUtteranceDelay = 0.2
         return utterance
+    }
+
+    /// The text as it should be said. The voice reads "e-bike" as "eh bike";
+    /// a capital letter on its own is read by name, so "E bike" says "ee bike".
+    nonisolated static func spokenText(_ text: String) -> String {
+        text.replacingOccurrences(of: #"\be-?bike"#, with: "E bike", options: [.regularExpression, .caseInsensitive])
     }
 
     /// Prefers, in order: male, a Siri voice, then Premium over Enhanced

@@ -13,7 +13,7 @@ import Foundation
 nonisolated struct DockFinderService: Sendable {
     /// The live service: real location, real Citi Bike data.
     @MainActor static var live: DockFinderService {
-        DockFinderService(location: LocationService.shared, feeds: CachedStationFeeds.shared)
+        DockFinderService(location: LocationService.shared, feeds: CachedStationFeeds.shared, walking: MapKitWalkingDistances())
     }
 
     static let maxFeedAge = StationNetwork.maxFeedAge
@@ -22,13 +22,25 @@ nonisolated struct DockFinderService: Sendable {
     /// Citi Bike's service area.
     static let maxSearchDistance: CLLocationDistance = 10_000
 
+    /// How long a quick answer waits for Apple Maps' walking distances.
+    static let quickMapsTimeLimit: Duration = .milliseconds(1_500)
+    /// How long directions wait for them; directions take longer to start anyway.
+    static let directionsMapsTimeLimit: Duration = .seconds(4)
+
     private let location: any LocationProviding
     private let feeds: any CitiBikeFeedProviding
+    private let walking: any WalkingDistanceProviding
     private let now: @Sendable () -> Date
 
-    init(location: any LocationProviding, feeds: any CitiBikeFeedProviding, now: @escaping @Sendable () -> Date = Date.init) {
+    init(
+        location: any LocationProviding,
+        feeds: any CitiBikeFeedProviding,
+        now: @escaping @Sendable () -> Date = Date.init,
+        walking: any WalkingDistanceProviding = NoWalkingDistances()
+    ) {
         self.location = location
         self.feeds = feeds
+        self.walking = walking
         self.now = now
     }
 
@@ -51,11 +63,14 @@ nonisolated struct DockFinderService: Sendable {
     /// the answer says why and reroutes to the closest station with space,
     /// preferring one on the rider's way. `origin` is where the rider is
     /// coming from; without it, a recent location fix is used if iOS has one.
+    /// When choosing among docks, Apple Maps' walking distances are used if
+    /// they arrive within `mapsTimeLimit`.
     func findDock(
         near destination: Destination,
         usualStationID: String? = nil,
         backupStationID: String? = nil,
-        from origin: CLLocation? = nil
+        from origin: CLLocation? = nil,
+        mapsTimeLimit: Duration = DockFinderService.quickMapsTimeLimit
     ) async throws -> DestinationDockResult {
         let start: CLLocation?
         if let origin {
@@ -63,22 +78,45 @@ nonisolated struct DockFinderService: Sendable {
         } else {
             start = await location.recentLocation()
         }
+        let network = try await loadNetwork()
+        let estimated = Self.dock(
+            near: destination,
+            usualStationID: usualStationID,
+            backupStationID: backupStationID,
+            from: start,
+            in: network
+        )
+        // The usual or backup dock is used as is; Maps only helps choose
+        // between docks.
+        guard estimated.selected != nil, !estimated.usesUsualDock, !estimated.selectedIsBackup else { return estimated }
+
+        let excluded = Set([usualStationID, backupStationID].compactMap { $0 })
+        let shortlist = Self.shortlist(Self.candidates(near: destination, excluding: excluded, in: network), near: destination.location)
+        guard shortlist.count > 1 else { return estimated }
+        let measured = await walking.walkingDistances(to: destination.location, from: shortlist, timeLimit: mapsTimeLimit)
+        guard !measured.isEmpty else { return estimated }
         return Self.dock(
             near: destination,
             usualStationID: usualStationID,
             backupStationID: backupStationID,
             from: start,
-            in: try await loadNetwork()
+            walkingDistances: measured,
+            in: network
         )
     }
 
     /// A saved place's usual and backup docks, checked in that order.
-    func findDock(for place: SavedPlace, from origin: CLLocation? = nil) async throws -> DestinationDockResult {
+    func findDock(
+        for place: SavedPlace,
+        from origin: CLLocation? = nil,
+        mapsTimeLimit: Duration = DockFinderService.quickMapsTimeLimit
+    ) async throws -> DestinationDockResult {
         try await findDock(
             near: place.destination,
             usualStationID: place.usualStationID,
             backupStationID: place.backupStationID,
-            from: origin
+            from: origin,
+            mapsTimeLimit: mapsTimeLimit
         )
     }
 
@@ -138,6 +176,7 @@ nonisolated struct DockFinderService: Sendable {
         usualStationID: String?,
         backupStationID: String? = nil,
         from origin: CLLocation? = nil,
+        walkingDistances measured: [String: CLLocationDistance] = [:],
         in network: StationNetwork
     ) -> DestinationDockResult {
         let usual = usualStationID.flatMap { network.station(id: $0) }
@@ -166,9 +205,12 @@ nonisolated struct DockFinderService: Sendable {
         }
 
         let excluded: Set<String> = Set([usual?.id, backupStationID].compactMap { $0 })
-        let candidates = network.returnableStations(around: destination.location, within: StationNetwork.nearbyRadius)
-            .filter { !excluded.contains($0.id) }
-        let selected = bestDock(among: candidates, near: destination.location, from: origin)
+        let selected = bestDock(
+            among: candidates(near: destination, excluding: excluded, in: network),
+            near: destination.location,
+            from: origin,
+            walkingDistances: measured
+        )
         return DestinationDockResult(
             destination: destination,
             usualDock: usual,
@@ -179,28 +221,53 @@ nonisolated struct DockFinderService: Sendable {
     }
 
     /// Docks within this much extra walking of the closest one count as
-    /// equally good, so the one on the rider's way can win. About one short
-    /// Manhattan block.
-    static let onTheWayMargin: CLLocationDistance = 100
+    /// equally good, so the one on the rider's way can win. About half a
+    /// short Manhattan block.
+    static let onTheWayMargin: CLLocationDistance = 50
+    /// How many of the closest docks get a real walking distance from Maps.
+    static let shortlistSize = 3
 
-    /// The dock to recommend near a destination: the shortest walk along
-    /// the street grid (ties go to more open docks). When the rider's
-    /// location is known, the docks within `onTheWayMargin` of that walk
-    /// are treated as tied, and the shortest ride from the rider wins.
+    /// Docks with room near a destination, other than `excluded`.
+    static func candidates(near destination: Destination, excluding excluded: Set<String>, in network: StationNetwork) -> [DockStation] {
+        network.returnableStations(around: destination.location, within: StationNetwork.nearbyRadius)
+            .filter { !excluded.contains($0.id) }
+    }
+
+    /// The docks with the shortest street-grid walk to `destination`.
+    static func shortlist(_ candidates: [DockStation], near destination: CLLocation) -> [DockStation] {
+        Array(rankedByWalk(candidates, near: destination, measured: [:]).prefix(shortlistSize).map(\.station))
+    }
+
+    /// The dock to recommend near a destination: the shortest walk (ties go
+    /// to more open docks). With Maps' walking distances (`measured`, by
+    /// station ID), only the shortlist is considered, and any dock Maps
+    /// didn't answer for keeps its street-grid estimate. When the rider's
+    /// location is known, the docks within `onTheWayMargin` of the shortest
+    /// walk are treated as tied, and the shortest ride from the rider wins.
     static func bestDock(
         among candidates: [DockStation],
         near destination: CLLocation,
-        from origin: CLLocation?
+        from origin: CLLocation?,
+        walkingDistances measured: [String: CLLocationDistance] = [:]
     ) -> DockStation? {
-        let ranked = candidates
-            .map { (station: $0, walk: StreetGrid.distance(from: destination, to: $0.location)) }
-            .sorted { ($0.walk, -$0.station.availableDocks) < ($1.walk, -$1.station.availableDocks) }
+        let pool = measured.isEmpty ? candidates : shortlist(candidates, near: destination)
+        let ranked = rankedByWalk(pool, near: destination, measured: measured)
         guard let closest = ranked.first else { return nil }
         guard let origin else { return closest.station }
         let tied = ranked.filter { $0.walk <= closest.walk + onTheWayMargin }
         let rides = tied.map { (station: $0.station, ride: StreetGrid.distance(from: origin, to: $0.station.location)) }
         // `min` keeps the first of equal rides, so a tie stays with the shorter walk.
         return rides.min { $0.ride < $1.ride }?.station
+    }
+
+    private static func rankedByWalk(
+        _ stations: [DockStation],
+        near destination: CLLocation,
+        measured: [String: CLLocationDistance]
+    ) -> [(station: DockStation, walk: CLLocationDistance)] {
+        stations
+            .map { (station: $0, walk: measured[$0.id] ?? StreetGrid.distance(from: destination, to: $0.location)) }
+            .sorted { ($0.walk, -$0.station.availableDocks) < ($1.walk, -$1.station.availableDocks) }
     }
 
     static func check(_ station: StationSnapshot, in network: StationNetwork) -> StationCheckResult {

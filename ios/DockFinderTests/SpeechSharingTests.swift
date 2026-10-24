@@ -266,3 +266,16 @@ struct VoicePrompterTests {
         #expect(session.events == ["on", "off"])
     }
 }
+
+struct SpokenTextTests {
+    @Test(arguments: [
+        ("It has 3 classic bikes and 1 e-bike.", "It has 3 classic bikes and 1 E bike."),
+        ("2 e-bikes", "2 E bikes"),
+        ("E-Bikes and ebikes", "E bikes and E bikes"),
+        ("Take the bike to the free bike lane.", "Take the bike to the free bike lane."),
+        ("Citi Bike", "Citi Bike"),
+    ])
+    func eBikeIsSaidAsEeBike(text: String, spoken: String) {
+        #expect(SpokenVoice.spokenText(text) == spoken)
+    }
+}
