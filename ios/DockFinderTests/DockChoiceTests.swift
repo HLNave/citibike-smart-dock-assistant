@@ -33,18 +33,24 @@ struct StreetGridTests {
     }
 
     @Test(arguments: [
-        (40.7334, -73.9884, true),  // East 14th St near Third Avenue
-        (40.7377, -73.9997, true),  // West 14th St & Seventh Avenue
-        (40.7940, -73.9720, true),  // Upper West Side
-        (40.8680, -73.9200, true),  // Inwood
-        (40.7334, -74.0037, false), // West Village
-        (40.7075, -74.0110, false), // Financial District
-        (40.6861, -73.9906, false), // Brooklyn
-        (40.7440, -73.9480, false), // Long Island City
-        (40.7440, -74.0300, false), // Hoboken
+        (40.7334, -73.9884), // East 14th St near Third Avenue
+        (40.7377, -73.9997), // West 14th St & Seventh Avenue
+        (40.7940, -73.9720), // Upper West Side
+        (40.8680, -73.9200), // Inwood
     ])
-    func gridArea(latitude: Double, longitude: Double, onGrid: Bool) {
-        #expect(StreetGrid.isOnGrid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude)) == onGrid)
+    func onTheGrid(latitude: Double, longitude: Double) {
+        #expect(StreetGrid.isOnGrid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
+    }
+
+    @Test(arguments: [
+        (40.7334, -74.0037), // West Village
+        (40.7075, -74.0110), // Financial District
+        (40.6861, -73.9906), // Brooklyn
+        (40.7440, -73.9480), // Long Island City
+        (40.7440, -74.0300), // Hoboken
+    ])
+    func offTheGrid(latitude: Double, longitude: Double) {
+        #expect(!StreetGrid.isOnGrid(CLLocationCoordinate2D(latitude: latitude, longitude: longitude)))
     }
 }
 

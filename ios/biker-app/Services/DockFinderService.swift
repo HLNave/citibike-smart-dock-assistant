@@ -235,7 +235,7 @@ nonisolated struct DockFinderService: Sendable {
 
     /// The docks with the shortest street-grid walk to `destination`.
     static func shortlist(_ candidates: [DockStation], near destination: CLLocation) -> [DockStation] {
-        Array(rankedByWalk(candidates, near: destination, measured: [:]).prefix(shortlistSize).map(\.station))
+        Array(rankedByWalk(candidates, near: destination, measured: [:]).prefix(shortlistSize).map { $0.station })
     }
 
     /// The dock to recommend near a destination: the shortest walk (ties go
