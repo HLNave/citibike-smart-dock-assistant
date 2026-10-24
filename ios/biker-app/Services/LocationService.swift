@@ -17,6 +17,9 @@ nonisolated struct LocationFix: Sendable {
 
 nonisolated protocol LocationProviding: Sendable {
     func currentLocation() async throws -> LocationFix
+    /// A fix from the last few minutes that iOS already has, without asking
+    /// for a new one; nil when there isn't one.
+    func recentLocation() async -> CLLocation?
 }
 
 @MainActor
@@ -30,6 +33,9 @@ final class LocationService: NSObject, LocationProviding {
     private static let requestTimeout: Duration = .seconds(15)
     /// A system-cached fix this recent is reused instead of requesting a new one.
     private static let maxCachedLocationAge: TimeInterval = 60
+    /// A fix this recent is good enough to tell which way the rider is
+    /// coming from when choosing a dock.
+    private static let maxRecentLocationAge: TimeInterval = 5 * 60
 
     private let manager = CLLocationManager()
     private var authorizationContinuations: [CheckedContinuation<CLAuthorizationStatus, Never>] = []
@@ -90,6 +96,18 @@ final class LocationService: NSObject, LocationProviding {
 
     nonisolated func currentLocation() async throws -> LocationFix {
         try await fetchCurrentLocation()
+    }
+
+    nonisolated func recentLocation() async -> CLLocation? {
+        await cachedLocation(maxAge: Self.maxRecentLocationAge)
+    }
+
+    private func cachedLocation(maxAge: TimeInterval) -> CLLocation? {
+        guard let cached = manager.location,
+              cached.horizontalAccuracy >= 0,
+              -cached.timestamp.timeIntervalSinceNow <= maxAge
+        else { return nil }
+        return cached
     }
 
     private func fetchCurrentLocation() async throws -> LocationFix {

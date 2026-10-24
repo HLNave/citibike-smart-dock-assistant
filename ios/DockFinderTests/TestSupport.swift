@@ -54,9 +54,14 @@ struct StubFeeds: CitiBikeFeedProviding {
 
 struct StubLocation: LocationProviding {
     var result: Result<LocationFix, DockFinderError>
+    var recent: CLLocation? = nil
 
     func currentLocation() async throws -> LocationFix {
         try result.get()
+    }
+
+    func recentLocation() async -> CLLocation? {
+        recent
     }
 }
 

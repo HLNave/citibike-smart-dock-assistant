@@ -162,14 +162,17 @@ struct AssistantRouter {
         case .directionsTo(let spoken):
             // The best dock there, the same one "check my school dock" or
             // "find a dock near Union Square" names.
+            // Directions need the rider's location anyway; asking for it
+            // first lets the dock on their way win a near tie.
             let result: DestinationDockResult
             var rewritten = false
+            let here = await service.riderLocation()
             if let saved = store.place(matching: spoken) {
-                result = try await service.findDock(for: saved)
+                result = try await service.findDock(for: saved, from: here)
             } else {
                 let found = try await searchedDestination(spoken)
                 rewritten = found.rewritten
-                result = try await service.findDock(near: found.destination)
+                result = try await service.findDock(near: found.destination, from: here)
             }
             // No dock with room there: the answer says so.
             guard let station = result.selected else { return result.answer }
